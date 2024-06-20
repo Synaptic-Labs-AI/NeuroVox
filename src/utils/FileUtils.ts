@@ -2,6 +2,16 @@
 import { App, TFile, TFolder } from 'obsidian';
 import { NeuroVoxSettings } from '../settings/Settings';
 
+/**
+ * Saves an audio file to the specified location within the app's file system.
+ * 
+ * @param {App} app - The main application object which provides access to file management functions.
+ * @param {Blob} audioBlob - The audio data as a Blob object to be saved.
+ * @param {string} fileName - The desired name of the file including its extension.
+ * @param {NeuroVoxSettings} settings - Configuration settings which include the path where the recording should be saved.
+ * @returns {Promise<TFile>} A promise that resolves to the TFile object representing the saved file.
+ * @throws {Error} Throws an error if the target path is not a folder.
+ */
 export async function saveAudioFile(app: App, audioBlob: Blob, fileName: string, settings: NeuroVoxSettings): Promise<TFile> {
     const fileManager = app.fileManager;
     let filePath = await fileManager.getAvailablePathForAttachment(fileName);
