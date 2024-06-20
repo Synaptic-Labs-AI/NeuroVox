@@ -1,0 +1,11 @@
+{
+	"id": "neurovox",
+	"name": "NeuroVox",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "To be determined",
+	"author": "Obsidian",
+	"authorUrl": "https://obsidian.md",
+	"fundingUrl": "https://obsidian.md/pricing",
+	"isDesktopOnly": false
+}

@@ -1,0 +1,13 @@
+{
+  "openaiApiKey": "",
+  "openaiModel": "gpt-4o",
+  "maxTokens": 8000,
+  "generateAudioSummary": false,
+  "voiceChoice": "alloy",
+  "prompt": "Distill the essence. Capture every vital detail with utmost brevity, ensuring no meaning is lost. Crystallize the core message.",
+  "voiceSpeed": 1.3,
+  "saveRecording": true,
+  "voiceMode": "standard",
+  "enableVoiceGeneration": false,
+  "recordingFolderPath": "Recordings"
+}
