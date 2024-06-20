@@ -27,55 +27,66 @@ __export(main_exports, {
   default: () => NeuroVoxPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian6 = require("obsidian");
+var import_obsidian8 = require("obsidian");
 
 // src/settings/Settings.ts
+var import_obsidian = require("obsidian");
 var DEFAULT_SETTINGS = {
   openaiApiKey: "",
-  openaiModel: "gpt-4",
+  openaiModel: "gpt-4o",
   maxTokens: 500,
   generateAudioSummary: false,
-  voiceChoice: "alloy",
-  prompt: "Distill the essence. Capture every vital detail with utmost brevity, ensuring no meaning is lost. Crystallize the core message.",
+  voiceChoice: "onyx",
+  prompt: "Summarize the following transcript concisely, capturing the main points and key details.",
   voiceSpeed: 1,
   saveRecording: true,
-  voiceMode: "standard",
   enableVoiceGeneration: false,
-  recordingFolderPath: "Recordings"
-  // Add this line
+  recordingFolderPath: "Recordings",
+  voiceMode: "standard"
 };
 
 // src/settings/SettingTab.ts
-var import_obsidian = require("obsidian");
-var NeuroVoxSettingTab = class extends import_obsidian.PluginSettingTab {
+var import_obsidian2 = require("obsidian");
+var NeuroVoxSettingTab = class extends import_obsidian2.PluginSettingTab {
+  /**
+   * Constructs a new instance of the class.
+   * @param app The main application object.
+   * @param plugin The NeuroVoxPlugin instance to be used with this class.
+   */
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
+  /**
+   * Displays the settings UI for the plugin.
+   * This method initializes and renders various settings components allowing the user to configure the plugin.
+   * Each setting component is responsible for a specific configuration option, such as API keys, model selection,
+   * token limits, prompt settings, and audio settings.
+   */
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian.Setting(containerEl).setName("OpenAI API Key").setDesc("Enter your OpenAI API Key").addText((text) => {
+    new import_obsidian2.Setting(containerEl).setName("OpenAI API Key").setDesc("Enter your OpenAI API Key").addText((text) => {
       text.inputEl.type = "password";
       text.setPlaceholder("Enter API Key").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
         this.plugin.settings.openaiApiKey = value;
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian.Setting(containerEl).setName("OpenAI Model").setDesc("Select the OpenAI Model to use").addText(
+    new import_obsidian2.Setting(containerEl).setName("OpenAI Model").setDesc("Select the OpenAI Model to use").addText(
       (text) => text.setPlaceholder("Enter model name").setValue(this.plugin.settings.openaiModel).onChange(async (value) => {
         this.plugin.settings.openaiModel = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName(`Max Tokens (${this.plugin.settings.maxTokens})`).setDesc("Maximum number of tokens").addSlider((slider) => {
+    new import_obsidian2.Setting(containerEl).setName(`Max Tokens (${this.plugin.settings.maxTokens})`).setDesc("Maximum number of tokens").addSlider((slider) => {
       slider.setLimits(0, 128e3, 500).setValue(this.plugin.settings.maxTokens).onChange(async (value) => {
         this.plugin.settings.maxTokens = value;
         this.display();
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian.Setting(containerEl).setName("Prompt").setDesc("This prompt is used when generating summaries.").addTextArea((text) => {
+    new import_obsidian2.Setting(containerEl).setName("Prompt").setDesc("This prompt is used when generating summaries.").addTextArea((text) => {
       text.inputEl.style.width = "100%";
       text.inputEl.style.height = "64px";
       text.inputEl.style.resize = "vertical";
@@ -84,13 +95,13 @@ var NeuroVoxSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian.Setting(containerEl).setName("Generate Audio Summary").setDesc("Enable or disable audio summary generation").addToggle(
+    new import_obsidian2.Setting(containerEl).setName("Generate Audio Summary").setDesc("Enable or disable audio summary generation").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.generateAudioSummary).onChange(async (value) => {
         this.plugin.settings.generateAudioSummary = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Enable AI Voice Generation of Summaries").setDesc(
+    new import_obsidian2.Setting(containerEl).setName("Enable AI Voice Generation of Summaries").setDesc(
       "Whether to enable AI voice generation from transcription summaries"
     ).addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.enableVoiceGeneration).onChange(async (value) => {
@@ -98,32 +109,32 @@ var NeuroVoxSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Voice Choice").setDesc("Select the voice for audio summary").addDropdown((dropdown) => {
+    new import_obsidian2.Setting(containerEl).setName("Voice Choice").setDesc("Select the voice for audio summary").addDropdown((dropdown) => {
       dropdown.addOption("alloy", "Alloy").addOption("echo", "Echo").addOption("fable", "Fable").addOption("onyx", "Onyx").addOption("nova", "Nova").addOption("shimmer", "Shimmer").setValue(this.plugin.settings.voiceChoice).onChange(async (value) => {
         this.plugin.settings.voiceChoice = value;
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian.Setting(containerEl).setName(`Voice Speed (${this.plugin.settings.voiceSpeed})`).setDesc("Set the speed of the voice").addSlider((slider) => {
+    new import_obsidian2.Setting(containerEl).setName(`Voice Speed (${this.plugin.settings.voiceSpeed})`).setDesc("Set the speed of the voice").addSlider((slider) => {
       slider.setLimits(0.25, 4, 0.25).setValue(this.plugin.settings.voiceSpeed).onChange(async (value) => {
         this.plugin.settings.voiceSpeed = value;
         this.display();
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian.Setting(containerEl).setName("Enable HD Voice").setDesc("When enabled, use HD voice for audio summaries").addToggle(
+    new import_obsidian2.Setting(containerEl).setName("Enable HD Voice").setDesc("When enabled, use HD voice for audio summaries").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.voiceMode === "hd").onChange(async (value) => {
         this.plugin.settings.voiceMode = value ? "hd" : "standard";
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Save Recording").setDesc("Enable or disable saving recordings").addToggle(
+    new import_obsidian2.Setting(containerEl).setName("Save Recording").setDesc("Enable or disable saving recordings").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.saveRecording).onChange(async (value) => {
         this.plugin.settings.saveRecording = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Recording Folder Path").setDesc(
+    new import_obsidian2.Setting(containerEl).setName("Recording Folder Path").setDesc(
       'Specify the folder path to save recordings relative to the vault root. For a folder in the root directory, enter its name (e.g., "Recordings"). For a nested folder, use forward slashes to indicate the path (e.g., "Audio/Recordings").'
     ).addText(
       (text) => text.setPlaceholder("Enter folder path").setValue(this.plugin.settings.recordingFolderPath).onChange(async (value) => {
@@ -134,27 +145,11 @@ var NeuroVoxSettingTab = class extends import_obsidian.PluginSettingTab {
   }
 };
 
-// src/commands/SimpleCommand.ts
-var import_obsidian2 = require("obsidian");
-function registerSimpleCommand(plugin) {
-  plugin.addCommand({
-    id: "open-sample-modal-simple",
-    name: "Open sample modal (simple)",
-    callback: () => {
-      new import_obsidian2.Notice("This is a notice!");
-    }
-  });
-}
-
 // src/processors/RecordBlockProcessor.ts
-function registerRecordBlockProcessor(plugin) {
-  plugin.registerMarkdownCodeBlockProcessor("record", (source, el, ctx) => {
-    el.createEl("p", { text: "This is the record block" });
-  });
-}
+var import_obsidian7 = require("obsidian");
 
 // src/ui/FloatingButton.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 
 // src/modals/TimerModal.ts
 var import_obsidian3 = require("obsidian");
@@ -186,37 +181,49 @@ var TimerModal = class extends import_obsidian3.Modal {
     this.mediaRecorder = null;
     this.audioChunks = [];
     this.recordingStopped = false;
+    this.isRecording = false;
+    this.isPaused = false;
   }
   onOpen() {
     const { contentEl } = this;
+    contentEl.empty();
     contentEl.addClass("neurovox-modal");
-    this.timerEl = contentEl.createEl("div", { cls: "timer", text: "00:00" });
-    const buttonGroup = contentEl.createEl("div", { cls: "button-group" });
-    this.playButton = createButtonWithSvgIcon(icons.play);
+    const modalContent = contentEl.createDiv({ cls: "neurovox-modal-content" });
+    this.timerEl = modalContent.createEl("div", { cls: "neurovox-timer", text: "00:00" });
+    const buttonGroup = modalContent.createEl("div", { cls: "neurovox-button-group" });
+    this.recordButton = createButtonWithSvgIcon(icons.microphone);
     this.pauseButton = createButtonWithSvgIcon(icons.pause);
     this.stopButton = createButtonWithSvgIcon(icons.stop);
-    this.playButton.addClass("neurovox-button");
-    this.pauseButton.addClass("neurovox-button");
-    this.stopButton.addClass("neurovox-button");
-    this.playButton.style.display = "none";
-    buttonGroup.appendChild(this.playButton);
+    this.recordButton.addClass("neurovox-button", "neurovox-record-button");
+    this.pauseButton.addClass("neurovox-button", "neurovox-pause-button");
+    this.stopButton.addClass("neurovox-button", "neurovox-stop-button");
+    this.pauseButton.style.display = "none";
+    buttonGroup.appendChild(this.recordButton);
     buttonGroup.appendChild(this.pauseButton);
     buttonGroup.appendChild(this.stopButton);
-    this.playButton.addEventListener("click", () => this.startRecording());
-    this.pauseButton.addEventListener("click", () => this.pauseRecording());
+    this.recordButton.addEventListener("click", () => this.toggleRecording());
+    this.pauseButton.addEventListener("click", () => this.togglePause());
     this.stopButton.addEventListener("click", () => this.stopRecording());
     this.startRecording();
   }
   onClose() {
-    const { contentEl } = this;
-    contentEl.empty();
     if (!this.recordingStopped) {
       this.stopRecording();
     }
   }
+  async toggleRecording() {
+    if (this.isRecording) {
+      this.pauseRecording();
+    } else {
+      this.startRecording();
+    }
+  }
   async startRecording() {
-    this.playButton.style.display = "none";
+    this.isRecording = true;
+    this.isPaused = false;
+    this.recordButton.addClass("recording");
     this.pauseButton.style.display = "flex";
+    this.recordButton.innerHTML = icons.microphone;
     if (!this.intervalId) {
       this.intervalId = window.setInterval(() => {
         this.seconds++;
@@ -234,6 +241,13 @@ var TimerModal = class extends import_obsidian3.Modal {
       this.mediaRecorder.resume();
     }
   }
+  togglePause() {
+    if (this.isPaused) {
+      this.resumeRecording();
+    } else {
+      this.pauseRecording();
+    }
+  }
   pauseRecording() {
     if (this.mediaRecorder) {
       this.mediaRecorder.pause();
@@ -242,8 +256,14 @@ var TimerModal = class extends import_obsidian3.Modal {
       window.clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    this.playButton.style.display = "flex";
-    this.pauseButton.style.display = "none";
+    this.isRecording = false;
+    this.isPaused = true;
+    this.recordButton.removeClass("recording");
+    this.pauseButton.innerHTML = icons.play;
+  }
+  resumeRecording() {
+    this.startRecording();
+    this.pauseButton.innerHTML = icons.pause;
   }
   stopRecording() {
     if (this.recordingStopped)
@@ -268,7 +288,7 @@ var TimerModal = class extends import_obsidian3.Modal {
     }
     this.seconds = 0;
     this.updateTimerDisplay();
-    this.playButton.style.display = "flex";
+    this.recordButton.removeClass("recording");
     this.pauseButton.style.display = "none";
   }
   updateTimerDisplay() {
@@ -278,8 +298,82 @@ var TimerModal = class extends import_obsidian3.Modal {
   }
 };
 
-// src/utils/FileUtils.ts
+// src/processors/openai.ts
 var import_obsidian4 = require("obsidian");
+var API_BASE_URL = "https://api.openai.com/v1";
+var WHISPER_MODEL = "whisper-1";
+var TTS_MODEL = "tts-1";
+async function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+async function sendOpenAIRequest(endpoint, body, settings) {
+  const response = await (0, import_obsidian4.requestUrl)({
+    url: endpoint,
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${settings.openaiApiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+  if (response.status !== 200) {
+    throw new Error(`OpenAI API request failed: ${response.status} ${response.text}`);
+  }
+  return JSON.parse(response.text);
+}
+async function transcribeAudio(audioBlob, settings) {
+  const endpoint = `${API_BASE_URL}/audio/transcriptions`;
+  const base64Audio = await blobToBase64(audioBlob);
+  const base64Data = base64Audio.split(",")[1];
+  const result = await sendOpenAIRequest(endpoint, {
+    model: WHISPER_MODEL,
+    file: base64Data,
+    response_format: "json"
+  }, settings);
+  return result.text;
+}
+async function generateChatCompletion(transcript, settings) {
+  const endpoint = `${API_BASE_URL}/chat/completions`;
+  const result = await sendOpenAIRequest(endpoint, {
+    model: settings.openaiModel,
+    messages: [
+      { role: "system", content: settings.prompt },
+      { role: "user", content: transcript }
+    ],
+    max_tokens: settings.maxTokens
+  }, settings);
+  return result.choices[0].message.content;
+}
+async function generateSpeech(text, settings) {
+  const endpoint = `${API_BASE_URL}/audio/speech`;
+  const response = await (0, import_obsidian4.requestUrl)({
+    url: endpoint,
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${settings.openaiApiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: TTS_MODEL,
+      input: text,
+      voice: settings.voiceChoice,
+      response_format: "mp3",
+      speed: settings.voiceSpeed
+    })
+  });
+  if (response.status !== 200) {
+    throw new Error(`Failed to generate speech: ${response.status} ${response.text}`);
+  }
+  return new Blob([response.arrayBuffer], { type: "audio/mp3" });
+}
+
+// src/utils/FileUtils.ts
+var import_obsidian5 = require("obsidian");
 async function saveAudioFile(app, audioBlob, fileName, settings) {
   const fileManager = app.fileManager;
   let filePath = await fileManager.getAvailablePathForAttachment(fileName);
@@ -289,7 +383,7 @@ async function saveAudioFile(app, audioBlob, fileName, settings) {
   if (!folder) {
     console.log(`Folder ${folderPath} does not exist. Creating...`);
     await app.vault.createFolder(folderPath);
-  } else if (!(folder instanceof import_obsidian4.TFolder)) {
+  } else if (!(folder instanceof import_obsidian5.TFolder)) {
     throw new Error(`${folderPath} is not a folder`);
   }
   const arrayBuffer = await audioBlob.arrayBuffer();
@@ -305,67 +399,174 @@ async function saveAudioFile(app, audioBlob, fileName, settings) {
 
 // src/ui/FloatingButton.ts
 var FloatingButton = class {
-  constructor(plugin, settings) {
+  constructor(plugin, settings, contentContainer) {
     this.plugin = plugin;
     this.settings = settings;
+    this.contentContainer = contentContainer;
     this.createButton();
-    this.registerEvents();
   }
   createButton() {
     this.buttonEl = createButtonWithSvgIcon(icons.microphone);
-    this.buttonEl.classList.add("neurovox-button", "floating");
-    this.buttonEl.style.display = "none";
-    this.buttonEl.addEventListener("click", () => {
-      const modal = new TimerModal(this.plugin.app);
-      modal.open();
-      modal.onStop = async (audioBlob) => {
-        const fileName = `recording-${Date.now()}.mp3`;
-        const file = await saveAudioFile(this.plugin.app, audioBlob, fileName, this.settings);
-        new import_obsidian5.Notice(`Saved recording as ${file.path}`);
-      };
-    });
-    document.body.appendChild(this.buttonEl);
+    this.buttonEl.addClass("neurovox-button", "floating");
+    this.buttonEl.addEventListener("click", () => this.openRecordingModal());
   }
-  registerEvents() {
-    this.plugin.registerEvent(this.plugin.app.workspace.on("active-leaf-change", this.toggleButtonVisibility.bind(this)));
+  openRecordingModal() {
+    const modal = new TimerModal(this.plugin.app);
+    modal.onStop = async (audioBlob) => {
+      await this.processRecording(audioBlob);
+    };
+    modal.open();
   }
-  toggleButtonVisibility(leaf) {
-    const currentButtonParent = this.buttonEl.parentElement;
-    if (currentButtonParent) {
-      currentButtonParent.removeChild(this.buttonEl);
-    }
-    if (leaf && leaf.view && leaf.view.getViewType() === "markdown") {
-      const viewContent = leaf.view.containerEl.querySelector(".view-content");
-      if (viewContent) {
-        viewContent.appendChild(this.buttonEl);
-        this.buttonEl.style.display = "flex";
+  async processRecording(audioBlob) {
+    try {
+      const fileName = `recording-${Date.now()}.mp3`;
+      const file = await saveAudioFile(this.plugin.app, audioBlob, fileName, this.settings);
+      const transcription = await transcribeAudio(audioBlob, this.settings);
+      const summary = await generateChatCompletion(transcription, this.settings);
+      let audioSummary = null;
+      if (this.settings.enableVoiceGeneration) {
+        audioSummary = await generateSpeech(summary, this.settings);
       }
-    } else {
-      this.buttonEl.style.display = "none";
+      this.updateRecordBlockContent(file.path, transcription, summary, audioSummary);
+      this.removeButton();
+      new import_obsidian6.Notice("Recording processed successfully");
+    } catch (error) {
+      console.error("Error processing recording:", error);
+      new import_obsidian6.Notice("Error processing recording. Check console for details.");
+    }
+  }
+  updateRecordBlockContent(audioPath, transcription, summary, audioSummary) {
+    const content = `
+## Generations
+${audioSummary ? `<audio controls src="${URL.createObjectURL(audioSummary)}"></audio>
+` : ""}
+${summary}
+
+## Transcript
+<audio controls src="${this.plugin.app.vault.adapter.getResourcePath(audioPath)}"></audio>
+${transcription}
+        `;
+    this.contentContainer.innerHTML = content;
+  }
+  removeButton() {
+    if (this.buttonEl && this.buttonEl.parentNode) {
+      this.buttonEl.parentNode.removeChild(this.buttonEl);
     }
   }
 };
 
+// src/processors/RecordBlockProcessor.ts
+function registerRecordBlockProcessor(plugin, settings) {
+  plugin.registerMarkdownCodeBlockProcessor("record", (source, el, ctx) => {
+    const contentContainer = el.createDiv({ cls: "neurovox-record-content" });
+    const floatingButton = new FloatingButton(plugin, settings, contentContainer);
+    el.appendChild(floatingButton.buttonEl);
+    el.neurovoxContentContainer = contentContainer;
+    el.neurovoxFloatingButton = floatingButton;
+    ctx.addChild(new class extends import_obsidian7.MarkdownRenderChild {
+      constructor(containerEl) {
+        super(containerEl);
+      }
+      onunload() {
+        floatingButton.removeButton();
+      }
+    }(el));
+  });
+}
+
 // src/main.ts
-var NeuroVoxPlugin = class extends import_obsidian6.Plugin {
+var NeuroVoxPlugin = class extends import_obsidian8.Plugin {
+  /**
+   * Runs when the plugin is loaded.
+   * Initializes settings, UI components, and sets up event listeners.
+   */
   async onload() {
-    console.log("NeuroVox Plugin Loaded");
+    console.log("Loading NeuroVox plugin");
     await this.loadSettings();
-    registerSimpleCommand(this);
-    registerRecordBlockProcessor(this);
-    this.floatingButton = new FloatingButton(this, this.settings);
+    registerRecordBlockProcessor(this, this.settings);
     this.addSettingTab(new NeuroVoxSettingTab(this.app, this));
+    this.registerView(
+      "neurovox-view",
+      (leaf) => new NeuroVoxView(leaf)
+    );
+    this.addRibbonIcon("microphone", "NeuroVox", () => {
+      this.activateView();
+    });
+    this.addCommand({
+      id: "open-neurovox-view",
+      name: "Open NeuroVox View",
+      callback: () => {
+        this.activateView();
+      }
+    });
   }
+  /**
+   * Runs when the plugin is unloaded.
+   * Performs cleanup tasks.
+   */
   onunload() {
-    console.log("NeuroVox Plugin Unloaded");
-    if (this.floatingButton && this.floatingButton.buttonEl.parentElement) {
-      this.floatingButton.buttonEl.parentElement.removeChild(this.floatingButton.buttonEl);
-    }
+    console.log("Unloading NeuroVox plugin");
   }
+  /**
+   * Loads the plugin settings.
+   * Merges saved settings with default settings.
+   */
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
+  /**
+   * Saves the current plugin settings.
+   */
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+  /**
+   * Activates the NeuroVox view.
+   * Creates a new leaf for the view if it doesn't exist, or reveals an existing one.
+   */
+  async activateView() {
+    const { workspace } = this.app;
+    let leaf = workspace.getLeavesOfType("neurovox-view")[0];
+    if (!leaf) {
+      const newLeaf = workspace.getRightLeaf(false);
+      if (newLeaf) {
+        await newLeaf.setViewState({ type: "neurovox-view", active: true });
+        leaf = newLeaf;
+      } else {
+        console.error("Failed to create a new leaf for NeuroVox view");
+        return;
+      }
+    }
+    workspace.revealLeaf(leaf);
+  }
+};
+var NeuroVoxView = class extends import_obsidian8.ItemView {
+  constructor(leaf) {
+    super(leaf);
+  }
+  /**
+   * Returns the type identifier for this view.
+   */
+  getViewType() {
+    return "neurovox-view";
+  }
+  /**
+   * Returns the display text for this view.
+   */
+  getDisplayText() {
+    return "NeuroVox";
+  }
+  /**
+   * Renders the content of the NeuroVox view.
+   */
+  async onOpen() {
+    const container = this.containerEl.children[1];
+    container.empty();
+    container.createEl("h4", { text: "Welcome to NeuroVox" });
+  }
+  /**
+   * Performs any necessary cleanup when the view is closed.
+   */
+  async onClose() {
   }
 };

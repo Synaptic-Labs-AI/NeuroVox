@@ -1,42 +1,70 @@
-/* styles.css */
-.neurovox-button {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
+.neurovox-modal {
     display: flex;
     justify-content: center;
     align-items: center;
-    cursor: pointer;
-    padding: 0;
-    z-index: 1000;
+    height: 100%;
 }
 
-.neurovox-button.floating {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-}
-
-.neurovox-modal {
+.neurovox-modal-content {
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 100%;
+    max-width: 300px;
+    padding: 20px;
 }
 
-.timer {
-    font-size: 2em;
+.neurovox-timer {
+    font-size: 48px;
     margin-bottom: 20px;
 }
 
-.button-group {
+.neurovox-button-group {
     display: flex;
-    gap: 20px;
+    justify-content: space-around;
+    width: 100%;
 }
 
-.button-group button {
-    width: 40px;
-    height: 40px;
+.neurovox-button {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: none;
+    background-color: #f0f0f0;
     display: flex;
     justify-content: center;
     align-items: center;
+    font-size: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.neurovox-button:active {
+    transform: scale(0.95);
+}
+
+.neurovox-record-button.recording {
+    background-color: #ff4136;
+    color: white;
+}
+
+.neurovox-pause-button, .neurovox-stop-button {
+    background-color: #0074d9;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .neurovox-modal-content {
+        padding: 10px;
+    }
+
+    .neurovox-timer {
+        font-size: 36px;
+    }
+
+    .neurovox-button {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+    }
 }

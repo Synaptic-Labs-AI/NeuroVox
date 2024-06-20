@@ -1,13 +1,28 @@
 // src/processors/RecordBlockProcessor.ts
-import { Plugin } from 'obsidian';
 
-/**
- * Registers a markdown code block processor for the 'record' type.
- * 
- * @param {Plugin} plugin - The plugin instance where the processor is to be registered.
- */
-export function registerRecordBlockProcessor(plugin: Plugin) {
+import { MarkdownPostProcessorContext, Plugin, MarkdownRenderChild } from 'obsidian';
+import { FloatingButton } from '../ui/FloatingButton';
+import { NeuroVoxSettings } from '../settings/Settings';
+
+export function registerRecordBlockProcessor(plugin: Plugin, settings: NeuroVoxSettings) {
     plugin.registerMarkdownCodeBlockProcessor('record', (source, el, ctx) => {
-        el.createEl('p', { text: 'This is the record block' });
+        const contentContainer = el.createDiv({ cls: 'neurovox-record-content' });
+        const floatingButton = new FloatingButton(plugin, settings, contentContainer);
+        
+        el.appendChild(floatingButton.buttonEl);
+
+        // Store references to be able to update content later
+        (el as any).neurovoxContentContainer = contentContainer;
+        (el as any).neurovoxFloatingButton = floatingButton;
+
+        ctx.addChild(new class extends MarkdownRenderChild {
+            constructor(containerEl: HTMLElement) {
+                super(containerEl);
+            }
+
+            onunload() {
+                floatingButton.removeButton();
+            }
+        }(el));
     });
 }

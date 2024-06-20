@@ -1,65 +1,137 @@
 // src/main.ts
-import { Plugin } from 'obsidian';
+
+import { Plugin, WorkspaceLeaf, ItemView } from 'obsidian';
 import { DEFAULT_SETTINGS, NeuroVoxSettings } from './settings/Settings';
 import { NeuroVoxSettingTab } from './settings/SettingTab';
-import { registerSimpleCommand } from './commands/SimpleCommand';
 import { registerRecordBlockProcessor } from './processors/RecordBlockProcessor';
-import { FloatingButton } from './ui/FloatingButton';
-import { saveAudioFile } from './utils/FileUtils'; // Import the function
 
+/**
+ * NeuroVoxPlugin is the main class for the NeuroVox Obsidian plugin.
+ * It handles plugin initialization, settings management, and core functionality.
+ */
 export default class NeuroVoxPlugin extends Plugin {
+    /** Stores the plugin settings */
     settings: NeuroVoxSettings;
-    floatingButton: FloatingButton;
 
-/**
- * Asynchronously loads the plugin and initializes its components.
- * This method is typically called when the plugin is loaded into the application.
- */
-async onload() {
-    // Log a message indicating that the plugin has been loaded
-    console.log('NeuroVox Plugin Loaded');
+    /**
+     * Runs when the plugin is loaded.
+     * Initializes settings, UI components, and sets up event listeners.
+     */
+    async onload() {
+        console.log('Loading NeuroVox plugin');
 
-    // Load settings from storage
-    await this.loadSettings();
+        // Load saved settings or use defaults
+        await this.loadSettings();
 
-    // Register a simple command to the application
-    registerSimpleCommand(this);
+        // Register the record block processor
+        registerRecordBlockProcessor(this, this.settings);
 
-    // Register a block processor for handling specific types of content blocks
-    registerRecordBlockProcessor(this);
+        // Add the settings tab to the Obsidian settings panel
+        this.addSettingTab(new NeuroVoxSettingTab(this.app, this));
 
-    // Create a floating action button and associate it with the plugin settings
-    this.floatingButton = new FloatingButton(this, this.settings);
+        // Register the view for our plugin
+        this.registerView(
+            'neurovox-view',
+            (leaf) => new NeuroVoxView(leaf)
+        );
 
-    // Add a settings tab to the application, allowing users to configure the plugin
-    this.addSettingTab(new NeuroVoxSettingTab(this.app, this));
-}
+        // Add a ribbon icon to activate our plugin's view
+        this.addRibbonIcon('microphone', 'NeuroVox', () => {
+            this.activateView();
+        });
 
-/**
- * Handles the cleanup process when the plugin is unloaded.
- * Specifically, it removes the floating button from the DOM if it exists.
- */
-onunload() {
-    console.log('NeuroVox Plugin Unloaded');
-    // Ensure to remove the button when the plugin is unloaded
-    if (this.floatingButton && this.floatingButton.buttonEl.parentElement) {
-        this.floatingButton.buttonEl.parentElement.removeChild(this.floatingButton.buttonEl);
+        // Register a command to open our plugin's view
+        this.addCommand({
+            id: 'open-neurovox-view',
+            name: 'Open NeuroVox View',
+            callback: () => {
+                this.activateView();
+            }
+        });
+    }
+
+    /**
+     * Runs when the plugin is unloaded.
+     * Performs cleanup tasks.
+     */
+    onunload() {
+        console.log('Unloading NeuroVox plugin');
+    }
+
+    /**
+     * Loads the plugin settings.
+     * Merges saved settings with default settings.
+     */
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    }
+
+    /**
+     * Saves the current plugin settings.
+     */
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
+
+    /**
+     * Activates the NeuroVox view.
+     * Creates a new leaf for the view if it doesn't exist, or reveals an existing one.
+     */
+    async activateView() {
+        const { workspace } = this.app;
+
+        let leaf = workspace.getLeavesOfType('neurovox-view')[0];
+        if (!leaf) {
+            const newLeaf = workspace.getRightLeaf(false);
+            if (newLeaf) {
+                await newLeaf.setViewState({ type: 'neurovox-view', active: true });
+                leaf = newLeaf;
+            } else {
+                console.error('Failed to create a new leaf for NeuroVox view');
+                return;
+            }
+        }
+        workspace.revealLeaf(leaf);
     }
 }
 
 /**
- * Asynchronously loads settings by merging default settings with user-specific settings.
- * The method first takes a copy of the default settings and then overrides them with user settings fetched asynchronously.
+ * NeuroVoxView represents the custom view for the NeuroVox plugin.
+ * It handles the rendering and functionality of the plugin's main interface.
  */
-async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-}
+class NeuroVoxView extends ItemView {
+    constructor(leaf: WorkspaceLeaf) {
+        super(leaf);
+    }
 
-/**
- * Asynchronously saves the current settings.
- * @returns {Promise<void>} A promise that resolves when the settings have been saved.
- */
-async saveSettings() {
-    await this.saveData(this.settings);
+    /**
+     * Returns the type identifier for this view.
+     */
+    getViewType(): string {
+        return 'neurovox-view';
+    }
+
+    /**
+     * Returns the display text for this view.
+     */
+    getDisplayText(): string {
+        return 'NeuroVox';
+    }
+
+    /**
+     * Renders the content of the NeuroVox view.
+     */
+    async onOpen() {
+        const container = this.containerEl.children[1];
+        container.empty();
+        container.createEl('h4', { text: 'Welcome to NeuroVox' });
+        // TODO: Add more UI elements and functionality here
+    }
+
+    /**
+     * Performs any necessary cleanup when the view is closed.
+     */
+    async onClose() {
+        // TODO: Add any necessary cleanup code here
     }
 }
