@@ -8,113 +8,103 @@ const WHISPER_MODEL = 'whisper-1';
 const TTS_MODEL = 'tts-1';
 
 /**
- * Converts a Blob to a base64 encoded string
- */
-async function blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-
-/**
  * Sends a request to OpenAI API
  */
-async function sendOpenAIRequest(endpoint: string, body: any, settings: NeuroVoxSettings): Promise<any> {
-    const response: RequestUrlResponse = await requestUrl({
-        url: endpoint,
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${settings.openaiApiKey}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-    });
+async function sendOpenAIRequest(endpoint: string, body: any, settings: NeuroVoxSettings, isJson: boolean = true): Promise<any> {
+    console.log(`Sending request to ${endpoint}`);
+    console.log(`API Key: ${settings.openaiApiKey.substring(0, 5)}...`); // Log first 5 chars of API key
 
-    if (response.status !== 200) {
-        throw new Error(`OpenAI API request failed: ${response.status} ${response.text}`);
+    const headers: Record<string, string> = {
+        'Authorization': `Bearer ${settings.openaiApiKey}`,
+    };
+
+    if (isJson) {
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify(body);
     }
 
-    return JSON.parse(response.text);
+    try {
+        const response: RequestUrlResponse = await requestUrl({
+            url: endpoint,
+            method: 'POST',
+            headers: headers,
+            body: body,
+        });
+
+        console.log(`Response status: ${response.status}`);
+
+        if (response.status !== 200) {
+            console.error('Response text:', response.text);
+            throw new Error(`OpenAI API request failed: ${response.status}`);
+        }
+
+        return JSON.parse(response.text);
+    } catch (error) {
+        console.error('Error in sendOpenAIRequest:', error);
+        throw error;
+    }
 }
 
 /**
  * Transcribes audio using OpenAI's Whisper model.
- * 
- * @param audioBlob - The audio data to transcribe
- * @param settings - The NeuroVox plugin settings
- * @returns The transcribed text
  */
 export async function transcribeAudio(audioBlob: Blob, settings: NeuroVoxSettings): Promise<string> {
     const endpoint = `${API_BASE_URL}/audio/transcriptions`;
     
-    // Convert audio blob to base64
-    const base64Audio = await blobToBase64(audioBlob);
-    // Remove the data URL prefix
-    const base64Data = base64Audio.split(',')[1];
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'audio.mp3');
+    formData.append('model', WHISPER_MODEL);
 
-    const result = await sendOpenAIRequest(endpoint, {
-        model: WHISPER_MODEL,
-        file: base64Data,
-        response_format: 'json'
-    }, settings);
-
-    return result.text;
+    try {
+        const result = await sendOpenAIRequest(endpoint, formData, settings, false);
+        return result.text;
+    } catch (error) {
+        console.error('Transcription error:', error);
+        throw new Error(`Failed to transcribe audio: ${error.message}`);
+    }
 }
 
 /**
  * Generates a chat completion using OpenAI's chat model.
- * 
- * @param transcript - The transcribed text to summarize
- * @param settings - The NeuroVox plugin settings
- * @returns The generated response text
  */
 export async function generateChatCompletion(transcript: string, settings: NeuroVoxSettings): Promise<string> {
     const endpoint = `${API_BASE_URL}/chat/completions`;
 
-    const result = await sendOpenAIRequest(endpoint, {
-        model: settings.openaiModel,
-        messages: [
-            { role: 'system', content: settings.prompt },
-            { role: 'user', content: transcript }
-        ],
-        max_tokens: settings.maxTokens
-    }, settings);
+    try {
+        const result = await sendOpenAIRequest(endpoint, {
+            model: settings.openaiModel,
+            messages: [
+                { role: 'system', content: settings.prompt },
+                { role: 'user', content: transcript }
+            ],
+            max_tokens: settings.maxTokens
+        }, settings);
 
-    return result.choices[0].message.content;
+        return result.choices[0].message.content;
+    } catch (error) {
+        console.error('Chat completion error:', error);
+        throw new Error(`Failed to generate chat completion: ${error.message}`);
+    }
 }
 
 /**
  * Generates audio from input text using OpenAI's text-to-speech API.
- * 
- * @param text - The text to convert to speech
- * @param settings - The NeuroVox plugin settings
- * @returns A Blob containing the audio data
  */
 export async function generateSpeech(text: string, settings: NeuroVoxSettings): Promise<Blob> {
     const endpoint = `${API_BASE_URL}/audio/speech`;
 
-    const response: RequestUrlResponse = await requestUrl({
-        url: endpoint,
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${settings.openaiApiKey}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+    try {
+        const result = await sendOpenAIRequest(endpoint, {
             model: TTS_MODEL,
             input: text,
             voice: settings.voiceChoice,
             response_format: 'mp3',
             speed: settings.voiceSpeed
-        }),
-    });
+        }, settings);
 
-    if (response.status !== 200) {
-        throw new Error(`Failed to generate speech: ${response.status} ${response.text}`);
+        return new Blob([result], { type: 'audio/mp3' });
+    } catch (error) {
+        console.error('Speech generation error:', error);
+        throw new Error(`Failed to generate speech: ${error.message}`);
     }
-
-    return new Blob([response.arrayBuffer], { type: 'audio/mp3' });
 }

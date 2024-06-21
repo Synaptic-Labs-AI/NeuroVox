@@ -303,73 +303,79 @@ var import_obsidian4 = require("obsidian");
 var API_BASE_URL = "https://api.openai.com/v1";
 var WHISPER_MODEL = "whisper-1";
 var TTS_MODEL = "tts-1";
-async function blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-async function sendOpenAIRequest(endpoint, body, settings) {
-  const response = await (0, import_obsidian4.requestUrl)({
-    url: endpoint,
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${settings.openaiApiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
-  if (response.status !== 200) {
-    throw new Error(`OpenAI API request failed: ${response.status} ${response.text}`);
+async function sendOpenAIRequest(endpoint, body, settings, isJson = true) {
+  console.log(`Sending request to ${endpoint}`);
+  console.log(`API Key: ${settings.openaiApiKey.substring(0, 5)}...`);
+  const headers = {
+    "Authorization": `Bearer ${settings.openaiApiKey}`
+  };
+  if (isJson) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(body);
   }
-  return JSON.parse(response.text);
+  try {
+    const response = await (0, import_obsidian4.requestUrl)({
+      url: endpoint,
+      method: "POST",
+      headers,
+      body
+    });
+    console.log(`Response status: ${response.status}`);
+    if (response.status !== 200) {
+      console.error("Response text:", response.text);
+      throw new Error(`OpenAI API request failed: ${response.status}`);
+    }
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Error in sendOpenAIRequest:", error);
+    throw error;
+  }
 }
 async function transcribeAudio(audioBlob, settings) {
   const endpoint = `${API_BASE_URL}/audio/transcriptions`;
-  const base64Audio = await blobToBase64(audioBlob);
-  const base64Data = base64Audio.split(",")[1];
-  const result = await sendOpenAIRequest(endpoint, {
-    model: WHISPER_MODEL,
-    file: base64Data,
-    response_format: "json"
-  }, settings);
-  return result.text;
+  const formData = new FormData();
+  formData.append("file", audioBlob, "audio.mp3");
+  formData.append("model", WHISPER_MODEL);
+  try {
+    const result = await sendOpenAIRequest(endpoint, formData, settings, false);
+    return result.text;
+  } catch (error) {
+    console.error("Transcription error:", error);
+    throw new Error(`Failed to transcribe audio: ${error.message}`);
+  }
 }
 async function generateChatCompletion(transcript, settings) {
   const endpoint = `${API_BASE_URL}/chat/completions`;
-  const result = await sendOpenAIRequest(endpoint, {
-    model: settings.openaiModel,
-    messages: [
-      { role: "system", content: settings.prompt },
-      { role: "user", content: transcript }
-    ],
-    max_tokens: settings.maxTokens
-  }, settings);
-  return result.choices[0].message.content;
+  try {
+    const result = await sendOpenAIRequest(endpoint, {
+      model: settings.openaiModel,
+      messages: [
+        { role: "system", content: settings.prompt },
+        { role: "user", content: transcript }
+      ],
+      max_tokens: settings.maxTokens
+    }, settings);
+    return result.choices[0].message.content;
+  } catch (error) {
+    console.error("Chat completion error:", error);
+    throw new Error(`Failed to generate chat completion: ${error.message}`);
+  }
 }
 async function generateSpeech(text, settings) {
   const endpoint = `${API_BASE_URL}/audio/speech`;
-  const response = await (0, import_obsidian4.requestUrl)({
-    url: endpoint,
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${settings.openaiApiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
+  try {
+    const result = await sendOpenAIRequest(endpoint, {
       model: TTS_MODEL,
       input: text,
       voice: settings.voiceChoice,
       response_format: "mp3",
       speed: settings.voiceSpeed
-    })
-  });
-  if (response.status !== 200) {
-    throw new Error(`Failed to generate speech: ${response.status} ${response.text}`);
+    }, settings);
+    return new Blob([result], { type: "audio/mp3" });
+  } catch (error) {
+    console.error("Speech generation error:", error);
+    throw new Error(`Failed to generate speech: ${error.message}`);
   }
-  return new Blob([response.arrayBuffer], { type: "audio/mp3" });
 }
 
 // src/utils/FileUtils.ts
@@ -419,15 +425,29 @@ var FloatingButton = class {
   }
   async processRecording(audioBlob) {
     try {
+      console.log("Processing recording started");
+      console.log(`Audio blob size: ${audioBlob.size} bytes`);
+      console.log(`Audio blob type: ${audioBlob.type}`);
       const fileName = `recording-${Date.now()}.mp3`;
-      const file = await saveAudioFile(this.plugin.app, audioBlob, fileName, this.settings);
+      const filePath = `${this.settings.recordingFolderPath}/${fileName}`;
+      const file = await saveAudioFile(this.plugin.app, audioBlob, filePath, this.settings);
+      console.log(`Saved recording as ${file.path}`);
+      console.log("Starting transcription");
       const transcription = await transcribeAudio(audioBlob, this.settings);
+      console.log("Transcription completed:", transcription);
+      console.log("Generating summary");
       const summary = await generateChatCompletion(transcription, this.settings);
-      let audioSummary = null;
+      console.log("Summary generated:", summary);
+      let audioSummaryFile = null;
       if (this.settings.enableVoiceGeneration) {
-        audioSummary = await generateSpeech(summary, this.settings);
+        console.log("Generating audio summary");
+        const audioSummaryBlob = await generateSpeech(summary, this.settings);
+        const summaryFileName = `summary-${Date.now()}.mp3`;
+        const summaryFilePath = `${this.settings.recordingFolderPath}/${summaryFileName}`;
+        audioSummaryFile = await saveAudioFile(this.plugin.app, audioSummaryBlob, summaryFilePath, this.settings);
+        console.log("Audio summary generated:", audioSummaryFile.path);
       }
-      this.updateRecordBlockContent(file.path, transcription, summary, audioSummary);
+      this.updateRecordBlockContent(file, transcription, summary, audioSummaryFile);
       this.removeButton();
       new import_obsidian6.Notice("Recording processed successfully");
     } catch (error) {
@@ -435,15 +455,15 @@ var FloatingButton = class {
       new import_obsidian6.Notice("Error processing recording. Check console for details.");
     }
   }
-  updateRecordBlockContent(audioPath, transcription, summary, audioSummary) {
+  updateRecordBlockContent(audioFile, transcription, summary, audioSummaryFile) {
     const content = `
 ## Generations
-${audioSummary ? `<audio controls src="${URL.createObjectURL(audioSummary)}"></audio>
+${audioSummaryFile ? `![[${audioSummaryFile.path}]]
 ` : ""}
 ${summary}
 
 ## Transcript
-<audio controls src="${this.plugin.app.vault.adapter.getResourcePath(audioPath)}"></audio>
+![[${audioFile.path}]]
 ${transcription}
         `;
     this.contentContainer.innerHTML = content;

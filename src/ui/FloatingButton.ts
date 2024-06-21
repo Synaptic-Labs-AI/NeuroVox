@@ -1,6 +1,6 @@
 // src/ui/FloatingButton.ts
 
-import { Plugin, Notice } from 'obsidian';
+import { Plugin, Notice, TFile } from 'obsidian';
 import { TimerModal } from '../modals/TimerModal';
 import { createButtonWithSvgIcon } from '../utils/SvgUtils';
 import { icons } from '../assets/icons';
@@ -37,24 +37,40 @@ export class FloatingButton {
 
     private async processRecording(audioBlob: Blob) {
         try {
+            console.log('Processing recording started');
+            console.log(`Audio blob size: ${audioBlob.size} bytes`);
+            console.log(`Audio blob type: ${audioBlob.type}`);
+
             // Save the original audio recording
             const fileName = `recording-${Date.now()}.mp3`;
-            const file = await saveAudioFile(this.plugin.app, audioBlob, fileName, this.settings);
+            const filePath = `${this.settings.recordingFolderPath}/${fileName}`;
+            const file = await saveAudioFile(this.plugin.app, audioBlob, filePath, this.settings);
             
+            console.log(`Saved recording as ${file.path}`);
+
             // Transcribe the audio
+            console.log('Starting transcription');
             const transcription = await transcribeAudio(audioBlob, this.settings);
+            console.log('Transcription completed:', transcription);
 
             // Generate summary
+            console.log('Generating summary');
             const summary = await generateChatCompletion(transcription, this.settings);
+            console.log('Summary generated:', summary);
 
             // Generate audio summary if enabled
-            let audioSummary: Blob | null = null;
+            let audioSummaryFile: TFile | null = null;
             if (this.settings.enableVoiceGeneration) {
-                audioSummary = await generateSpeech(summary, this.settings);
+                console.log('Generating audio summary');
+                const audioSummaryBlob = await generateSpeech(summary, this.settings);
+                const summaryFileName = `summary-${Date.now()}.mp3`;
+                const summaryFilePath = `${this.settings.recordingFolderPath}/${summaryFileName}`;
+                audioSummaryFile = await saveAudioFile(this.plugin.app, audioSummaryBlob, summaryFilePath, this.settings);
+                console.log('Audio summary generated:', audioSummaryFile.path);
             }
 
             // Update content in the record block
-            this.updateRecordBlockContent(file.path, transcription, summary, audioSummary);
+            this.updateRecordBlockContent(file, transcription, summary, audioSummaryFile);
 
             // Remove the floating button
             this.removeButton();
@@ -66,14 +82,14 @@ export class FloatingButton {
         }
     }
 
-    private updateRecordBlockContent(audioPath: string, transcription: string, summary: string, audioSummary: Blob | null) {
+    private updateRecordBlockContent(audioFile: TFile, transcription: string, summary: string, audioSummaryFile: TFile | null) {
         const content = `
 ## Generations
-${audioSummary ? `<audio controls src="${URL.createObjectURL(audioSummary)}"></audio>\n` : ''}
+${audioSummaryFile ? `![[${audioSummaryFile.path}]]\n` : ''}
 ${summary}
 
 ## Transcript
-<audio controls src="${this.plugin.app.vault.adapter.getResourcePath(audioPath)}"></audio>
+![[${audioFile.path}]]
 ${transcription}
         `;
 
