@@ -15,35 +15,27 @@ NeuroVox is an Obsidian plugin that enhances your note-taking with voice transcr
 1. Download the NeuroVox plugin.
 2. Move the plugin files to your Obsidian plugins directory (.obsidian/plugins).
 3. Enable the plugin from the Obsidian settings by toggling it on.
-4. Input your OpenAI API key.
+4. Input your OpenAI API key (instructions below).
 
 ## Usage
 
 1. **Recording**:
-    - Insert a code block with three backticks, the word `return`, and three backticks again.
-      ```record
-      ```
+    - Insert a code block with three backticks, the word `record`, and three backticks again.
+    - 
+![neurovox record](https://github.com/Synaptic-Labs-AI/NeuroVox/assets/131487882/2996f6a1-fc1e-41cd-bd98-5d3218f260c3)
 
-https://github.com/Synaptic-Labs-AI/NeuroVox/assets/131487882/bc298d89-f360-46ae-bd07-8a7edfc2d1be
-
-
-    - ![Inserting the Code Block](path/to/inserting-code-block.gif)
-      *GIF showing the process of typing three backticks, `return`, and three backticks again in Obsidian.*
-    - Click the microphone icon to start recording.
-    - ![Recording Audio](path/to/recording-audio.gif)
-      *GIF showing clicking the microphone icon and the live spectrogram waveform.*
 2. **Transcription**:
+   	- Click the microphone icon to start recording.  
     - The plugin automatically transcribes your recording.
-    - ![Transcription Process](path/to/transcription-process.gif)
-      *GIF displaying the transcription appearing in the note.*
-3. **Applying Prompts**:
-    - Use custom prompts to process the transcription.
-    - ![Applying Custom Prompts](path/to/applying-prompts.gif)
-      *GIF showing applying a custom prompt to the transcription and the resulting output.*
-4. **Embedded Output**:
+
+![neurovox mic button](https://github.com/Synaptic-Labs-AI/NeuroVox/assets/131487882/0ac849c9-46f2-43ab-b3ec-b282d3a4f4a8)
+
+
+4. **Applying Prompts**:
+    - Use custom prompts to process the transcription by going to settings and filling in the `Prompt` field.
+
+5. **Embedded Output**:
     - The transcription and AI-generated content are embedded in your note with headings.
-    - ![Embedded Output](path/to/embedded-output.png)
-      *Image showing the final embedded transcription and AI-generated content in the note.*
 
 ## API Key Setup
 
@@ -78,7 +70,7 @@ If you need to obtain an OpenAI API key, follow the steps below:
 ### Important Notes
 
 - **Security**: Do not share your API key with anyone. Treat it as your personal password for accessing OpenAI services.
-- **Usage Costs**: Be aware of the costs associated with API usage. OpenAI provides initial credit, but continued use will incur charges based on your data usage.
+- **Usage Costs**: Be aware of the costs associated with API usage.
 
 ## Contribution
 
