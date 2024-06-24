@@ -4,7 +4,7 @@ NeuroVox is an Obsidian plugin that enhances your note-taking with voice transcr
 
 ## Features
 
-- **Voice Recording**: Insert a code block with three backticks, the word `return`, and three backticks again. A mic icon will appear in your note, which you can press to record.
+- **Voice Recording**: Insert a code block with three backticks, the word `record`, and three backticks again. A mic icon will appear in your note, which you can press to record.
 - **Transcription**: Automatically transcribes your voice recordings using the [OpenAI Whisper API](https://openai.com/index/whisper/).
 - **Custom Prompts**: Apply custom prompts to the transcription to summarize, extract to-dos, or other actions.
 - **Audio Playback**: Embeds the audio file in your note for easy access.
@@ -21,7 +21,7 @@ NeuroVox is an Obsidian plugin that enhances your note-taking with voice transcr
 
 1. **Recording**:
     - Insert a code block with three backticks, the word `record`, and three backticks again.
-    - 
+      
 ![neurovox record](https://github.com/Synaptic-Labs-AI/NeuroVox/assets/131487882/2996f6a1-fc1e-41cd-bd98-5d3218f260c3)
 
 2. **Transcription**:
