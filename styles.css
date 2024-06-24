@@ -51,6 +51,7 @@
 }
 
 .neurovox-button.pulsing {
+    pointer-events: none;
     background-color: #ff4136; /* Red */
     animation: pulse 1s infinite;
 }
@@ -70,6 +71,13 @@
 .neurovox-pause-button, .neurovox-stop-button {
     background-color: #4B4B4B;
     color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 40px; /* Ensure consistent size */
+    height: 40px; /* Ensure consistent size */
+    border-radius: 50%;
+    transition: all 0.3s ease;
 }
 
 /* Responsive adjustments */
@@ -87,7 +95,12 @@
         height: 50px;
         font-size: 20px;
     }
+    .neurovox-pause-button, .neurovox-stop-button {
+        width: 50px;
+        height: 50px;
+    }
 }
+
 
 /* Floating Button Positioning */
 :root {
