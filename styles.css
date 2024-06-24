@@ -71,7 +71,7 @@
 .neurovox-pause-button, .neurovox-stop-button {
     background-color: #4B4B4B;
     color: white;
-    display: flex;
+    display: flex!important;
     justify-content: center;
     align-items: center;
     width: 40px; /* Ensure consistent size */

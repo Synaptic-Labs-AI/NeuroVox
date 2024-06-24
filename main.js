@@ -148,12 +148,12 @@ var TimerModal = class extends import_obsidian3.Modal {
     contentEl.empty();
     contentEl.addClass("neurovox-modal");
     const modalContent = contentEl.createDiv({ cls: "neurovox-modal-content" });
-    const timerGroup = modalContent.createEl("div", { cls: "neurovox-timer-group" });
-    this.timerEl = timerGroup.createEl("div", { cls: "neurovox-timer", text: "00:00" });
+    const timerGroup = modalContent.createDiv({ cls: "neurovox-timer-group" });
+    this.timerEl = timerGroup.createDiv({ cls: "neurovox-timer", text: "00:00" });
     this.pulsingButton = document.createElement("button");
     this.pulsingButton.addClass("neurovox-button", "pulsing");
     timerGroup.appendChild(this.pulsingButton);
-    const buttonGroup = modalContent.createEl("div", { cls: "neurovox-button-group" });
+    const buttonGroup = modalContent.createDiv({ cls: "neurovox-button-group" });
     this.pauseButton = createButtonWithSvgIcon(icons.pause);
     this.stopButton = createButtonWithSvgIcon(icons.stop);
     this.pauseButton.addClass("neurovox-button", "neurovox-pause-button");
@@ -169,7 +169,7 @@ var TimerModal = class extends import_obsidian3.Modal {
       this.stopRecording();
     }
   }
-  async togglePause() {
+  togglePause() {
     if (this.isPaused) {
       this.resumeRecording();
     } else {
@@ -208,12 +208,11 @@ var TimerModal = class extends import_obsidian3.Modal {
     }
     this.isRecording = false;
     this.isPaused = true;
-    this.pulsingButton.style.display = "none";
-    this.pauseButton.innerHTML = icons.play;
+    this.updateButtonIcon(this.pauseButton, icons.play);
   }
   resumeRecording() {
     this.startRecording();
-    this.pauseButton.innerHTML = icons.pause;
+    this.updateButtonIcon(this.pauseButton, icons.pause);
   }
   stopRecording() {
     if (this.recordingStopped)
@@ -245,6 +244,10 @@ var TimerModal = class extends import_obsidian3.Modal {
     const minutes = Math.floor(this.seconds / 60).toString().padStart(2, "0");
     const seconds = (this.seconds % 60).toString().padStart(2, "0");
     this.timerEl.textContent = `${minutes}:${seconds}`;
+  }
+  updateButtonIcon(button, svgIcon) {
+    button.innerHTML = "";
+    button.appendChild(createButtonWithSvgIcon(svgIcon));
   }
 };
 

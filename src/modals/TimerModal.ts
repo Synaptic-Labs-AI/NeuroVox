@@ -1,4 +1,3 @@
-// src/modals/TimerModal.ts
 import { App, Modal } from 'obsidian';
 import { createButtonWithSvgIcon } from '../utils/SvgUtils';
 import { icons } from '../assets/icons';
@@ -30,10 +29,10 @@ export class TimerModal extends Modal {
         const modalContent = contentEl.createDiv({ cls: 'neurovox-modal-content' });
 
         // Create a container for the timer and pulsing button
-        const timerGroup = modalContent.createEl('div', { cls: 'neurovox-timer-group' });
+        const timerGroup = modalContent.createDiv({ cls: 'neurovox-timer-group' });
 
         // Create a timer element
-        this.timerEl = timerGroup.createEl('div', { cls: 'neurovox-timer', text: '00:00' });
+        this.timerEl = timerGroup.createDiv({ cls: 'neurovox-timer', text: '00:00' });
 
         // Create the pulsing red button
         this.pulsingButton = document.createElement('button');
@@ -41,7 +40,7 @@ export class TimerModal extends Modal {
         timerGroup.appendChild(this.pulsingButton);
 
         // Create a container for the control buttons
-        const buttonGroup = modalContent.createEl('div', { cls: 'neurovox-button-group' });
+        const buttonGroup = modalContent.createDiv({ cls: 'neurovox-button-group' });
 
         // Create control buttons using the createButtonWithSvgIcon function
         this.pauseButton = createButtonWithSvgIcon(icons.pause);
@@ -69,7 +68,7 @@ export class TimerModal extends Modal {
         }
     }
 
-    private async togglePause() {
+    private togglePause() {
         if (this.isPaused) {
             this.resumeRecording();
         } else {
@@ -112,13 +111,12 @@ export class TimerModal extends Modal {
         }
         this.isRecording = false;
         this.isPaused = true;
-        this.pulsingButton.style.display = 'none';
-        this.pauseButton.innerHTML = icons.play; // Show play icon
+        this.updateButtonIcon(this.pauseButton, icons.play); // Show play icon
     }
 
     private resumeRecording() {
         this.startRecording();
-        this.pauseButton.innerHTML = icons.pause; // Show pause icon
+        this.updateButtonIcon(this.pauseButton, icons.pause); // Show pause icon
     }
 
     private stopRecording() {
@@ -158,5 +156,10 @@ export class TimerModal extends Modal {
         const minutes = Math.floor(this.seconds / 60).toString().padStart(2, '0');
         const seconds = (this.seconds % 60).toString().padStart(2, '0');
         this.timerEl.textContent = `${minutes}:${seconds}`;
+    }
+
+    private updateButtonIcon(button: HTMLButtonElement, svgIcon: string) {
+        button.innerHTML = ''; // Clear existing content
+        button.appendChild(createButtonWithSvgIcon(svgIcon));
     }
 }
