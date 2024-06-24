@@ -137,34 +137,24 @@ export class FloatingButton {
      */
     private async processRecording(audioBlob: Blob) {
         try {
-            console.log('Processing recording started');
-            console.log(`Audio blob size: ${audioBlob.size} bytes`);
-            console.log(`Audio blob type: ${audioBlob.type}`);
 
             // Save the original audio recording
             const fileName = `recording-${Date.now()}.wav`;
             const file = await saveAudioFile(this.plugin.app, audioBlob, fileName, this.settings);
 
-            console.log(`Saved recording as ${file.path}`);
 
             // Transcribe the audio
-            console.log('Starting transcription');
             const transcription = await transcribeAudio(audioBlob, this.settings);
-            console.log('Transcription completed:', transcription);
 
             // Generate summary
-            console.log('Generating summary');
             const summary = await generateChatCompletion(transcription, this.settings);
-            console.log('Summary generated:', summary);
 
             // Generate audio summary if enabled
             let audioSummaryFile: TFile | null = null;
             if (this.settings.enableVoiceGeneration) {
-                console.log('Generating audio summary');
                 const audioSummaryArrayBuffer = await generateSpeech(summary, this.settings);
                 const audioSummaryBlob = new Blob([audioSummaryArrayBuffer], { type: 'audio/wav' });
                 audioSummaryFile = await saveAudioFile(this.plugin.app, audioSummaryBlob, `summary-${Date.now()}.wav`, this.settings);
-                console.log('Audio summary generated:', audioSummaryFile.path);
             }
 
             // Update content in the record block

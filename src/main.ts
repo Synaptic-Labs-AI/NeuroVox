@@ -122,13 +122,11 @@ class NeuroVoxView extends ItemView {
         const container = this.containerEl.children[1];
         container.empty();
         container.createEl('h4', { text: 'Welcome to NeuroVox' });
-        // TODO: Add more UI elements and functionality here
     }
 
     /**
      * Performs any necessary cleanup when the view is closed.
      */
     async onClose() {
-        // TODO: Add any necessary cleanup code here
     }
 }

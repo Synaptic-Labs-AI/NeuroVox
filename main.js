@@ -407,16 +407,13 @@ async function saveAudioFile(app, audioBlob, fileName, settings) {
   try {
     const folderPath = settings.recordingFolderPath;
     const filePath = `${folderPath}/${fileName}`;
-    console.log(`Attempting to save audio file to path: ${filePath}`);
     await ensureDirectoryExists(app, folderPath);
     const arrayBuffer = await audioBlob.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
-    console.log(`Writing file to vault at path: ${filePath}`);
     const file = await app.vault.createBinary(filePath, uint8Array);
     if (!file) {
       throw new Error("File creation failed and returned null");
     }
-    console.log(`Successfully saved recording as ${file.path}`);
     return file;
   } catch (error) {
     console.error("Error saving audio file:", error);
@@ -431,7 +428,6 @@ async function ensureDirectoryExists(app, folderPath) {
     try {
       const folder = app.vault.getAbstractFileByPath(currentPath);
       if (!folder) {
-        console.log(`Creating folder: ${currentPath}`);
         await app.vault.createFolder(currentPath);
       } else if (folder instanceof import_obsidian4.TFolder) {
         console.log(`Folder already exists: ${currentPath}`);
@@ -556,25 +552,15 @@ var FloatingButton = class {
    */
   async processRecording(audioBlob) {
     try {
-      console.log("Processing recording started");
-      console.log(`Audio blob size: ${audioBlob.size} bytes`);
-      console.log(`Audio blob type: ${audioBlob.type}`);
       const fileName = `recording-${Date.now()}.wav`;
       const file = await saveAudioFile(this.plugin.app, audioBlob, fileName, this.settings);
-      console.log(`Saved recording as ${file.path}`);
-      console.log("Starting transcription");
       const transcription = await transcribeAudio(audioBlob, this.settings);
-      console.log("Transcription completed:", transcription);
-      console.log("Generating summary");
       const summary = await generateChatCompletion(transcription, this.settings);
-      console.log("Summary generated:", summary);
       let audioSummaryFile = null;
       if (this.settings.enableVoiceGeneration) {
-        console.log("Generating audio summary");
         const audioSummaryArrayBuffer = await generateSpeech(summary, this.settings);
         const audioSummaryBlob = new Blob([audioSummaryArrayBuffer], { type: "audio/wav" });
         audioSummaryFile = await saveAudioFile(this.plugin.app, audioSummaryBlob, `summary-${Date.now()}.wav`, this.settings);
-        console.log("Audio summary generated:", audioSummaryFile.path);
       }
       this.updateRecordBlockContent(file, transcription, summary, audioSummaryFile);
       const activeLeaf = this.plugin.app.workspace.activeLeaf;

@@ -16,19 +16,15 @@ export async function saveAudioFile(app: App, audioBlob: Blob, fileName: string,
         const folderPath = settings.recordingFolderPath;
         const filePath = `${folderPath}/${fileName}`;
 
-        console.log(`Attempting to save audio file to path: ${filePath}`);
-
         await ensureDirectoryExists(app, folderPath);
 
         const arrayBuffer = await audioBlob.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
 
-        console.log(`Writing file to vault at path: ${filePath}`);
         const file = await app.vault.createBinary(filePath, uint8Array);
         if (!file) {
             throw new Error('File creation failed and returned null');
         }
-        console.log(`Successfully saved recording as ${file.path}`);
         return file;
     } catch (error) {
         console.error('Error saving audio file:', error);
@@ -53,7 +49,6 @@ async function ensureDirectoryExists(app: App, folderPath: string) {
         try {
             const folder = app.vault.getAbstractFileByPath(currentPath);
             if (!folder) {
-                console.log(`Creating folder: ${currentPath}`);
                 await app.vault.createFolder(currentPath);
             } else if (folder instanceof TFolder) {
                 console.log(`Folder already exists: ${currentPath}`);
