@@ -3,9 +3,9 @@
 	"name": "NeuroVox",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "To be determined",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "Enhances your note-taking with voice transcription and AI capabilities",
+	"author": "Synaptic Labs",
+	"authorUrl": "https://www.synapticlabs.ai",
+	"fundingUrl": "https://donate.stripe.com/bIY4gsgDo2mJ5kkfZ6",
 	"isDesktopOnly": false
 }

@@ -1,7 +1,7 @@
 {
 	"name": "neurovox",
 	"version": "1.0.0",
-	"description": "To be determined",
+	"description": "Enhances your note-taking with voice transcription and AI capabilities",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
