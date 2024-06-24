@@ -1,4 +1,3 @@
-// src/utils/FileUtils.ts
 import { App, TFile, TFolder } from 'obsidian';
 import { NeuroVoxSettings } from '../settings/Settings';
 
@@ -13,32 +12,49 @@ import { NeuroVoxSettings } from '../settings/Settings';
  * @throws {Error} Throws an error if the target path is not a folder.
  */
 export async function saveAudioFile(app: App, audioBlob: Blob, fileName: string, settings: NeuroVoxSettings): Promise<TFile> {
-    const fileManager = app.fileManager;
-    let filePath = await fileManager.getAvailablePathForAttachment(fileName);
+    try {
+        const folderPath = settings.recordingFolderPath;
+        const filePath = `${folderPath}/${fileName}`;
 
-    // prepend the folder path from settings to the file path
-    const folderPath = settings.recordingFolderPath;
-    filePath = `${folderPath}/${filePath}`;
+        console.log(`Attempting to save audio file to path: ${filePath}`);
 
-    // Check if the specified folder exists, if not, create it
-    const folder = app.vault.getAbstractFileByPath(folderPath);
-    if (!folder) {
-        console.log(`Folder ${folderPath} does not exist. Creating...`);
-        await app.vault.createFolder(folderPath);
-    } else if (!(folder instanceof TFolder)) {
-        throw new Error(`${folderPath} is not a folder`);
+        await ensureDirectoryExists(app, folderPath);
+
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+
+        console.log(`Writing file to vault at path: ${filePath}`);
+        const file = await app.vault.createBinary(filePath, uint8Array);
+        if (!file) {
+            throw new Error('File creation failed and returned null');
+        }
+        console.log(`Successfully saved recording as ${file.path}`);
+        return file;
+    } catch (error) {
+        console.error('Error saving audio file:', error);
+        throw error;
     }
+}
 
-    const arrayBuffer = await audioBlob.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
+async function ensureDirectoryExists(app: App, folderPath: string) {
+    const parts = folderPath.split('/');
+    let currentPath = '';
 
-    const existingFile = app.vault.getAbstractFileByPath(filePath);
-    if (existingFile) {
-        // If the file already exists, remove it first
-        await app.vault.delete(existingFile);
+    for (const part of parts) {
+        currentPath = currentPath ? `${currentPath}/${part}` : part;
+        try {
+            const folder = app.vault.getAbstractFileByPath(currentPath);
+            if (!folder) {
+                console.log(`Creating folder: ${currentPath}`);
+                await app.vault.createFolder(currentPath);
+            } else if (folder instanceof TFolder) {
+                console.log(`Folder already exists: ${currentPath}`);
+            } else {
+                throw new Error(`${currentPath} is not a folder`);
+            }
+        } catch (error) {
+            console.error(`Error ensuring directory exists: ${error.message}`);
+            throw error;
+        }
     }
-
-    const file = await app.vault.createBinary(filePath, uint8Array);
-    console.log(`Saved recording as ${file.path}`);
-    return file;
 }

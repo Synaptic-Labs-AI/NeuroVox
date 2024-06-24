@@ -7,7 +7,7 @@ import { NeuroVoxSettings } from '../settings/Settings';
 export function registerRecordBlockProcessor(plugin: Plugin, settings: NeuroVoxSettings) {
     plugin.registerMarkdownCodeBlockProcessor('record', (source, el, ctx) => {
         const contentContainer = el.createDiv({ cls: 'neurovox-record-content' });
-        const floatingButton = new FloatingButton(plugin, settings, contentContainer);
+        const floatingButton = new FloatingButton(plugin, settings);
         
         el.appendChild(floatingButton.buttonEl);
 

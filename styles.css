@@ -1,3 +1,4 @@
+/* Modal and Button Styles */
 .neurovox-modal {
     display: flex;
     justify-content: center;
@@ -14,9 +15,15 @@
     padding: 20px;
 }
 
+.neurovox-timer-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
 .neurovox-timer {
     font-size: 48px;
-    margin-bottom: 20px;
+    margin-right: 10px;
 }
 
 .neurovox-button-group {
@@ -26,11 +33,11 @@
 }
 
 .neurovox-button {
-    width: 60px;
-    height: 60px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     border: none;
-    background-color: #f0f0f0;
+    background-color: #4B4B4B; /* Obsidian gray */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -43,16 +50,29 @@
     transform: scale(0.95);
 }
 
-.neurovox-record-button.recording {
-    background-color: #ff4136;
-    color: white;
+.neurovox-button.pulsing {
+    background-color: #ff4136; /* Red */
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+    }
 }
 
 .neurovox-pause-button, .neurovox-stop-button {
-    background-color: #0074d9;
+    background-color: #4B4B4B;
     color: white;
 }
 
+/* Responsive adjustments */
 @media (max-width: 768px) {
     .neurovox-modal-content {
         padding: 10px;
@@ -66,5 +86,32 @@
         width: 50px;
         height: 50px;
         font-size: 20px;
+    }
+}
+
+/* Floating Button Positioning */
+.neurovox-button.floating {
+    position: fixed;
+    bottom: 40px;
+    right: 40px;
+    z-index: 1000;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #4B4B4B;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Mobile adjustments for floating button */
+@media (max-width: 768px) {
+    .neurovox-button.floating {
+        width: 50px;
+        height: 50px;
+        bottom: calc(50px + env(safe-area-inset-bottom)); /* Ensuring it stays above the bottom bar */
+        right: 15px;
     }
 }

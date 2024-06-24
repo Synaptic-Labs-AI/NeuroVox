@@ -1,13 +1,13 @@
 {
-  "openaiApiKey": "",
+  "openaiApiKey": "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",
   "openaiModel": "gpt-4o",
-  "maxTokens": 8000,
-  "generateAudioSummary": false,
+  "maxTokens": 500,
+  "generateAudioSummary": true,
   "voiceChoice": "alloy",
   "prompt": "Distill the essence. Capture every vital detail with utmost brevity, ensuring no meaning is lost. Crystallize the core message.",
   "voiceSpeed": 1.3,
   "saveRecording": true,
-  "voiceMode": "standard",
   "enableVoiceGeneration": false,
-  "recordingFolderPath": "Recordings"
+  "recordingFolderPath": "Recordings",
+  "voiceMode": "standard"
 }

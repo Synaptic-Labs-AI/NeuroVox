@@ -5,7 +5,7 @@ import { icons } from '../assets/icons';
 
 export class TimerModal extends Modal {
     private timerEl: HTMLElement;
-    private recordButton: HTMLButtonElement;
+    private pulsingButton: HTMLButtonElement;
     private pauseButton: HTMLButtonElement;
     private stopButton: HTMLButtonElement;
     private intervalId: number | null = null;
@@ -29,32 +29,33 @@ export class TimerModal extends Modal {
 
         const modalContent = contentEl.createDiv({ cls: 'neurovox-modal-content' });
 
+        // Create a container for the timer and pulsing button
+        const timerGroup = modalContent.createEl('div', { cls: 'neurovox-timer-group' });
+
         // Create a timer element
-        this.timerEl = modalContent.createEl('div', { cls: 'neurovox-timer', text: '00:00' });
+        this.timerEl = timerGroup.createEl('div', { cls: 'neurovox-timer', text: '00:00' });
+
+        // Create the pulsing red button
+        this.pulsingButton = document.createElement('button');
+        this.pulsingButton.addClass('neurovox-button', 'pulsing');
+        timerGroup.appendChild(this.pulsingButton);
 
         // Create a container for the control buttons
         const buttonGroup = modalContent.createEl('div', { cls: 'neurovox-button-group' });
 
         // Create control buttons using the createButtonWithSvgIcon function
-        this.recordButton = createButtonWithSvgIcon(icons.microphone);
         this.pauseButton = createButtonWithSvgIcon(icons.pause);
         this.stopButton = createButtonWithSvgIcon(icons.stop);
 
         // Add classes for styling the buttons
-        this.recordButton.addClass('neurovox-button', 'neurovox-record-button');
         this.pauseButton.addClass('neurovox-button', 'neurovox-pause-button');
         this.stopButton.addClass('neurovox-button', 'neurovox-stop-button');
 
-        // Initially hide the pause button
-        this.pauseButton.style.display = 'none';
-
         // Append buttons to the button group container
-        buttonGroup.appendChild(this.recordButton);
         buttonGroup.appendChild(this.pauseButton);
         buttonGroup.appendChild(this.stopButton);
 
         // Attach event listeners to buttons for recording control
-        this.recordButton.addEventListener('click', () => this.toggleRecording());
         this.pauseButton.addEventListener('click', () => this.togglePause());
         this.stopButton.addEventListener('click', () => this.stopRecording());
 
@@ -68,20 +69,19 @@ export class TimerModal extends Modal {
         }
     }
 
-    private async toggleRecording() {
-        if (this.isRecording) {
-            this.pauseRecording();
+    private async togglePause() {
+        if (this.isPaused) {
+            this.resumeRecording();
         } else {
-            this.startRecording();
+            this.pauseRecording();
         }
     }
 
     private async startRecording() {
         this.isRecording = true;
         this.isPaused = false;
-        this.recordButton.addClass('recording');
-        this.pauseButton.style.display = 'flex';
-        this.recordButton.innerHTML = icons.microphone; // Show solid microphone icon
+        this.pulsingButton.style.display = 'block';
+        this.pauseButton.style.display = 'block';
 
         if (!this.intervalId) {
             this.intervalId = window.setInterval(() => {
@@ -102,14 +102,6 @@ export class TimerModal extends Modal {
         }
     }
 
-    private togglePause() {
-        if (this.isPaused) {
-            this.resumeRecording();
-        } else {
-            this.pauseRecording();
-        }
-    }
-
     private pauseRecording() {
         if (this.mediaRecorder) {
             this.mediaRecorder.pause();
@@ -120,7 +112,7 @@ export class TimerModal extends Modal {
         }
         this.isRecording = false;
         this.isPaused = true;
-        this.recordButton.removeClass('recording');
+        this.pulsingButton.style.display = 'none';
         this.pauseButton.innerHTML = icons.play; // Show play icon
     }
 
@@ -136,7 +128,7 @@ export class TimerModal extends Modal {
 
         if (this.mediaRecorder) {
             this.mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(this.audioChunks, { type: 'audio/mp3' });
+                const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
                 this.audioChunks = [];
     
                 if (this.onStop) {
@@ -158,7 +150,7 @@ export class TimerModal extends Modal {
         this.seconds = 0;
         this.updateTimerDisplay();
 
-        this.recordButton.removeClass('recording');
+        this.pulsingButton.style.display = 'none';
         this.pauseButton.style.display = 'none';
     }
 

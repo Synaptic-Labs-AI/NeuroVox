@@ -58,7 +58,7 @@ display(): void {
         .setDesc("Maximum number of tokens")
         .addSlider((slider) => {
             slider
-                .setLimits(0, 128000, 500)
+                .setLimits(0, 4096, 500) // Update the maximum limit to 4096
                 .setValue(this.plugin.settings.maxTokens)
                 .onChange(async (value) => {
                     this.plugin.settings.maxTokens = value;

@@ -4,6 +4,7 @@ import { Plugin, WorkspaceLeaf, ItemView } from 'obsidian';
 import { DEFAULT_SETTINGS, NeuroVoxSettings } from './settings/Settings';
 import { NeuroVoxSettingTab } from './settings/SettingTab';
 import { registerRecordBlockProcessor } from './processors/RecordBlockProcessor';
+import { FloatingButton } from './ui/FloatingButton';
 
 /**
  * NeuroVoxPlugin is the main class for the NeuroVox Obsidian plugin.
@@ -29,11 +30,8 @@ export default class NeuroVoxPlugin extends Plugin {
         // Add the settings tab to the Obsidian settings panel
         this.addSettingTab(new NeuroVoxSettingTab(this.app, this));
 
-        // Register the view for our plugin
-        this.registerView(
-            'neurovox-view',
-            (leaf) => new NeuroVoxView(leaf)
-        );
+        // Create the floating button
+        new FloatingButton(this, this.settings);
 
         // Add a ribbon icon to activate our plugin's view
         this.addRibbonIcon('microphone', 'NeuroVox', () => {
