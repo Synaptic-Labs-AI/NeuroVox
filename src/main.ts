@@ -30,13 +30,11 @@ export default class NeuroVoxPlugin extends Plugin {
         // Add the settings tab to the Obsidian settings panel
         this.addSettingTab(new NeuroVoxSettingTab(this.app, this));
 
+        // Apply the saved microphone button color
+        document.documentElement.style.setProperty('--mic-button-color', this.settings.micButtonColor);
+
         // Create the floating button
         new FloatingButton(this, this.settings);
-
-        // Add a ribbon icon to activate our plugin's view
-        this.addRibbonIcon('microphone', 'NeuroVox', () => {
-            this.activateView();
-        });
 
         // Register a command to open our plugin's view
         this.addCommand({

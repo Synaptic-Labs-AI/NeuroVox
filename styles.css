@@ -90,6 +90,10 @@
 }
 
 /* Floating Button Positioning */
+:root {
+    --mic-button-color: #4B4B4B; /* Default color */
+}
+
 .neurovox-button.floating {
     position: fixed;
     bottom: 40px;
@@ -98,7 +102,7 @@
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background-color: #4B4B4B;
+    background-color: var(--mic-button-color);
     color: white;
     display: flex;
     justify-content: center;
@@ -106,12 +110,11 @@
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* Mobile adjustments for floating button */
 @media (max-width: 768px) {
     .neurovox-button.floating {
         width: 50px;
         height: 50px;
-        bottom: calc(50px + env(safe-area-inset-bottom)); /* Ensuring it stays above the bottom bar */
+        bottom: calc(50px + env(safe-area-inset-bottom));
         right: 15px;
     }
 }

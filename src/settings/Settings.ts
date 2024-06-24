@@ -15,6 +15,7 @@ export type NeuroVoxSettings = {
     enableVoiceGeneration: boolean;
     recordingFolderPath: string;
     voiceMode: 'standard' | 'hd';
+    micButtonColor: string;
 }
 
 /**
@@ -33,6 +34,7 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     enableVoiceGeneration: false,
     recordingFolderPath: 'Recordings',
     voiceMode: 'standard',
+    micButtonColor: '#4B4B4B'
 };
 
 /**
@@ -79,6 +81,7 @@ function sanitizeSettings(settings: Partial<NeuroVoxSettings>): NeuroVoxSettings
         enableVoiceGeneration: typeof settings.enableVoiceGeneration === 'boolean' ? settings.enableVoiceGeneration : DEFAULT_SETTINGS.enableVoiceGeneration,
         recordingFolderPath: settings.recordingFolderPath || DEFAULT_SETTINGS.recordingFolderPath,
         voiceMode: settings.voiceMode || DEFAULT_SETTINGS.voiceMode,
+        micButtonColor: settings.micButtonColor || DEFAULT_SETTINGS.micButtonColor,
     };
 }
 

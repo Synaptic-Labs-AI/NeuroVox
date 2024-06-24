@@ -9,5 +9,6 @@
   "saveRecording": true,
   "enableVoiceGeneration": false,
   "recordingFolderPath": "Recordings",
-  "voiceMode": "standard"
+  "voiceMode": "standard",
+  "micButtonColor": "#5d5656"
 }
