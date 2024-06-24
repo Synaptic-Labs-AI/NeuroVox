@@ -4,9 +4,18 @@ const API_BASE_URL = 'https://api.openai.com/v1';
 const WHISPER_MODEL = 'whisper-1';
 const TTS_MODEL = 'tts-1';
 
+/**
+ * Sends a request to the OpenAI API.
+ * 
+ * @param {string} endpoint - The API endpoint to send the request to.
+ * @param {any} body - The request payload.
+ * @param {NeuroVoxSettings} settings - The NeuroVox plugin settings.
+ * @param {boolean} [isFormData=false] - Indicates if the request body is form data.
+ * @param {boolean} [isBinaryResponse=false] - Indicates if the response is expected to be binary.
+ * @returns {Promise<any>} - The response from the API.
+ * @throws {Error} - Throws an error if the API request fails.
+ */
 async function sendOpenAIRequest(endpoint: string, body: any, settings: NeuroVoxSettings, isFormData: boolean = false, isBinaryResponse: boolean = false): Promise<any> {
-    console.log(`[sendOpenAIRequest] Starting request to ${endpoint}`);
-
     let requestBody: any;
     let headers: Record<string, string> = {
         'Authorization': `Bearer ${settings.openaiApiKey}`,
@@ -41,11 +50,8 @@ async function sendOpenAIRequest(endpoint: string, body: any, settings: NeuroVox
             });
         }
 
-        console.log(`[sendOpenAIRequest] Response status: ${response.status}`);
-        
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('[sendOpenAIRequest] Error response:', errorText);
             throw new Error(`OpenAI API request failed: ${response.status} - ${errorText}`);
         }
 
@@ -60,9 +66,15 @@ async function sendOpenAIRequest(endpoint: string, body: any, settings: NeuroVox
     }
 }
 
+/**
+ * Transcribes audio using the OpenAI API.
+ * 
+ * @param {Blob} audioBlob - The audio data as a Blob object.
+ * @param {NeuroVoxSettings} settings - The NeuroVox plugin settings.
+ * @returns {Promise<string>} - The transcribed text.
+ * @throws {Error} - Throws an error if the transcription fails.
+ */
 export async function transcribeAudio(audioBlob: Blob, settings: NeuroVoxSettings): Promise<string> {
-    console.log('[transcribeAudio] Starting transcription');
-    
     if (!(audioBlob instanceof Blob)) {
         throw new Error('Invalid input: audioBlob must be a Blob object');
     }
@@ -71,14 +83,10 @@ export async function transcribeAudio(audioBlob: Blob, settings: NeuroVoxSetting
         throw new Error('Invalid input: audioBlob is empty');
     }
 
-    console.log(`[transcribeAudio] Audio blob size: ${audioBlob.size} bytes`);
-    console.log(`[transcribeAudio] Audio blob type: ${audioBlob.type}`);
-
     const endpoint = '/audio/transcriptions';
 
     try {
         const result = await sendOpenAIRequest(endpoint, audioBlob, settings, true);
-        console.log('[transcribeAudio] Transcription result:', result);
         return result.text;
     } catch (error) {
         console.error('[transcribeAudio] Transcription error:', error);
@@ -86,9 +94,15 @@ export async function transcribeAudio(audioBlob: Blob, settings: NeuroVoxSetting
     }
 }
 
+/**
+ * Generates a chat completion using the OpenAI API.
+ * 
+ * @param {string} transcript - The transcript text to generate a completion for.
+ * @param {NeuroVoxSettings} settings - The NeuroVox plugin settings.
+ * @returns {Promise<string>} - The generated chat completion text.
+ * @throws {Error} - Throws an error if the chat completion fails.
+ */
 export async function generateChatCompletion(transcript: string, settings: NeuroVoxSettings): Promise<string> {
-    console.log('[generateChatCompletion] Starting chat completion');
-    
     const endpoint = '/chat/completions';
 
     // Ensure max_tokens does not exceed the model's limit
@@ -105,7 +119,6 @@ export async function generateChatCompletion(transcript: string, settings: Neuro
 
     try {
         const result = await sendOpenAIRequest(endpoint, requestBody, settings);
-        console.log('[generateChatCompletion] Chat completion result:', result);
         return result.choices[0].message.content;
     } catch (error) {
         console.error('[generateChatCompletion] Chat completion error:', error);
@@ -113,9 +126,15 @@ export async function generateChatCompletion(transcript: string, settings: Neuro
     }
 }
 
+/**
+ * Generates speech from text using the OpenAI API.
+ * 
+ * @param {string} text - The text to generate speech for.
+ * @param {NeuroVoxSettings} settings - The NeuroVox plugin settings.
+ * @returns {Promise<ArrayBuffer>} - The generated speech audio as an ArrayBuffer.
+ * @throws {Error} - Throws an error if the speech generation fails.
+ */
 export async function generateSpeech(text: string, settings: NeuroVoxSettings): Promise<ArrayBuffer> {
-    console.log('[generateSpeech] Starting speech generation');
-    
     const endpoint = '/audio/speech';
 
     const requestBody = {
@@ -128,7 +147,6 @@ export async function generateSpeech(text: string, settings: NeuroVoxSettings): 
 
     try {
         const result = await sendOpenAIRequest(endpoint, requestBody, settings, false, true);
-        console.log('[generateSpeech] Speech generation result:', result);
         return result;
     } catch (error) {
         console.error('[generateSpeech] Speech generation error:', error);

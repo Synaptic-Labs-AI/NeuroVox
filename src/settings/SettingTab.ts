@@ -1,21 +1,36 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import { NeuroVoxSettings, DEFAULT_SETTINGS } from '../settings/Settings';
 
+/**
+ * NeuroVoxSettingTab is the settings tab for the NeuroVox plugin.
+ * It provides a user interface for configuring the plugin settings.
+ */
 export class NeuroVoxSettingTab extends PluginSettingTab {
     plugin: any;
 
+    /**
+     * Constructs a new instance of NeuroVoxSettingTab.
+     * 
+     * @param {App} app - The main application object.
+     * @param {any} plugin - The NeuroVox plugin instance.
+     */
     constructor(app: App, plugin: any) {
         super(app, plugin);
         this.plugin = plugin;
     }
 
+    /**
+     * Displays the settings tab content.
+     * This method is called when the settings tab is activated.
+     */
     display(): void {
         const { containerEl } = this;
 
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'NeuroVox Settings' });
+        // Removed the heading "NeuroVox Settings"
 
+        // OpenAI API Key Setting
         new Setting(containerEl)
             .setName('OpenAI API Key')
             .setDesc('Enter your OpenAI API key')
@@ -27,6 +42,7 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
+        // OpenAI Model Setting
         new Setting(containerEl)
             .setName('OpenAI Model')
             .setDesc('Enter the OpenAI model to use for content generation. See the available models here: https://platform.openai.com/docs/models')
@@ -38,6 +54,7 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
+        // Max Tokens Setting
         new Setting(containerEl)
             .setName('Max Tokens')
             .setDesc('Set the maximum number of tokens for chat completions')
@@ -49,6 +66,7 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
+        // Prompt Setting
         new Setting(containerEl)
             .setName('Prompt')
             .setDesc('Enter the prompt to use for content generation')
@@ -60,6 +78,7 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
+        // Voice Speed Setting
         new Setting(containerEl)
             .setName('Voice Speed')
             .setDesc('Set the speed of the generated speech (0.25 to 4.0)')
@@ -71,6 +90,7 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
+        // Enable AI Voice Generation Setting
         new Setting(containerEl)
             .setName('Enable AI Voice Generation of Summaries')
             .setDesc('Whether to enable AI voice generation from transcription summaries')
@@ -81,6 +101,7 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
+        // Enable HD Voice Setting
         new Setting(containerEl)
             .setName('Enable HD Voice')
             .setDesc('When enabled, use HD voice for audio summaries')
@@ -91,6 +112,7 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
+        // Save Recording Setting
         new Setting(containerEl)
             .setName('Save Recording')
             .setDesc('Enable or disable saving recordings')
@@ -101,6 +123,7 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
+        // Recording Folder Path Setting
         new Setting(containerEl)
             .setName('Recording Folder Path')
             .setDesc('Specify the folder path to save recordings relative to the vault root. For a folder in the root directory, enter its name (e.g., "Recordings"). For a nested folder, use forward slashes to indicate the path (e.g., "Audio/Recordings").')
@@ -112,7 +135,7 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // Add color picker for microphone button
+        // Microphone Button Color Setting
         new Setting(containerEl)
             .setName('Microphone Button Color')
             .setDesc('Choose a color for the microphone button')
@@ -125,6 +148,11 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
                 }));
     }
 
+    /**
+     * Updates the CSS variable for the microphone button color.
+     * 
+     * @param {string} color - The new color value.
+     */
     updateMicButtonColor(color: string): void {
         document.documentElement.style.setProperty('--mic-button-color', color);
     }

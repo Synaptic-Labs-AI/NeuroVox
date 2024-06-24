@@ -2,6 +2,9 @@ import { App, Modal } from 'obsidian';
 import { createButtonWithSvgIcon } from '../utils/SvgUtils';
 import { icons } from '../assets/icons';
 
+/**
+ * TimerModal class handles the creation and management of a modal for audio recording.
+ */
 export class TimerModal extends Modal {
     private timerEl: HTMLElement;
     private pulsingButton: HTMLButtonElement;
@@ -21,6 +24,10 @@ export class TimerModal extends Modal {
         super(app);
     }
 
+    /**
+     * Called when the modal is opened.
+     * Initializes the modal content and starts the recording.
+     */
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
@@ -62,12 +69,19 @@ export class TimerModal extends Modal {
         this.startRecording();
     }
 
+    /**
+     * Called when the modal is closed.
+     * Stops the recording if it hasn't been stopped already.
+     */
     onClose() {
         if (!this.recordingStopped) {
             this.stopRecording();
         }
     }
 
+    /**
+     * Toggles the pause state of the recording.
+     */
     private togglePause() {
         if (this.isPaused) {
             this.resumeRecording();
@@ -76,6 +90,9 @@ export class TimerModal extends Modal {
         }
     }
 
+    /**
+     * Starts the audio recording.
+     */
     private async startRecording() {
         this.isRecording = true;
         this.isPaused = false;
@@ -101,6 +118,9 @@ export class TimerModal extends Modal {
         }
     }
 
+    /**
+     * Pauses the audio recording.
+     */
     private pauseRecording() {
         if (this.mediaRecorder) {
             this.mediaRecorder.pause();
@@ -114,11 +134,17 @@ export class TimerModal extends Modal {
         this.updateButtonIcon(this.pauseButton, icons.play); // Show play icon
     }
 
+    /**
+     * Resumes the audio recording.
+     */
     private resumeRecording() {
         this.startRecording();
         this.updateButtonIcon(this.pauseButton, icons.pause); // Show pause icon
     }
 
+    /**
+     * Stops the audio recording and processes the recorded data.
+     */
     private stopRecording() {
         if (this.recordingStopped) return;
 
@@ -152,14 +178,26 @@ export class TimerModal extends Modal {
         this.pauseButton.style.display = 'none';
     }
 
+    /**
+     * Updates the timer display element with the current recording time.
+     */
     private updateTimerDisplay() {
         const minutes = Math.floor(this.seconds / 60).toString().padStart(2, '0');
         const seconds = (this.seconds % 60).toString().padStart(2, '0');
         this.timerEl.textContent = `${minutes}:${seconds}`;
     }
 
+    /**
+     * Updates the icon of a button element.
+     * 
+     * @param {HTMLButtonElement} button - The button element to update.
+     * @param {string} svgIcon - The SVG icon to set on the button.
+     */
     private updateButtonIcon(button: HTMLButtonElement, svgIcon: string) {
-        button.innerHTML = ''; // Clear existing content
+        // Clear existing content without using innerHTML
+        while (button.firstChild) {
+            button.removeChild(button.firstChild);
+        }
         button.appendChild(createButtonWithSvgIcon(svgIcon));
     }
 }

@@ -6,12 +6,22 @@ import { NeuroVoxSettings } from '../settings/Settings';
 import { transcribeAudio, generateChatCompletion, generateSpeech } from '../processors/openai';
 import { saveAudioFile } from '../utils/FileUtils';
 
+/**
+ * FloatingButton class handles the creation and management of a floating button
+ * that interacts with audio recordings and updates the Obsidian editor content.
+ */
 export class FloatingButton {
     private plugin: Plugin;
     private settings: NeuroVoxSettings;
     public buttonEl: HTMLButtonElement;
     private contentContainer: HTMLElement;
 
+    /**
+     * Constructs a FloatingButton instance.
+     * 
+     * @param {Plugin} plugin - The main plugin instance.
+     * @param {NeuroVoxSettings} settings - Configuration settings for the plugin.
+     */
     constructor(plugin: Plugin, settings: NeuroVoxSettings) {
         this.plugin = plugin;
         this.settings = settings;
@@ -20,12 +30,18 @@ export class FloatingButton {
         this.registerEventListeners();
     }
 
+    /**
+     * Creates a button element with an embedded SVG icon.
+     */
     private createButton() {
         this.buttonEl = createButtonWithSvgIcon(icons.microphone);
         this.buttonEl.addClass('neurovox-button', 'floating');
         this.buttonEl.addEventListener('click', () => this.openRecordingModal());
     }
 
+    /**
+     * Appends the button to the current note if a `record` block is found.
+     */
     private appendButtonToCurrentNote() {
         const activeLeaf = this.plugin.app.workspace.activeLeaf;
         if (activeLeaf) {
@@ -54,6 +70,9 @@ export class FloatingButton {
         }
     }
 
+    /**
+     * Registers event listeners to check for `record` blocks in the active note.
+     */
     private registerEventListeners() {
         this.plugin.app.workspace.on('layout-change', () => {
             this.checkForRecordBlock();
@@ -68,6 +87,10 @@ export class FloatingButton {
         });
     }
 
+    /**
+     * Checks for the presence of a `record` block in the active note.
+     * Appends or removes the button based on the presence of the block.
+     */
     private checkForRecordBlock() {
         const activeLeaf = this.plugin.app.workspace.activeLeaf;
         if (activeLeaf) {
@@ -95,6 +118,9 @@ export class FloatingButton {
         }
     }
 
+    /**
+     * Opens a recording modal to capture audio.
+     */
     private openRecordingModal() {
         const modal = new TimerModal(this.plugin.app);
         modal.onStop = async (audioBlob: Blob) => {
@@ -103,6 +129,12 @@ export class FloatingButton {
         modal.open();
     }
 
+    /**
+     * Processes the recorded audio, transcribes it, generates a summary,
+     * and updates the content of the record block in the active note.
+     * 
+     * @param {Blob} audioBlob - The recorded audio data as a Blob object.
+     */
     private async processRecording(audioBlob: Blob) {
         try {
             console.log('Processing recording started');
@@ -178,6 +210,15 @@ export class FloatingButton {
         }
     }
 
+    /**
+     * Formats the content to be inserted into the record block.
+     * 
+     * @param {TFile} audioFile - The file object representing the saved audio file.
+     * @param {string} transcription - The transcription text.
+     * @param {string} summary - The summary text.
+     * @param {TFile | null} audioSummaryFile - The file object representing the audio summary, if generated.
+     * @returns {string} The formatted content string.
+     */
     private formatContent(audioFile: TFile, transcription: string, summary: string, audioSummaryFile: TFile | null): string {
         let content = '## Generations\n';
         if (audioSummaryFile) {
@@ -190,6 +231,14 @@ export class FloatingButton {
         return content;
     }
 
+    /**
+     * Updates the content container with the formatted content.
+     * 
+     * @param {TFile} audioFile - The file object representing the saved audio file.
+     * @param {string} transcription - The transcription text.
+     * @param {string} summary - The summary text.
+     * @param {TFile | null} audioSummaryFile - The file object representing the audio summary, if generated.
+     */
     private updateRecordBlockContent(audioFile: TFile, transcription: string, summary: string, audioSummaryFile: TFile | null) {
         // Clear the content container
         while (this.contentContainer.firstChild) {
@@ -232,6 +281,9 @@ export class FloatingButton {
         this.removeButton();
     }
 
+    /**
+     * Removes the floating button from the DOM.
+     */
     public removeButton() {
         if (this.buttonEl && this.buttonEl.parentNode) {
             this.buttonEl.parentNode.removeChild(this.buttonEl);

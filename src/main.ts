@@ -1,5 +1,3 @@
-// src/main.ts
-
 import { Plugin, WorkspaceLeaf, ItemView } from 'obsidian';
 import { DEFAULT_SETTINGS, NeuroVoxSettings } from './settings/Settings';
 import { NeuroVoxSettingTab } from './settings/SettingTab';
@@ -19,8 +17,6 @@ export default class NeuroVoxPlugin extends Plugin {
      * Initializes settings, UI components, and sets up event listeners.
      */
     async onload() {
-        console.log('Loading NeuroVox plugin');
-
         // Load saved settings or use defaults
         await this.loadSettings();
 
@@ -51,7 +47,6 @@ export default class NeuroVoxPlugin extends Plugin {
      * Performs cleanup tasks.
      */
     onunload() {
-        console.log('Unloading NeuroVox plugin');
     }
 
     /**
@@ -96,12 +91,17 @@ export default class NeuroVoxPlugin extends Plugin {
  * It handles the rendering and functionality of the plugin's main interface.
  */
 class NeuroVoxView extends ItemView {
+    /**
+     * Constructs a new instance of NeuroVoxView.
+     * @param leaf The workspace leaf where the view will be rendered.
+     */
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
     }
 
     /**
      * Returns the type identifier for this view.
+     * @returns The view type identifier.
      */
     getViewType(): string {
         return 'neurovox-view';
@@ -109,6 +109,7 @@ class NeuroVoxView extends ItemView {
 
     /**
      * Returns the display text for this view.
+     * @returns The display text for the view.
      */
     getDisplayText(): string {
         return 'NeuroVox';

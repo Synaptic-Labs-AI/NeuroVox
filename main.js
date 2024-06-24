@@ -49,14 +49,23 @@ var DEFAULT_SETTINGS = {
 // src/settings/SettingTab.ts
 var import_obsidian2 = require("obsidian");
 var NeuroVoxSettingTab = class extends import_obsidian2.PluginSettingTab {
+  /**
+   * Constructs a new instance of NeuroVoxSettingTab.
+   * 
+   * @param {App} app - The main application object.
+   * @param {any} plugin - The NeuroVox plugin instance.
+   */
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
+  /**
+   * Displays the settings tab content.
+   * This method is called when the settings tab is activated.
+   */
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "NeuroVox Settings" });
     new import_obsidian2.Setting(containerEl).setName("OpenAI API Key").setDesc("Enter your OpenAI API key").addText((text) => text.setPlaceholder("API Key").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
       this.plugin.settings.openaiApiKey = value;
       await this.plugin.saveSettings();
@@ -99,6 +108,11 @@ var NeuroVoxSettingTab = class extends import_obsidian2.PluginSettingTab {
       this.updateMicButtonColor(value);
     }));
   }
+  /**
+   * Updates the CSS variable for the microphone button color.
+   * 
+   * @param {string} color - The new color value.
+   */
   updateMicButtonColor(color) {
     document.documentElement.style.setProperty("--mic-button-color", color);
   }
@@ -143,6 +157,10 @@ var TimerModal = class extends import_obsidian3.Modal {
     this.isRecording = false;
     this.isPaused = false;
   }
+  /**
+   * Called when the modal is opened.
+   * Initializes the modal content and starts the recording.
+   */
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
@@ -164,11 +182,18 @@ var TimerModal = class extends import_obsidian3.Modal {
     this.stopButton.addEventListener("click", () => this.stopRecording());
     this.startRecording();
   }
+  /**
+   * Called when the modal is closed.
+   * Stops the recording if it hasn't been stopped already.
+   */
   onClose() {
     if (!this.recordingStopped) {
       this.stopRecording();
     }
   }
+  /**
+   * Toggles the pause state of the recording.
+   */
   togglePause() {
     if (this.isPaused) {
       this.resumeRecording();
@@ -176,6 +201,9 @@ var TimerModal = class extends import_obsidian3.Modal {
       this.pauseRecording();
     }
   }
+  /**
+   * Starts the audio recording.
+   */
   async startRecording() {
     this.isRecording = true;
     this.isPaused = false;
@@ -198,6 +226,9 @@ var TimerModal = class extends import_obsidian3.Modal {
       this.mediaRecorder.resume();
     }
   }
+  /**
+   * Pauses the audio recording.
+   */
   pauseRecording() {
     if (this.mediaRecorder) {
       this.mediaRecorder.pause();
@@ -210,10 +241,16 @@ var TimerModal = class extends import_obsidian3.Modal {
     this.isPaused = true;
     this.updateButtonIcon(this.pauseButton, icons.play);
   }
+  /**
+   * Resumes the audio recording.
+   */
   resumeRecording() {
     this.startRecording();
     this.updateButtonIcon(this.pauseButton, icons.pause);
   }
+  /**
+   * Stops the audio recording and processes the recorded data.
+   */
   stopRecording() {
     if (this.recordingStopped)
       return;
@@ -240,13 +277,24 @@ var TimerModal = class extends import_obsidian3.Modal {
     this.pulsingButton.style.display = "none";
     this.pauseButton.style.display = "none";
   }
+  /**
+   * Updates the timer display element with the current recording time.
+   */
   updateTimerDisplay() {
     const minutes = Math.floor(this.seconds / 60).toString().padStart(2, "0");
     const seconds = (this.seconds % 60).toString().padStart(2, "0");
     this.timerEl.textContent = `${minutes}:${seconds}`;
   }
+  /**
+   * Updates the icon of a button element.
+   * 
+   * @param {HTMLButtonElement} button - The button element to update.
+   * @param {string} svgIcon - The SVG icon to set on the button.
+   */
   updateButtonIcon(button, svgIcon) {
-    button.innerHTML = "";
+    while (button.firstChild) {
+      button.removeChild(button.firstChild);
+    }
     button.appendChild(createButtonWithSvgIcon(svgIcon));
   }
 };
@@ -256,7 +304,6 @@ var API_BASE_URL = "https://api.openai.com/v1";
 var WHISPER_MODEL = "whisper-1";
 var TTS_MODEL = "tts-1";
 async function sendOpenAIRequest(endpoint, body, settings, isFormData = false, isBinaryResponse = false) {
-  console.log(`[sendOpenAIRequest] Starting request to ${endpoint}`);
   let requestBody;
   let headers = {
     "Authorization": `Bearer ${settings.openaiApiKey}`
@@ -287,10 +334,8 @@ async function sendOpenAIRequest(endpoint, body, settings, isFormData = false, i
         body: requestBody
       });
     }
-    console.log(`[sendOpenAIRequest] Response status: ${response.status}`);
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[sendOpenAIRequest] Error response:", errorText);
       throw new Error(`OpenAI API request failed: ${response.status} - ${errorText}`);
     }
     if (isBinaryResponse) {
@@ -304,19 +349,15 @@ async function sendOpenAIRequest(endpoint, body, settings, isFormData = false, i
   }
 }
 async function transcribeAudio(audioBlob, settings) {
-  console.log("[transcribeAudio] Starting transcription");
   if (!(audioBlob instanceof Blob)) {
     throw new Error("Invalid input: audioBlob must be a Blob object");
   }
   if (audioBlob.size === 0) {
     throw new Error("Invalid input: audioBlob is empty");
   }
-  console.log(`[transcribeAudio] Audio blob size: ${audioBlob.size} bytes`);
-  console.log(`[transcribeAudio] Audio blob type: ${audioBlob.type}`);
   const endpoint = "/audio/transcriptions";
   try {
     const result = await sendOpenAIRequest(endpoint, audioBlob, settings, true);
-    console.log("[transcribeAudio] Transcription result:", result);
     return result.text;
   } catch (error) {
     console.error("[transcribeAudio] Transcription error:", error);
@@ -324,7 +365,6 @@ async function transcribeAudio(audioBlob, settings) {
   }
 }
 async function generateChatCompletion(transcript, settings) {
-  console.log("[generateChatCompletion] Starting chat completion");
   const endpoint = "/chat/completions";
   const maxTokens = Math.min(settings.maxTokens, 4096);
   const requestBody = {
@@ -337,7 +377,6 @@ async function generateChatCompletion(transcript, settings) {
   };
   try {
     const result = await sendOpenAIRequest(endpoint, requestBody, settings);
-    console.log("[generateChatCompletion] Chat completion result:", result);
     return result.choices[0].message.content;
   } catch (error) {
     console.error("[generateChatCompletion] Chat completion error:", error);
@@ -345,7 +384,6 @@ async function generateChatCompletion(transcript, settings) {
   }
 }
 async function generateSpeech(text, settings) {
-  console.log("[generateSpeech] Starting speech generation");
   const endpoint = "/audio/speech";
   const requestBody = {
     model: TTS_MODEL,
@@ -356,7 +394,6 @@ async function generateSpeech(text, settings) {
   };
   try {
     const result = await sendOpenAIRequest(endpoint, requestBody, settings, false, true);
-    console.log("[generateSpeech] Speech generation result:", result);
     return result;
   } catch (error) {
     console.error("[generateSpeech] Speech generation error:", error);
@@ -410,6 +447,12 @@ async function ensureDirectoryExists(app, folderPath) {
 
 // src/ui/FloatingButton.ts
 var FloatingButton = class {
+  /**
+   * Constructs a FloatingButton instance.
+   * 
+   * @param {Plugin} plugin - The main plugin instance.
+   * @param {NeuroVoxSettings} settings - Configuration settings for the plugin.
+   */
   constructor(plugin, settings) {
     this.plugin = plugin;
     this.settings = settings;
@@ -417,11 +460,17 @@ var FloatingButton = class {
     this.contentContainer = document.createElement("div");
     this.registerEventListeners();
   }
+  /**
+   * Creates a button element with an embedded SVG icon.
+   */
   createButton() {
     this.buttonEl = createButtonWithSvgIcon(icons.microphone);
     this.buttonEl.addClass("neurovox-button", "floating");
     this.buttonEl.addEventListener("click", () => this.openRecordingModal());
   }
+  /**
+   * Appends the button to the current note if a `record` block is found.
+   */
   appendButtonToCurrentNote() {
     const activeLeaf = this.plugin.app.workspace.activeLeaf;
     if (activeLeaf) {
@@ -447,6 +496,9 @@ var FloatingButton = class {
       }
     }
   }
+  /**
+   * Registers event listeners to check for `record` blocks in the active note.
+   */
   registerEventListeners() {
     this.plugin.app.workspace.on("layout-change", () => {
       this.checkForRecordBlock();
@@ -458,6 +510,10 @@ var FloatingButton = class {
       this.checkForRecordBlock();
     });
   }
+  /**
+   * Checks for the presence of a `record` block in the active note.
+   * Appends or removes the button based on the presence of the block.
+   */
   checkForRecordBlock() {
     const activeLeaf = this.plugin.app.workspace.activeLeaf;
     if (activeLeaf) {
@@ -482,6 +538,9 @@ var FloatingButton = class {
       }
     }
   }
+  /**
+   * Opens a recording modal to capture audio.
+   */
   openRecordingModal() {
     const modal = new TimerModal(this.plugin.app);
     modal.onStop = async (audioBlob) => {
@@ -489,6 +548,12 @@ var FloatingButton = class {
     };
     modal.open();
   }
+  /**
+   * Processes the recorded audio, transcribes it, generates a summary,
+   * and updates the content of the record block in the active note.
+   * 
+   * @param {Blob} audioBlob - The recorded audio data as a Blob object.
+   */
   async processRecording(audioBlob) {
     try {
       console.log("Processing recording started");
@@ -547,6 +612,15 @@ var FloatingButton = class {
       new import_obsidian5.Notice("Failed to process recording");
     }
   }
+  /**
+   * Formats the content to be inserted into the record block.
+   * 
+   * @param {TFile} audioFile - The file object representing the saved audio file.
+   * @param {string} transcription - The transcription text.
+   * @param {string} summary - The summary text.
+   * @param {TFile | null} audioSummaryFile - The file object representing the audio summary, if generated.
+   * @returns {string} The formatted content string.
+   */
   formatContent(audioFile, transcription, summary, audioSummaryFile) {
     let content = "## Generations\n";
     if (audioSummaryFile) {
@@ -563,6 +637,14 @@ var FloatingButton = class {
 `;
     return content;
   }
+  /**
+   * Updates the content container with the formatted content.
+   * 
+   * @param {TFile} audioFile - The file object representing the saved audio file.
+   * @param {string} transcription - The transcription text.
+   * @param {string} summary - The summary text.
+   * @param {TFile | null} audioSummaryFile - The file object representing the audio summary, if generated.
+   */
   updateRecordBlockContent(audioFile, transcription, summary, audioSummaryFile) {
     while (this.contentContainer.firstChild) {
       this.contentContainer.removeChild(this.contentContainer.firstChild);
@@ -593,6 +675,9 @@ var FloatingButton = class {
     this.contentContainer.appendChild(transcriptionParagraph);
     this.removeButton();
   }
+  /**
+   * Removes the floating button from the DOM.
+   */
   removeButton() {
     if (this.buttonEl && this.buttonEl.parentNode) {
       this.buttonEl.parentNode.removeChild(this.buttonEl);
@@ -612,6 +697,7 @@ function registerRecordBlockProcessor(plugin, settings) {
       constructor(containerEl) {
         super(containerEl);
       }
+      // Remove the floating button when the MarkdownRenderChild is unloaded
       onunload() {
         floatingButton.removeButton();
       }
@@ -626,7 +712,6 @@ var NeuroVoxPlugin = class extends import_obsidian7.Plugin {
    * Initializes settings, UI components, and sets up event listeners.
    */
   async onload() {
-    console.log("Loading NeuroVox plugin");
     await this.loadSettings();
     registerRecordBlockProcessor(this, this.settings);
     this.addSettingTab(new NeuroVoxSettingTab(this.app, this));
@@ -645,7 +730,6 @@ var NeuroVoxPlugin = class extends import_obsidian7.Plugin {
    * Performs cleanup tasks.
    */
   onunload() {
-    console.log("Unloading NeuroVox plugin");
   }
   /**
    * Loads the plugin settings.

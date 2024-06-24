@@ -1,4 +1,9 @@
-// src/utils/SvgUtils.ts
+/**
+ * Utility function to create a button element with an embedded SVG icon.
+ * 
+ * @param svgText - The SVG content as a string.
+ * @returns The HTMLButtonElement with the embedded SVG icon.
+ */
 export function createButtonWithSvgIcon(svgText: string): HTMLButtonElement {
     // Parse the SVG text into a DOM element
     const parser = new DOMParser();

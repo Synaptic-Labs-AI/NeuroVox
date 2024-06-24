@@ -36,6 +36,14 @@ export async function saveAudioFile(app: App, audioBlob: Blob, fileName: string,
     }
 }
 
+/**
+ * Ensures that the directory specified by the folderPath exists.
+ * Creates the directory if it does not exist.
+ * 
+ * @param {App} app - The main application object which provides access to file management functions.
+ * @param {string} folderPath - The path of the folder to ensure exists.
+ * @throws {Error} Throws an error if a part of the path is not a folder.
+ */
 async function ensureDirectoryExists(app: App, folderPath: string) {
     const parts = folderPath.split('/');
     let currentPath = '';
