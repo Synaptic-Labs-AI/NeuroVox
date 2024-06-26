@@ -90,5 +90,5 @@ For support or to report issues, use the GitHub Issues page for this repository.
 ## Acknowledgments
 
 Special thanks to:
-- **James Griffin** (GitHub: [Forgetabyteit](https://github.com/Forgetabyteit))
+- **James Griffing** (GitHub: [Forgetabyteit](https://github.com/Forgetabyteit))
 - **David Youngblood** (GitHub: [LouminAI](https://github.com/thedavidyoungblood))

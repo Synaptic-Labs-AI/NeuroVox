@@ -1,10 +1,6 @@
 import { App, Modal } from 'obsidian';
-import { createButtonWithSvgIcon } from '../utils/SvgUtils';
 import { icons } from '../assets/icons';
 
-/**
- * TimerModal class handles the creation and management of a modal for audio recording.
- */
 export class TimerModal extends Modal {
     private timerEl: HTMLElement;
     private pulsingButton: HTMLButtonElement;
@@ -24,10 +20,6 @@ export class TimerModal extends Modal {
         super(app);
     }
 
-    /**
-     * Called when the modal is opened.
-     * Initializes the modal content and starts the recording.
-     */
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
@@ -35,53 +27,37 @@ export class TimerModal extends Modal {
 
         const modalContent = contentEl.createDiv({ cls: 'neurovox-modal-content' });
 
-        // Create a container for the timer and pulsing button
         const timerGroup = modalContent.createDiv({ cls: 'neurovox-timer-group' });
 
-        // Create a timer element
         this.timerEl = timerGroup.createDiv({ cls: 'neurovox-timer', text: '00:00' });
 
-        // Create the pulsing red button
         this.pulsingButton = document.createElement('button');
         this.pulsingButton.addClass('neurovox-button', 'pulsing');
         timerGroup.appendChild(this.pulsingButton);
 
-        // Create a container for the control buttons
         const buttonGroup = modalContent.createDiv({ cls: 'neurovox-button-group' });
 
-        // Create control buttons using the createButtonWithSvgIcon function
-        this.pauseButton = createButtonWithSvgIcon(icons.pause);
-        this.stopButton = createButtonWithSvgIcon(icons.stop);
+        this.pauseButton = this.createIconButton(icons.pause);
+        this.stopButton = this.createIconButton(icons.stop);
 
-        // Add classes for styling the buttons
         this.pauseButton.addClass('neurovox-button', 'neurovox-pause-button');
         this.stopButton.addClass('neurovox-button', 'neurovox-stop-button');
 
-        // Append buttons to the button group container
         buttonGroup.appendChild(this.pauseButton);
         buttonGroup.appendChild(this.stopButton);
 
-        // Attach event listeners to buttons for recording control
         this.pauseButton.addEventListener('click', () => this.togglePause());
         this.stopButton.addEventListener('click', () => this.stopRecording());
 
-        // Start recording immediately upon modal open
         this.startRecording();
     }
 
-    /**
-     * Called when the modal is closed.
-     * Stops the recording if it hasn't been stopped already.
-     */
     onClose() {
         if (!this.recordingStopped) {
             this.stopRecording();
         }
     }
 
-    /**
-     * Toggles the pause state of the recording.
-     */
     private togglePause() {
         if (this.isPaused) {
             this.resumeRecording();
@@ -90,14 +66,13 @@ export class TimerModal extends Modal {
         }
     }
 
-    /**
-     * Starts the audio recording.
-     */
     private async startRecording() {
         this.isRecording = true;
         this.isPaused = false;
-        this.pulsingButton.style.display = 'block';
-        this.pauseButton.style.display = 'block';
+        this.pulsingButton.classList.remove('hidden');
+        this.pulsingButton.classList.add('showing');
+        this.pauseButton.classList.remove('hidden');
+        this.pauseButton.classList.add('showing');
 
         if (!this.intervalId) {
             this.intervalId = window.setInterval(() => {
@@ -118,9 +93,6 @@ export class TimerModal extends Modal {
         }
     }
 
-    /**
-     * Pauses the audio recording.
-     */
     private pauseRecording() {
         if (this.mediaRecorder) {
             this.mediaRecorder.pause();
@@ -131,20 +103,14 @@ export class TimerModal extends Modal {
         }
         this.isRecording = false;
         this.isPaused = true;
-        this.updateButtonIcon(this.pauseButton, icons.play); // Show play icon
+        this.updateButtonIcon(this.pauseButton, icons.play);
     }
 
-    /**
-     * Resumes the audio recording.
-     */
     private resumeRecording() {
         this.startRecording();
-        this.updateButtonIcon(this.pauseButton, icons.pause); // Show pause icon
+        this.updateButtonIcon(this.pauseButton, icons.pause);
     }
 
-    /**
-     * Stops the audio recording and processes the recorded data.
-     */
     private stopRecording() {
         if (this.recordingStopped) return;
 
@@ -174,30 +140,47 @@ export class TimerModal extends Modal {
         this.seconds = 0;
         this.updateTimerDisplay();
 
-        this.pulsingButton.style.display = 'none';
-        this.pauseButton.style.display = 'none';
+        this.pulsingButton.classList.remove('showing');
+        this.pulsingButton.classList.add('hidden');
+        this.pauseButton.classList.remove('showing');
+        this.pauseButton.classList.add('hidden');
     }
 
-    /**
-     * Updates the timer display element with the current recording time.
-     */
     private updateTimerDisplay() {
         const minutes = Math.floor(this.seconds / 60).toString().padStart(2, '0');
         const seconds = (this.seconds % 60).toString().padStart(2, '0');
         this.timerEl.textContent = `${minutes}:${seconds}`;
     }
 
-    /**
-     * Updates the icon of a button element.
-     * 
-     * @param {HTMLButtonElement} button - The button element to update.
-     * @param {string} svgIcon - The SVG icon to set on the button.
-     */
+    private createIconButton(svgIcon: string): HTMLButtonElement {
+        const button = document.createElement('button');
+        const svgElement = this.createSvgElement(svgIcon);
+        if (svgElement) {
+            button.appendChild(svgElement);
+        }
+        return button;
+    }
+
     private updateButtonIcon(button: HTMLButtonElement, svgIcon: string) {
-        // Clear existing content without using innerHTML
         while (button.firstChild) {
             button.removeChild(button.firstChild);
         }
-        button.appendChild(createButtonWithSvgIcon(svgIcon));
+        const svgElement = this.createSvgElement(svgIcon);
+        if (svgElement) {
+            button.appendChild(svgElement);
+        }
+    }
+
+    private createSvgElement(svgIcon: string): SVGElement | null {
+        const parser = new DOMParser();
+        const svgDoc = parser.parseFromString(svgIcon, 'image/svg+xml');
+        const svgElement = svgDoc.documentElement;
+
+        if (svgElement instanceof SVGElement) {
+            return svgElement;
+        } else {
+            console.error('Failed to parse SVG string');
+            return null;
+        }
     }
 }

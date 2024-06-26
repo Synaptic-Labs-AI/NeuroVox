@@ -1,5 +1,5 @@
 {
-  "openaiApiKey": "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",
+  "openaiApiKey": "",
   "openaiModel": "gpt-4o",
   "maxTokens": 500,
   "generateAudioSummary": true,
