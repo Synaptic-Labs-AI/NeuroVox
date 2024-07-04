@@ -1,4 +1,4 @@
-import { Plugin, TFile, MarkdownView, Notice } from 'obsidian';
+import { Plugin, TFile, MarkdownView, Notice, Editor } from 'obsidian';
 import { TimerModal } from '../modals/TimerModal';
 import { createButtonWithSvgIcon } from '../utils/SvgUtils';
 import { icons } from '../assets/icons';
@@ -11,145 +11,79 @@ import { saveAudioFile } from '../utils/FileUtils';
  * that interacts with audio recordings and updates the Obsidian editor content.
  */
 export class FloatingButton {
-    private plugin: Plugin;
-    private settings: NeuroVoxSettings;
     public buttonEl: HTMLButtonElement;
     private contentContainer: HTMLElement;
 
-    /**
-     * Constructs a FloatingButton instance.
-     * 
-     * @param {Plugin} plugin - The main plugin instance.
-     * @param {NeuroVoxSettings} settings - Configuration settings for the plugin.
-     */
-    constructor(plugin: Plugin, settings: NeuroVoxSettings) {
-        this.plugin = plugin;
-        this.settings = settings;
+    constructor(private plugin: Plugin, private settings: NeuroVoxSettings) {
         this.createButton();
         this.contentContainer = document.createElement('div');
         this.registerEventListeners();
     }
 
-    /**
-     * Creates a button element with an embedded SVG icon.
-     */
-    private createButton() {
+    private createButton(): void {
         this.buttonEl = createButtonWithSvgIcon(icons.microphone);
         this.buttonEl.addClass('neurovox-button', 'floating');
         this.buttonEl.addEventListener('click', () => this.openRecordingModal());
     }
 
-    /**
-     * Appends the button to the current note if a `record` block is found.
-     */
-    private appendButtonToCurrentNote() {
+    private appendButtonToCurrentNote(): void {
         const activeLeaf = this.plugin.app.workspace.activeLeaf;
-        if (activeLeaf) {
+        if (activeLeaf?.view instanceof MarkdownView) {
             const view = activeLeaf.view;
-            if (view instanceof MarkdownView) {
-                const container = view.containerEl;
-                const editor = view.editor;
-                const doc = editor.getDoc();
-                const lines = doc.lineCount();
-                let recordBlockFound = false;
+            const container = view.containerEl;
+            const editor = view.editor;
 
-                for (let i = 0; i < lines; i++) {
-                    const line = doc.getLine(i);
-                    if (line.trim() === '```record') {
-                        recordBlockFound = true;
-                        break;
-                    }
-                }
+            const recordBlockFound = this.findRecordBlock(editor);
 
-                if (recordBlockFound) {
-                    container.appendChild(this.buttonEl);
-                } else {
-                    this.removeButton();
-                }
+            if (recordBlockFound) {
+                container.appendChild(this.buttonEl);
+            } else {
+                this.removeButton();
             }
         }
     }
 
-    /**
-     * Registers event listeners to check for `record` blocks in the active note.
-     */
-    private registerEventListeners() {
-        this.plugin.app.workspace.on('layout-change', () => {
-            this.checkForRecordBlock();
-        });
-
-        this.plugin.app.workspace.on('active-leaf-change', () => {
-            this.checkForRecordBlock();
-        });
-
-        this.plugin.app.workspace.on('editor-change', () => {
-            this.checkForRecordBlock();
-        });
+    private registerEventListeners(): void {
+        this.plugin.app.workspace.on('layout-change', this.checkForRecordBlock.bind(this));
+        this.plugin.app.workspace.on('active-leaf-change', this.checkForRecordBlock.bind(this));
+        this.plugin.app.workspace.on('editor-change', this.checkForRecordBlock.bind(this));
     }
 
-    /**
-     * Checks for the presence of a `record` block in the active note.
-     * Appends or removes the button based on the presence of the block.
-     */
-    private checkForRecordBlock() {
+    private checkForRecordBlock(): void {
         const activeLeaf = this.plugin.app.workspace.activeLeaf;
-        if (activeLeaf) {
+        if (activeLeaf?.view instanceof MarkdownView) {
             const view = activeLeaf.view;
-            if (view instanceof MarkdownView) {
-                const editor = view.editor;
-                const doc = editor.getDoc();
-                const lines = doc.lineCount();
-                let recordBlockFound = false;
+            const editor = view.editor;
 
-                for (let i = 0; i < lines; i++) {
-                    const line = doc.getLine(i);
-                    if (line.trim() === '```record') {
-                        recordBlockFound = true;
-                        break;
-                    }
-                }
+            const recordBlockFound = this.findRecordBlock(editor);
 
-                if (recordBlockFound) {
-                    this.appendButtonToCurrentNote();
-                } else {
-                    this.removeButton();
-                }
+            if (recordBlockFound) {
+                this.appendButtonToCurrentNote();
+            } else {
+                this.removeButton();
             }
         }
     }
 
-    /**
-     * Opens a recording modal to capture audio.
-     */
-    private openRecordingModal() {
+    private findRecordBlock(editor: Editor): boolean {
+        const content = editor.getValue();
+        return content.includes('```record');
+    }
+
+    private openRecordingModal(): void {
         const modal = new TimerModal(this.plugin.app);
-        modal.onStop = async (audioBlob: Blob) => {
-            await this.processRecording(audioBlob);
-        };
+        modal.onStop = this.processRecording.bind(this);
         modal.open();
     }
 
-    /**
-     * Processes the recorded audio, transcribes it, generates a summary,
-     * and updates the content of the record block in the active note.
-     * 
-     * @param {Blob} audioBlob - The recorded audio data as a Blob object.
-     */
-    private async processRecording(audioBlob: Blob) {
+    private async processRecording(audioBlob: Blob): Promise<void> {
         try {
-
-            // Save the original audio recording
             const fileName = `recording-${Date.now()}.wav`;
             const file = await saveAudioFile(this.plugin.app, audioBlob, fileName, this.settings);
 
-
-            // Transcribe the audio
             const transcription = await transcribeAudio(audioBlob, this.settings);
-
-            // Generate summary
             const summary = await generateChatCompletion(transcription, this.settings);
 
-            // Generate audio summary if enabled
             let audioSummaryFile: TFile | null = null;
             if (this.settings.enableVoiceGeneration) {
                 const audioSummaryArrayBuffer = await generateSpeech(summary, this.settings);
@@ -157,41 +91,7 @@ export class FloatingButton {
                 audioSummaryFile = await saveAudioFile(this.plugin.app, audioSummaryBlob, `summary-${Date.now()}.wav`, this.settings);
             }
 
-            // Update content in the record block
             this.updateRecordBlockContent(file, transcription, summary, audioSummaryFile);
-
-            // Replace the `record` block in the note
-            const activeLeaf = this.plugin.app.workspace.activeLeaf;
-            if (activeLeaf) {
-                const view = activeLeaf.view;
-                if (view instanceof MarkdownView) {
-                    const editor = view.editor;
-                    const doc = editor.getDoc();
-                    const lines = doc.lineCount();
-                    let recordBlockStart = -1;
-                    let recordBlockEnd = -1;
-
-                    for (let i = 0; i < lines; i++) {
-                        const line = doc.getLine(i);
-                        if (line.trim() === '```record') {
-                            recordBlockStart = i;
-                        } else if (line.trim() === '```' && recordBlockStart !== -1) {
-                            recordBlockEnd = i;
-                            break;
-                        }
-                    }
-
-                    if (recordBlockStart !== -1 && recordBlockEnd !== -1) {
-                        const formattedContent = this.formatContent(file, transcription, summary, audioSummaryFile);
-                        doc.replaceRange(
-                            formattedContent,
-                            { line: recordBlockStart, ch: 0 },
-                            { line: recordBlockEnd, ch: doc.getLine(recordBlockEnd).length }
-                        );
-                        this.removeButton(); // Remove the button after replacing the block
-                    }
-                }
-            }
 
             new Notice('Recording processed successfully');
         } catch (error) {
@@ -200,83 +100,57 @@ export class FloatingButton {
         }
     }
 
-    /**
-     * Formats the content to be inserted into the record block.
-     * 
-     * @param {TFile} audioFile - The file object representing the saved audio file.
-     * @param {string} transcription - The transcription text.
-     * @param {string} summary - The summary text.
-     * @param {TFile | null} audioSummaryFile - The file object representing the audio summary, if generated.
-     * @returns {string} The formatted content string.
-     */
     private formatContent(audioFile: TFile, transcription: string, summary: string, audioSummaryFile: TFile | null): string {
         let content = '## Generations\n';
         if (audioSummaryFile) {
             content += `![[${audioSummaryFile.path}]]\n`;
         }
-        content += `${summary}\n\n`;
-        content += '## Transcription\n';
-        content += `![[${audioFile.path}]]\n`;
-        content += `${transcription}\n`;
+        content += `${summary}\n\n## Transcription\n![[${audioFile.path}]]\n${transcription}\n`;
         return content;
     }
 
-    /**
-     * Updates the content container with the formatted content.
-     * 
-     * @param {TFile} audioFile - The file object representing the saved audio file.
-     * @param {string} transcription - The transcription text.
-     * @param {string} summary - The summary text.
-     * @param {TFile | null} audioSummaryFile - The file object representing the audio summary, if generated.
-     */
-    private updateRecordBlockContent(audioFile: TFile, transcription: string, summary: string, audioSummaryFile: TFile | null) {
-        // Clear the content container
-        while (this.contentContainer.firstChild) {
-            this.contentContainer.removeChild(this.contentContainer.firstChild);
+    private updateRecordBlockContent(audioFile: TFile, transcription: string, summary: string, audioSummaryFile: TFile | null): void {
+        const activeLeaf = this.plugin.app.workspace.activeLeaf;
+        if (activeLeaf?.view instanceof MarkdownView) {
+            const view = activeLeaf.view;
+            const editor = view.editor;
+
+            const { start, end } = this.findRecordBlockRange(editor);
+
+            if (start !== -1 && end !== -1) {
+                const formattedContent = this.formatContent(audioFile, transcription, summary, audioSummaryFile);
+                editor.replaceRange(
+                    formattedContent,
+                    { line: start, ch: 0 },
+                    { line: end, ch: editor.getLine(end).length }
+                );
+                this.removeButton();
+            } else {
+                console.warn("Could not find record block to update");
+            }
         }
-
-        // Create and append generations section
-        const generationsHeader = document.createElement('h2');
-        generationsHeader.textContent = 'Generations';
-        this.contentContainer.appendChild(generationsHeader);
-
-        if (audioSummaryFile) {
-            const audioSummaryLink = document.createElement('a');
-            audioSummaryLink.href = audioSummaryFile.path;
-            audioSummaryLink.textContent = audioSummaryFile.path;
-            this.contentContainer.appendChild(audioSummaryLink);
-            this.contentContainer.appendChild(document.createElement('br'));
-        }
-
-        const summaryParagraph = document.createElement('p');
-        summaryParagraph.textContent = summary;
-        this.contentContainer.appendChild(summaryParagraph);
-
-        // Create and append transcript section
-        const transcriptHeader = document.createElement('h2');
-        transcriptHeader.textContent = 'Transcript';
-        this.contentContainer.appendChild(transcriptHeader);
-
-        const audioFileLink = document.createElement('a');
-        audioFileLink.href = audioFile.path;
-        audioFileLink.textContent = audioFile.path;
-        this.contentContainer.appendChild(audioFileLink);
-        this.contentContainer.appendChild(document.createElement('br'));
-
-        const transcriptionParagraph = document.createElement('p');
-        transcriptionParagraph.textContent = transcription;
-        this.contentContainer.appendChild(transcriptionParagraph);
-
-        // Remove the floating button
-        this.removeButton();
     }
 
-    /**
-     * Removes the floating button from the DOM.
-     */
-    public removeButton() {
-        if (this.buttonEl && this.buttonEl.parentNode) {
-            this.buttonEl.parentNode.removeChild(this.buttonEl);
+    private findRecordBlockRange(editor: Editor): { start: number, end: number } {
+        const content = editor.getValue();
+        const lines = content.split('\n');
+        let start = -1;
+        let end = -1;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line === '```record') {
+                start = i;
+            } else if (line === '```' && start !== -1) {
+                end = i;
+                break;
+            }
         }
+
+        return { start, end };
+    }
+
+    public removeButton(): void {
+        this.buttonEl.remove();
     }
 }
