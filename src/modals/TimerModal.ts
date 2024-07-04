@@ -179,4 +179,8 @@ export class TimerModal extends Modal {
             this.stream = null;
         }
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 5d40b8d (replaced mediarecorder with recordrtc so it would work for apple. works but only records in wav, so cant replay on apple.)

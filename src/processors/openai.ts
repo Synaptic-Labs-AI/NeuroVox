@@ -1,4 +1,10 @@
 import { NeuroVoxSettings } from '../settings/Settings';
+import { Notice } from 'obsidian';
+
+// Helper function for debug notices
+function debugNotice(message: string) {
+    new Notice(`[DEBUG] ${message}`, 5000);  // Display for 5 seconds
+}
 
 const API_BASE_URL = 'https://api.openai.com/v1';
 const WHISPER_MODEL = 'whisper-1';
@@ -30,13 +36,25 @@ async function sendOpenAIRequest(
     let requestBody: any;
     if (isFormData) {
         requestBody = new FormData();
+        // Change the file extension to ..wav
         requestBody.append('file', body, 'audio.wav');
         requestBody.append('model', WHISPER_MODEL);
+        
+        // Log FormData entries
+        for (let [key, value] of requestBody.entries()) {
+            debugNotice(`FormData entry - ${key}: ${value}`);
+        }
     } else {
         requestBody = JSON.stringify(body);
         headers['Content-Type'] = 'application/json';
     }
 
+<<<<<<< HEAD
+=======
+    const url = `${API_BASE_URL}${endpoint}`;
+    debugNotice(`Sending request to ${url}`);
+
+>>>>>>> 5d40b8d (replaced mediarecorder with recordrtc so it would work for apple. works but only records in wav, so cant replay on apple.)
     try {
         const response = await fetch(url, {
             method: 'POST',
@@ -46,12 +64,13 @@ async function sendOpenAIRequest(
 
         if (!response.ok) {
             const errorText = await response.text();
+            debugNotice(`API Error Response: ${errorText}`);
             throw new Error(`OpenAI API request failed: ${response.status} - ${errorText}`);
         }
 
         return isBinaryResponse ? await response.arrayBuffer() : await response.json();
     } catch (error) {
-        console.error('[sendOpenAIRequest] Error:', error);
+        debugNotice(`[sendOpenAIRequest] Error: ${error.message}`);
         throw error;
     }
 }
@@ -66,20 +85,25 @@ async function sendOpenAIRequest(
  */
 export async function transcribeAudio(audioBlob: Blob, settings: NeuroVoxSettings): Promise<string> {
     if (!(audioBlob instanceof Blob)) {
+        debugNotice('Invalid input: audioBlob must be a Blob object');
         throw new Error('Invalid input: audioBlob must be a Blob object');
     }
 
     if (audioBlob.size === 0) {
+        debugNotice('Invalid input: audioBlob is empty');
         throw new Error('Invalid input: audioBlob is empty');
     }
+
+    debugNotice(`Transcribing audio - Blob size: ${audioBlob.size}, type: ${audioBlob.type}`);
 
     const endpoint = '/audio/transcriptions';
 
     try {
         const result = await sendOpenAIRequest(endpoint, audioBlob, settings, true);
+        debugNotice(`Transcription successful - length: ${result.text.length}`);
         return result.text;
     } catch (error) {
-        console.error('[transcribeAudio] Transcription error:', error);
+        debugNotice(`[transcribeAudio] Transcription error: ${error.message}`);
         throw new Error(`Failed to transcribe audio: ${error.message}`);
     }
 }
