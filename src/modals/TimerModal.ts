@@ -183,4 +183,8 @@ export class TimerModal extends Modal {
 }
 =======
 }
+<<<<<<< HEAD
 >>>>>>> 5d40b8d (replaced mediarecorder with recordrtc so it would work for apple. works but only records in wav, so cant replay on apple.)
+=======
+>>>>>>> 6563c723182882a1287d3136f87cbb6676153b21
+>>>>>>> 821ce7d (cleaning up debugs)

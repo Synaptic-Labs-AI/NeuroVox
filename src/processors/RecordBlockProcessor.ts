@@ -2,14 +2,19 @@ import { MarkdownPostProcessorContext, Plugin, MarkdownRenderChild } from 'obsid
 import { FloatingButton } from '../ui/FloatingButton';
 import { NeuroVoxSettings } from '../settings/Settings';
 
+interface NeuroVoxElement extends HTMLElement {
+    neurovoxContentContainer?: HTMLDivElement;
+    neurovoxFloatingButton?: FloatingButton;
+}
+
 /**
  * Registers a Markdown code block processor for the 'record' code block.
  * 
- * @param {Plugin} plugin - The NeuroVox plugin instance.
- * @param {NeuroVoxSettings} settings - The settings for the NeuroVox plugin.
+ * @param plugin - The NeuroVox plugin instance.
+ * @param settings - The settings for the NeuroVox plugin.
  */
-export function registerRecordBlockProcessor(plugin: Plugin, settings: NeuroVoxSettings) {
-    plugin.registerMarkdownCodeBlockProcessor('record', (source, el, ctx) => {
+export function registerRecordBlockProcessor(plugin: Plugin, settings: NeuroVoxSettings): void {
+    plugin.registerMarkdownCodeBlockProcessor('record', (source: string, el: NeuroVoxElement, ctx: MarkdownPostProcessorContext) => {
         // Create a container for the NeuroVox record content
         const contentContainer = el.createDiv({ cls: 'neurovox-record-content' });
 
@@ -18,8 +23,8 @@ export function registerRecordBlockProcessor(plugin: Plugin, settings: NeuroVoxS
         el.appendChild(floatingButton.buttonEl);
 
         // Store references to be able to update content later
-        (el as any).neurovoxContentContainer = contentContainer;
-        (el as any).neurovoxFloatingButton = floatingButton;
+        el.neurovoxContentContainer = contentContainer;
+        el.neurovoxFloatingButton = floatingButton;
 
         // Add a MarkdownRenderChild to manage the lifecycle of the floating button
         ctx.addChild(new class extends MarkdownRenderChild {
@@ -27,8 +32,7 @@ export function registerRecordBlockProcessor(plugin: Plugin, settings: NeuroVoxS
                 super(containerEl);
             }
 
-            // Remove the floating button when the MarkdownRenderChild is unloaded
-            onunload() {
+            onunload(): void {
                 floatingButton.removeButton();
             }
         }(el));
