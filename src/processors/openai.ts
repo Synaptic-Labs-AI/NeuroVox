@@ -22,7 +22,7 @@ async function sendOpenAIRequest(
     isFormData: boolean = false, 
     isBinaryResponse: boolean = false
 ): Promise<any> {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const apiUrl = `${API_BASE_URL}${endpoint}`; // Renamed from 'url' to 'apiUrl'
     const headers: Record<string, string> = {
         'Authorization': `Bearer ${settings.openaiApiKey}`,
     };
@@ -37,17 +37,8 @@ async function sendOpenAIRequest(
         headers['Content-Type'] = 'application/json';
     }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-    const url = `${API_BASE_URL}${endpoint}`;
-    debugNotice(`Sending request to ${url}`);
-
->>>>>>> 5d40b8d (replaced mediarecorder with recordrtc so it would work for apple. works but only records in wav, so cant replay on apple.)
-=======
->>>>>>> 821ce7d (cleaning up debugs)
     try {
-        const response = await fetch(url, {
+        const response = await fetch(apiUrl, { // Use 'apiUrl' here
             method: 'POST',
             headers: headers,
             body: requestBody,
