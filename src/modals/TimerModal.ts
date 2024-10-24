@@ -1,20 +1,22 @@
-import { App, Modal } from 'obsidian';
+import { App, Modal, Notice } from 'obsidian';
 import { icons } from '../assets/icons';
 import RecordRTC from 'recordrtc';
 
 export class TimerModal extends Modal {
-    private timerEl: HTMLElement;
-    private pulsingButton: HTMLButtonElement;
-    private pauseButton: HTMLButtonElement;
-    private stopButton: HTMLButtonElement;
-    private intervalId: number | null = null;
-    private seconds: number = 0;
-    private recorder: RecordRTC | null = null;
-    private stream: MediaStream | null = null;
-    private isRecording: boolean = false;
-    private isPaused: boolean = false;
+    public timerEl: HTMLElement;
+    public pauseButton: HTMLButtonElement;
+    public stopButton: HTMLButtonElement;
+    public intervalId: number | null = null;
+    public seconds: number = 0;
+    public recorder: RecordRTC | null = null;
+    public stream: MediaStream | null = null;
+    public isRecording: boolean = false;
+    public isPaused: boolean = false;
 
     public onStop: (audioBlob: Blob) => void;
+
+    // Maximum recording duration in seconds (e.g., 12 minutes)
+    public readonly MAX_RECORDING_DURATION = 12 * 60; // 720 seconds
 
     constructor(app: App) {
         super(app);
@@ -29,14 +31,10 @@ export class TimerModal extends Modal {
         const timerGroup = modalContent.createDiv({ cls: 'neurovox-timer-group' });
         this.timerEl = timerGroup.createDiv({ cls: 'neurovox-timer', text: '00:00' });
 
-        this.pulsingButton = document.createElement('button');
-        this.pulsingButton.addClass('neurovox-button', 'pulsing');
-        timerGroup.appendChild(this.pulsingButton);
-
-        const buttonGroup = modalContent.createDiv({ cls: 'neurovox-button-group' });
         this.pauseButton = this.createIconButton(icons.pause, 'neurovox-pause-button');
         this.stopButton = this.createIconButton(icons.stop, 'neurovox-stop-button');
 
+        const buttonGroup = modalContent.createDiv({ cls: 'neurovox-button-group' });
         buttonGroup.appendChild(this.pauseButton);
         buttonGroup.appendChild(this.stopButton);
 
@@ -52,21 +50,14 @@ export class TimerModal extends Modal {
         }
     }
 
-    private togglePause() {
+    public togglePause() {
         this.isPaused ? this.resumeRecording() : this.pauseRecording();
     }
 
-    private async startRecording() {
+    public async startRecording() {
         this.isRecording = true;
         this.isPaused = false;
-        this.updateButtonVisibility(true);
-
-        if (!this.intervalId) {
-            this.intervalId = window.setInterval(() => {
-                this.seconds++;
-                this.updateTimerDisplay();
-            }, 1000);
-        }
+        this.updateButtonState();
 
         if (!this.recorder) {
             try {
@@ -79,30 +70,46 @@ export class TimerModal extends Modal {
                     desiredSampRate: 16000,
                 });
                 this.recorder.startRecording();
+
+                // Start the timer
+                this.intervalId = window.setInterval(() => {
+                    this.seconds++;
+                    this.updateTimerDisplay();
+
+                    // Enforce maximum duration
+                    if (this.seconds >= this.MAX_RECORDING_DURATION) {
+                        this.stopRecording();
+                        new Notice('Maximum recording duration reached. Stopping recording.');
+                    }
+                }, 1000);
             } catch (error) {
                 console.error('Error starting RecordRTC:', error);
+                new Notice('Failed to start recording. Please check microphone permissions.');
+                this.close();
             }
         } else {
             this.recorder.resumeRecording();
         }
     }
 
-    private pauseRecording() {
+    public pauseRecording() {
         if (this.recorder) {
             this.recorder.pauseRecording();
             this.clearInterval();
             this.isRecording = false;
             this.isPaused = true;
             this.updateButtonIcon(this.pauseButton, icons.play);
+            new Notice('Recording paused.');
         }
     }
 
-    private resumeRecording() {
+    public resumeRecording() {
         this.startRecording();
         this.updateButtonIcon(this.pauseButton, icons.pause);
+        new Notice('Recording resumed.');
     }
 
-    private stopRecording() {
+    public async stopRecording() {
         if (!this.isRecording && !this.isPaused) return;
 
         this.isRecording = false;
@@ -122,16 +129,23 @@ export class TimerModal extends Modal {
         this.clearInterval();
         this.seconds = 0;
         this.updateTimerDisplay();
-        this.updateButtonVisibility(false);
+        this.updateButtonState();
     }
 
-    private updateTimerDisplay() {
+    public updateTimerDisplay() {
         const minutes = Math.floor(this.seconds / 60).toString().padStart(2, '0');
         const seconds = (this.seconds % 60).toString().padStart(2, '0');
         this.timerEl.textContent = `${minutes}:${seconds}`;
+
+        // Change color when approaching max duration (e.g., last minute)
+        if (this.seconds >= this.MAX_RECORDING_DURATION - 60) {
+            this.timerEl.style.color = 'orange';
+        } else {
+            this.timerEl.style.color = 'var(--text-normal)';
+        }
     }
 
-    private createIconButton(svgIcon: string, className: string): HTMLButtonElement {
+    public createIconButton(svgIcon: string, className: string): HTMLButtonElement {
         const button = document.createElement('button');
         button.addClass('neurovox-button', className);
         const svgElement = this.createSvgElement(svgIcon);
@@ -141,7 +155,7 @@ export class TimerModal extends Modal {
         return button;
     }
 
-    private updateButtonIcon(button: HTMLButtonElement, svgIcon: string) {
+    public updateButtonIcon(button: HTMLButtonElement, svgIcon: string) {
         button.empty();
         const svgElement = this.createSvgElement(svgIcon);
         if (svgElement) {
@@ -149,27 +163,30 @@ export class TimerModal extends Modal {
         }
     }
 
-    private createSvgElement(svgIcon: string): SVGElement | null {
+    public createSvgElement(svgIcon: string): SVGElement | null {
         const parser = new DOMParser();
         const svgDoc = parser.parseFromString(svgIcon, 'image/svg+xml');
         return svgDoc.documentElement instanceof SVGElement ? svgDoc.documentElement : null;
     }
 
-    private updateButtonVisibility(isVisible: boolean) {
-        this.pulsingButton.toggleClass('hidden', !isVisible);
-        this.pulsingButton.toggleClass('showing', isVisible);
-        this.pauseButton.toggleClass('hidden', !isVisible);
-        this.pauseButton.toggleClass('showing', isVisible);
+    public updateButtonState() {
+        if (this.isRecording) {
+            this.pauseButton.removeClass('hidden');
+            this.stopButton.removeClass('hidden');
+        } else {
+            this.pauseButton.addClass('hidden');
+            this.stopButton.addClass('hidden');
+        }
     }
 
-    private clearInterval() {
+    public clearInterval() {
         if (this.intervalId) {
             window.clearInterval(this.intervalId);
             this.intervalId = null;
         }
     }
 
-    private cleanupRecording() {
+    public cleanupRecording() {
         if (this.recorder) {
             this.recorder.destroy();
             this.recorder = null;
