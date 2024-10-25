@@ -27,7 +27,7 @@ export type NeuroVoxSettings = {
  */
 export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     openaiApiKey: '',
-    openaiModel: 'gpt-4',
+    openaiModel: 'gpt-4o-mini',
     maxTokens: 500,
     generateAudioSummary: false,
     voiceChoice: 'onyx',

@@ -3,8 +3,8 @@ import { icons } from '../assets/icons';
 import RecordRTC from 'recordrtc';
 
 /**
- * TimerModal provides a recording interface with integrated timer and controls.
- * This implementation flattens the modal hierarchy and uses Obsidian's native modal structure.
+ * TimerModal provides a recording interface with integrated timer, controls, and audio visualization.
+ * Uses Obsidian's native modal structure and includes an animated audio wave visualization.
  */
 export class TimerModal extends Modal {
     private recorder: RecordRTC | null = null;
@@ -16,6 +16,7 @@ export class TimerModal extends Modal {
     private timerText: HTMLElement;
     private pauseButton: HTMLButtonElement;
     private stopButton: HTMLButtonElement;
+    private waveContainer: HTMLElement;
     
     // Maximum recording duration in seconds (12 minutes)
     private readonly MAX_RECORDING_DURATION = 12 * 60;
@@ -28,27 +29,35 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Initializes the modal interface with a flattened structure
+     * Initializes the modal interface with timer, controls, and audio wave
      */
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
 
+        // Container for all content
+        const container = contentEl.createDiv('timer-content');
+
         // Create timer display
-        contentEl.addClass('timer-content');
-        this.timerText = contentEl.createDiv('timer-text');
+        this.timerText = container.createDiv('timer-text');
         this.timerText.setText('00:00');
 
         // Create controls container
-        const controls = contentEl.createDiv('timer-controls');
+        const controls = container.createDiv('timer-controls');
         this.createButtons(controls);
+
+        // Create audio wave visualization
+        this.waveContainer = container.createDiv('audio-wave');
+        for (let i = 0; i < 5; i++) {
+            this.waveContainer.createDiv('wave-bar');
+        }
 
         // Start recording automatically
         this.initializeRecording();
     }
 
     /**
-     * Creates control buttons with simplified structure
+     * Creates control buttons with icons and event handlers
      */
     private createButtons(container: HTMLElement) {
         // Create pause button
@@ -106,7 +115,7 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Initializes the recording session with simplified error handling
+     * Initializes the recording session
      */
     private async initializeRecording() {
         try {
@@ -131,7 +140,7 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Starts or resumes recording with updated button states
+     * Starts or resumes recording with updated UI states
      */
     private startRecording() {
         if (!this.recorder) return;
@@ -139,6 +148,7 @@ export class TimerModal extends Modal {
         this.isRecording = true;
         this.isPaused = false;
         this.updateButtonState();
+        this.updateWaveState();
 
         if (this.recorder.state === 'inactive') {
             this.recorder.startRecording();
@@ -163,7 +173,7 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Pauses recording with visual feedback
+     * Pauses recording and updates UI states
      */
     private pauseRecording() {
         if (!this.recorder || !this.isRecording) return;
@@ -174,6 +184,7 @@ export class TimerModal extends Modal {
         this.isRecording = false;
         this.isPaused = true;
         this.updateButtonState();
+        this.updateWaveState();
         
         new Notice('Recording paused');
     }
@@ -195,6 +206,7 @@ export class TimerModal extends Modal {
 
         this.isRecording = false;
         this.isPaused = false;
+        this.updateWaveState();
 
         return new Promise<void>((resolve) => {
             if (!this.recorder) {
@@ -215,7 +227,7 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Manages the recording timer display
+     * Starts the recording timer
      */
     private startTimer() {
         this.seconds = 0;
@@ -242,6 +254,21 @@ export class TimerModal extends Modal {
 
         if (this.seconds >= this.MAX_RECORDING_DURATION - 60) {
             this.timerText.addClass('warning');
+        }
+    }
+
+    /**
+     * Updates the audio wave animation state
+     */
+    private updateWaveState() {
+        if (!this.waveContainer) return;
+
+        this.waveContainer.removeClass('paused', 'stopped');
+
+        if (this.isPaused) {
+            this.waveContainer.addClass('paused');
+        } else if (!this.isRecording) {
+            this.waveContainer.addClass('stopped');
         }
     }
 
