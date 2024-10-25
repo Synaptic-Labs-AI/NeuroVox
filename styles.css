@@ -1,201 +1,177 @@
-/* Modal and Button Styles */
-.neurovox-modal {
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	height: 100%;
+.timer-content {
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
 }
 
-.neurovox-modal-content {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	width: 100%;
-	max-width: 400px;
-	padding: 20px;
-	background-color: var(--background-primary);
-	border-radius: 8px;
-	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+/* Timer Text */
+.timer-text {
+    font-family: var(--font-monospace);
+    font-size: 4rem;
+    font-weight: 600;
+    color: var(--text-normal);
+    margin: 1rem 0 2rem 0;
+    line-height: 1;
+    letter-spacing: 2px;
 }
 
-.neurovox-timer-group {
-	display: flex;
-	align-items: center;
-	margin-bottom: 20px;
+.timer-text.warning {
+    color: var(--text-error);
+    animation: pulse 2s infinite;
 }
 
-.neurovox-timer {
-	font-size: 48px;
-	margin-right: 10px;
-	color: var(--text-normal);
-}
-
-.neurovox-button-group {
-	display: flex;
-	justify-content: space-around;
-	width: 100%;
-}
-
-.neurovox-button {
-	width: 50px;
-	height: 50px;
-	border-radius: 50%;
-	border: none;
-	background-color: var(--color-base-40);
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	font-size: 24px;
-	cursor: pointer;
-	transition: all 0.3s ease;
-}
-
-.neurovox-button:active {
-	transform: scale(0.95);
-}
-
-.neurovox-button.pulsing {
-	pointer-events: none;
-	background-color: var(--color-red);
-	animation: pulse 1s infinite;
-}
-
-.neurovox-modal-content .neurovox-button.hidden {
-	display: none;
-}
-
-.neurovox-modal-content .neurovox-button.showing {
-	display: flex;
-}
-
-@keyframes pulse {
-	0% {
-		transform: scale(1);
-	}
-	50% {
-		transform: scale(1.1);
-	}
-	100% {
-		transform: scale(1);
-	}
-}
-
-.neurovox-pause-button,
-.neurovox-stop-button {
-	background-color: var(--color-base-40);
-	color: var(--text-normal);
-	justify-content: center;
-	align-items: center;
-	width: 50px;
-	height: 50px;
-	border-radius: 50%;
-	transition: all 0.3s ease;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-	.neurovox-modal-content {
-		padding: 10px;
-	}
-
-	.neurovox-timer {
-		font-size: 36px;
-	}
-
-	.neurovox-button {
-		width: 40px;
-		height: 40px;
-		font-size: 20px;
-	}
-	.neurovox-pause-button,
-	.neurovox-stop-button {
-		width: 40px;
-		height: 40px;
-	}
-}
-
-/* Collapsible Sections */
-.details-summary {
-	cursor: pointer;
-	color: var(--text-normal);
-	font-weight: bold;
-}
-
-details summary::-webkit-details-marker {
-	display: none;
-}
-
-details summary::before {
-	content: '► ';
-	display: inline-block;
-	transition: transform 0.2s;
-}
-
-details[open] summary::before {
-	transform: rotate(90deg);
-}
-
-/* Floating Button Positioning */
-:root {
-	--mic-button-color: var(--color-base-40);
-}
-
-.neurovox-button.floating {
-    position: fixed;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
+/* Control Section */
+.timer-controls {
     display: flex;
     justify-content: center;
+    gap: 1.5rem;
+    padding: 0.5rem;
+}
+
+/* Button Base Styles */
+.timer-button {
+    width: 56px;
+    height: 56px;
+    border: none;
+    border-radius: 50%;
+    background-color: var(--interactive-normal);
+    color: var(--text-on-accent);
+    display: flex;
     align-items: center;
-    cursor: grab;
-    transition: all 0.3s ease;
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: none;
-    z-index: 49;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.timer-button:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.1);
+}
+
+.timer-button:active {
+    transform: translateY(0);
+}
+
+/* Button Variants */
+.pause-button {
+    background-color: var(--interactive-accent);
+}
+
+.stop-button {
+    background-color: var(--text-error);
+}
+
+/* SVG Icon Styling */
+.timer-button svg {
+    width: 24px;
+    height: 24px;
+    stroke-width: 2;
+}
+
+/* Animation Keyframes */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+/* Modal Backdrop */
+.modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+/* Floating Button */
+.neurovox-button.floating {
+    position: fixed;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-s);
+    z-index: 1000;
 }
 
 .neurovox-button.floating:hover {
-    filter: brightness(1.1);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-l);
 }
 
 .neurovox-button.floating.dragging {
     cursor: grabbing;
-    filter: brightness(0.95);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-}
-
-@media (max-width: 768px) {
-	.neurovox-button.floating {
-		width: 50px;
-		height: 50px;
-		bottom: calc(50px + env(safe-area-inset-bottom));
-		right: 15px;
-	}
+    transform: scale(1.1);
 }
 
 /* Toolbar Button */
 .neurovox-toolbar-button {
-	margin-left: 8px;
-	width: 32px;
-	height: 32px;
-	border: none;
-	background: none;
-	cursor: pointer;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	transition: background-color 0.3s ease;
+    color: var(--text-muted);
+    padding: 0 8px;
+    transition: color 0.2s ease;
 }
 
 .neurovox-toolbar-button:hover {
-	background-color: var(--color-base-20);
-	border-radius: 4px;
+    color: var(--text-normal);
 }
 
-.neurovox-toolbar-button svg {
-	width: 24px;
-	height: 24px;
+/* Responsive Adjustments */
+@media screen and (max-width: 768px) {
+    .timer-modal-container {
+        padding: 1.5rem;
+    }
+
+    .timer-text {
+        font-size: 3rem;
+    }
+
+    .timer-button {
+        width: 48px;
+        height: 48px;
+    }
+
+    .timer-button svg {
+        width: 20px;
+        height: 20px;
+    }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+    .timer-text.warning {
+        animation: none;
+    }
+
+    .timer-button, 
+    .neurovox-button.floating {
+        transition: none;
+    }
+
+    .timer-button:hover,
+    .neurovox-button.floating:hover {
+        transform: none;
+    }
+}
+
+/* Focus States */
+.timer-button:focus-visible,
+.neurovox-button:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 2px;
+}
+
+/* Dark Mode Adjustments */
+.theme-dark .timer-modal-container {
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
 }
