@@ -1,8 +1,4 @@
 /* Modal Container Override */
-.modal {
-    width: auto !important;
-    max-width: 260px !important;
-}
 
 /* Timer Content */
 .timer-content {
