@@ -1,7 +1,10 @@
+// src/ui/ToolbarButton.ts
+
 import { MarkdownView, Notice } from 'obsidian';
 import NeuroVoxPlugin from '../main';
 import { TimerModal } from '../modals/TimerModal';
-import { NeuroVoxSettings } from '../settings/Settings';
+import { PluginData } from '../types';
+import { icons } from '../assets/icons'; // Ensure you have imported icons
 
 /**
  * ToolbarButton handles the creation and functionality of the toolbar microphone button.
@@ -9,11 +12,11 @@ import { NeuroVoxSettings } from '../settings/Settings';
 export class ToolbarButton {
     public ribbonIconEl: HTMLElement;
     public plugin: NeuroVoxPlugin;
-    public settings: NeuroVoxSettings;
+    public pluginData: PluginData;
 
-    constructor(plugin: NeuroVoxPlugin, settings: NeuroVoxSettings) {
+    constructor(plugin: NeuroVoxPlugin, pluginData: PluginData) {
         this.plugin = plugin;
-        this.settings = settings;
+        this.pluginData = pluginData;
         this.createButton();
     }
 
@@ -29,6 +32,7 @@ export class ToolbarButton {
             }
         );
         this.ribbonIconEl.addClass('neurovox-toolbar-button');
+        this.updateButtonColor(); // Apply initial color
     }
 
     /**
@@ -53,6 +57,14 @@ export class ToolbarButton {
         } else {
             new Notice('No active note found to insert transcription.');
         }
+    }
+
+    /**
+     * Updates the toolbar button color based on settings.
+     */
+    public updateButtonColor(): void {
+        const color = this.pluginData.micButtonColor;
+        this.ribbonIconEl.style.backgroundColor = color;
     }
 
     /**

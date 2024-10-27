@@ -1,20 +1,61 @@
-/* Modal Container Override */
+/************************************
+ * THEME VARIABLES
+ ************************************/
+ :root {
+    /* Core Sizes */
+    --neurovox-spacing-xs: 0.25rem;
+    --neurovox-spacing-sm: 0.5rem;
+    --neurovox-spacing-md: 1rem;
+    --neurovox-spacing-lg: 1.5rem;
+    --neurovox-spacing-xl: 2rem;
 
-/* Timer Content */
-.timer-content {
+    /* Component Sizes */
+    --neurovox-button-size: 38px;
+    --neurovox-timer-size: 3rem;
+    --neurovox-wave-width: 7px;
+    --neurovox-wave-height: 40px;
+    --neurovox-icon-size: 20px;
+    --neurovox-control-size: 48px;
+    --neurovox-toggle-width: 40px;
+    --neurovox-toggle-height: 20px;
+
+    /* Animation Timing */
+    --neurovox-transition-quick: 0.2s;
+    --neurovox-transition-normal: 0.3s;
+    --neurovox-animation-duration: 1.2s;
+
+    /* Effects */
+    --neurovox-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    --neurovox-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.2);
+    --neurovox-transition: all var(--neurovox-transition-quick) cubic-bezier(0.4, 0, 0.2, 1);
+    --neurovox-border-radius: var(--radius-s);
+    --neurovox-border-radius-lg: var(--radius-m);
+}
+
+/************************************
+ * MODAL STYLES
+ ************************************/
+.neurovox-timer-modal {
+    background-color: var(--background-primary);
+    border-radius: var(--neurovox-border-radius-lg);
+    box-shadow: var(--shadow-l);
+    overflow: hidden;
+}
+
+.neurovox-timer-content {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1.75rem;
-    padding: 1.75rem;
+    gap: var(--neurovox-spacing-lg);
+    padding: var(--neurovox-spacing-lg);
     margin: 0 auto;
     width: 100%;
+    max-width: 400px;
 }
 
-/* Timer Display */
-.timer-text {
+.neurovox-timer-display {
     font-family: var(--font-monospace);
-    font-size: 3rem;
+    font-size: var(--neurovox-timer-size);
     font-weight: 700;
     color: var(--text-normal);
     line-height: 1;
@@ -22,27 +63,27 @@
     text-align: center;
     margin: 0;
     white-space: nowrap;
-    width: auto;
+    transition: color var(--neurovox-transition-normal) ease;
 }
 
-.timer-text.warning {
+.neurovox-timer-display.is-warning {
     color: var(--text-error);
     animation: pulse 2s infinite;
 }
 
-/* Controls Section */
-.timer-controls {
+/************************************
+ * CONTROL BUTTONS
+ ************************************/
+.neurovox-timer-controls {
     display: flex;
     justify-content: center;
-    gap: 1.25rem;
+    gap: var(--neurovox-spacing-md);
     padding: 0;
-    width: auto;
 }
 
-/* Button Styles */
-.timer-button {
-    width: 48px;
-    height: 48px;
+.neurovox-timer-button {
+    width: var(--neurovox-control-size);
+    height: var(--neurovox-control-size);
     border: none;
     border-radius: 50%;
     background-color: var(--interactive-normal);
@@ -51,220 +92,328 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--neurovox-transition);
     padding: 0;
+    box-shadow: var(--neurovox-shadow);
+    will-change: transform;
 }
 
-.timer-button:hover {
+.neurovox-timer-button:hover {
     transform: translateY(-2px);
-    filter: brightness(1.1);
+    box-shadow: var(--neurovox-shadow-hover);
 }
 
-.timer-button:active {
+.neurovox-timer-button:active {
     transform: translateY(0);
 }
 
-.timer-button svg {
-    width: 22px;
-    height: 22px;
+.neurovox-timer-button svg {
+    width: var(--neurovox-icon-size);
+    height: var(--neurovox-icon-size);
     stroke-width: 2;
 }
 
-/* Button Variants */
-.pause-button {
+.neurovox-pause-button {
     background-color: var(--interactive-accent);
 }
 
-.stop-button {
+.neurovox-stop-button {
     background-color: var(--text-error);
 }
 
-/* Audio Wave Visualization */
-.audio-wave {
+/************************************
+ * AUDIO VISUALIZATION
+ ************************************/
+.neurovox-audio-wave {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    height: 54px;
+    gap: var(--neurovox-spacing-xs);
+    height: calc(var(--neurovox-wave-height) + var(--neurovox-spacing-md));
     margin: 0;
-    width: auto;
 }
 
-.wave-bar {
-    width: 7px;
-    height: 40px;
-    border-radius: 4px;
-    background-color: var(--mic-button-color);
+.neurovox-wave-bar {
+    width: var(--neurovox-wave-width);
+    height: var(--neurovox-wave-height);
+    border-radius: calc(var(--neurovox-wave-width) / 2);
+    background-color: var(--interactive-accent);
     opacity: 0.8;
     transform-origin: bottom;
+    will-change: transform;
 }
 
-/* Wave Bar Animations */
-.wave-bar:nth-child(1) { animation: wave 1.2s ease-in-out infinite; }
-.wave-bar:nth-child(2) { animation: wave 1.1s ease-in-out infinite 0.1s; }
-.wave-bar:nth-child(3) { animation: wave 1.3s ease-in-out infinite 0.2s; }
-.wave-bar:nth-child(4) { animation: wave 1s ease-in-out infinite 0.3s; }
-.wave-bar:nth-child(5) { animation: wave 1.2s ease-in-out infinite 0.4s; }
+.neurovox-audio-wave.is-recording .neurovox-wave-bar {
+    animation: wave var(--neurovox-animation-duration) ease-in-out infinite;
+}
 
-/* Wave States */
-.paused .wave-bar {
+.neurovox-audio-wave.is-recording .neurovox-wave-bar:nth-child(1) { animation-delay: 0s; }
+.neurovox-audio-wave.is-recording .neurovox-wave-bar:nth-child(2) { animation-delay: 0.1s; }
+.neurovox-audio-wave.is-recording .neurovox-wave-bar:nth-child(3) { animation-delay: 0.2s; }
+.neurovox-audio-wave.is-recording .neurovox-wave-bar:nth-child(4) { animation-delay: 0.3s; }
+.neurovox-audio-wave.is-recording .neurovox-wave-bar:nth-child(5) { animation-delay: 0.4s; }
+
+.neurovox-audio-wave.is-paused .neurovox-wave-bar {
     animation-play-state: paused;
 }
 
-.stopped .wave-bar {
+.neurovox-audio-wave.is-stopped .neurovox-wave-bar {
     animation: none;
     transform: scaleY(0.3);
 }
 
-/* Floating Button */
+/************************************
+ * FLOATING BUTTON
+ ************************************/
+ :root {
+    --neurovox-button-size: 48px;
+    --neurovox-button-margin: 20px;
+    --neurovox-resize-delay: 100ms;
+    --neurovox-icon-size: 24px;
+    --neurovox-border-width: 2px;
+    --neurovox-hover-transform: -2px;
+    --neurovox-drag-scale: 1.1;
+    --neurovox-transition-duration: 0.2s;
+}
+
+.neurovox-button-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: var(--layer-notice);
+}
+
 .neurovox-button.floating {
-    position: fixed;
-    width: 56px;
-    height: 56px;
+    position: absolute;
+    width: var(--neurovox-button-size);
+    height: var(--neurovox-button-size);
     border-radius: 50%;
-    background-color: var(--background-primary);
-    color: var(--text-normal);
+    background-color: var(--neurovox-button-color, var(--interactive-accent));
+    border: var(--neurovox-border-width) solid var(--background-modifier-border);
+    color: var(--text-on-accent);
+    padding: 0;
+    margin: 0;
+    cursor: grab;
+    pointer-events: all;
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
     box-shadow: var(--shadow-s);
-    z-index: 1000;
+    transition: all var(--neurovox-transition-duration) ease;
+    transform-origin: top left;
 }
 
 .neurovox-button.floating:hover {
-    transform: translateY(-2px);
+    transform: translateY(var(--neurovox-hover-transform));
     box-shadow: var(--shadow-l);
 }
 
-.neurovox-button.floating.dragging {
+.neurovox-button.floating.is-dragging {
     cursor: grabbing;
-    transform: scale(1.1);
+    transform: scale(var(--neurovox-drag-scale));
+    box-shadow: var(--shadow-l);
 }
 
-/* Toolbar Button */
+.neurovox-button.floating svg {
+    width: var(--neurovox-icon-size);
+    height: var(--neurovox-icon-size);
+    color: currentColor;
+}
+/************************************
+ * TOOLBAR BUTTON
+ ************************************/
 .neurovox-toolbar-button {
     color: var(--text-muted);
-    padding: 0 8px;
-    transition: color 0.2s ease;
+    padding: 0 var(--neurovox-spacing-sm);
+    transition: color var(--neurovox-transition-quick) ease;
 }
 
 .neurovox-toolbar-button:hover {
     color: var(--text-normal);
 }
 
-/* Animations */
+/************************************
+ * SETTINGS & ACCORDIONS
+ ************************************/
+.neurovox-settings-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--neurovox-spacing-md);
+    padding: var(--neurovox-spacing-sm);
+}
+
+.neurovox-accordion {
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    overflow: hidden;
+    transition: var(--neurovox-transition);
+}
+
+.neurovox-accordion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--neurovox-spacing-md);
+    background-color: var(--background-secondary-alt);
+    cursor: pointer;
+    border-bottom: 1px solid var(--background-modifier-border);
+    transition: background-color var(--neurovox-transition-quick) ease;
+}
+
+.neurovox-accordion-header:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.neurovox-accordion-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: var(--neurovox-spacing-sm);
+}
+
+.neurovox-accordion-title {
+    font-size: var(--font-ui-medium);
+    font-weight: var(--font-medium);
+    color: var(--text-normal);
+}
+
+.neurovox-accordion-description {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    padding: var(--neurovox-spacing-xs) var(--neurovox-spacing-md);
+}
+
+.neurovox-accordion-content {
+    padding: var(--neurovox-spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--neurovox-spacing-md);
+    background-color: var(--background-primary);
+    height: 0;
+    opacity: 0;
+    transition: all var(--neurovox-transition-normal) ease;
+}
+
+.neurovox-accordion-open .neurovox-accordion-content {
+    height: auto;
+    opacity: 1;
+}
+
+/************************************
+ * FORM CONTROLS
+ ************************************/
+.neurovox-setting-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--neurovox-spacing-xs);
+    padding: var(--neurovox-spacing-sm) 0;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.neurovox-setting-item:last-child {
+    border-bottom: none;
+}
+
+/* Model Selection */
+.neurovox-model-select {
+    width: 100%;
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: var(--neurovox-spacing-xs) var(--neurovox-spacing-sm);
+    color: var(--text-normal);
+    transition: border-color var(--neurovox-transition-quick) ease;
+}
+
+.neurovox-model-select:hover,
+.neurovox-model-select:focus {
+    border-color: var(--interactive-accent);
+}
+
+.neurovox-model-group {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    padding: var(--neurovox-spacing-xs) var(--neurovox-spacing-sm);
+}
+
+.neurovox-model-option {
+    color: var(--text-normal);
+    background-color: var(--background-primary);
+    padding: var(--neurovox-spacing-xs) var(--neurovox-spacing-sm);
+}
+
+/* Toggle Switch */
+.neurovox-toggle {
+    width: var(--neurovox-toggle-width);
+    height: var(--neurovox-toggle-height);
+    border-radius: calc(var(--neurovox-toggle-height) / 2);
+    background-color: var(--background-modifier-border);
+    transition: var(--neurovox-transition);
+    cursor: pointer;
+}
+
+.neurovox-toggle.is-enabled {
+    background-color: var(--interactive-accent);
+}
+
+/* Sliders */
+.neurovox-slider {
+    width: 100%;
+    height: 4px;
+    background-color: var(--background-modifier-border);
+    border-radius: 2px;
+    appearance: none;
+    cursor: pointer;
+}
+
+.neurovox-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background-color: var(--interactive-accent);
+    border: none;
+    border-radius: 50%;
+    transition: var(--neurovox-transition);
+    cursor: grab;
+}
+
+.neurovox-slider::-webkit-slider-thumb:hover {
+    background-color: var(--interactive-accent-hover);
+    transform: scale(1.1);
+}
+
+/* Textarea */
+.neurovox-prompt-textarea {
+    width: 100%;
+    min-height: 100px;
+    resize: vertical;
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: var(--neurovox-spacing-sm);
+    color: var(--text-normal);
+    font-family: var(--font-text);
+    line-height: 1.5;
+    transition: border-color var(--neurovox-transition-quick) ease;
+}
+
+.neurovox-prompt-textarea:focus {
+    border-color: var(--interactive-accent);
+    outline: none;
+}
+
+/************************************
+ * ANIMATIONS
+ ************************************/
 @keyframes wave {
-    0%, 100% {
-        transform: scaleY(0.2);
-    }
-    50% {
-        transform: scaleY(1.2);
-    }
+    0%, 100% { transform: scaleY(0.2); }
+    50% { transform: scaleY(1.2); }
 }
 
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
-}
-
-/* Focus States */
-.timer-button:focus-visible,
-.neurovox-button:focus-visible {
-    outline: 2px solid var(--interactive-accent);
-    outline-offset: 2px;
-}
-
-/* Mobile Responsive Design */
-@media screen and (max-width: 768px) {
-    .modal {
-        max-width: 240px !important;
-    }
-
-    .timer-content {
-        padding: 1.5rem;
-        gap: 1.5rem;
-    }
-
-    .timer-text {
-        font-size: 2.5rem;
-    }
-
-    .timer-controls {
-        gap: 1.25rem;
-    }
-
-    .timer-button {
-        width: 42px;
-        height: 42px;
-    }
-
-    .timer-button svg {
-        width: 20px;
-        height: 20px;
-    }
-    
-    .audio-wave {
-        gap: 6px;
-        height: 48px;
-    }
-    
-    .wave-bar {
-        width: 6px;
-        height: 35px;
-    }
-}
-
-/* Small Mobile Adjustments */
-@media screen and (max-width: 320px) {
-    .modal {
-        max-width: 220px !important;
-    }
-
-    .timer-content {
-        padding: 1.25rem;
-        gap: 1.25rem;
-    }
-
-    .timer-text {
-        font-size: 2.25rem;
-    }
-
-    .timer-button {
-        width: 38px;
-        height: 38px;
-    }
-
-    .timer-button svg {
-        width: 18px;
-        height: 18px;
-    }
-    
-    .wave-bar {
-        width: 5px;
-        height: 30px;
-    }
-}
-
-/* Accessibility */
-@media (prefers-reduced-motion: reduce) {
-    .timer-text.warning,
-    .wave-bar {
-        animation: none !important;
-    }
-
-    .timer-button, 
-    .neurovox-button.floating {
-        transition: none;
-    }
-
-    .timer-button:hover,
-    .neurovox-button.floating:hover {
-        transform: none;
-    }
-
-    .wave-bar {
-        height: 20px;
-    }
 }

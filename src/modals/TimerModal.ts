@@ -4,24 +4,21 @@ import RecordRTC from 'recordrtc';
 
 /**
  * TimerModal provides a recording interface with integrated timer, controls, and audio visualization.
- * Uses Obsidian's native modal structure and includes an animated audio wave visualization.
+ * Uses CSS classes for styling and state management.
  */
 export class TimerModal extends Modal {
-    private recorder: RecordRTC | null = null;
-    private stream: MediaStream | null = null;
-    private intervalId: number | null = null;
-    private seconds: number = 0;
-    private isRecording: boolean = false;
-    private isPaused: boolean = false;
-    private timerText: HTMLElement;
-    private pauseButton: HTMLButtonElement;
-    private stopButton: HTMLButtonElement;
-    private waveContainer: HTMLElement;
+    public recorder: RecordRTC | null = null;
+    public stream: MediaStream | null = null;
+    public intervalId: number | null = null;
+    public seconds: number = 0;
+    public isRecording: boolean = false;
+    public isPaused: boolean = false;
+    public timerText: HTMLElement;
+    public pauseButton: HTMLButtonElement;
+    public stopButton: HTMLButtonElement;
+    public waveContainer: HTMLElement;
     
-    // Maximum recording duration in seconds (12 minutes)
-    private readonly MAX_RECORDING_DURATION = 12 * 60;
-
-    // Callback for when recording is stopped
+    public readonly MAX_RECORDING_DURATION = 12 * 60;
     public onStop: (audioBlob: Blob) => void;
 
     constructor(app: App) {
@@ -29,50 +26,52 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Initializes the modal interface with timer, controls, and audio wave
+     * Initializes the modal interface with timer, controls, and audio wave visualization
      */
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
+        contentEl.addClass('neurovox-timer-modal');
 
-        // Container for all content
-        const container = contentEl.createDiv('timer-content');
+        const container = contentEl.createDiv({
+            cls: 'neurovox-timer-content'
+        });
 
-        // Create timer display
-        this.timerText = container.createDiv('timer-text');
-        this.timerText.setText('00:00');
-
-        // Create controls container
-        const controls = container.createDiv('timer-controls');
-        this.createButtons(controls);
-
-        // Create audio wave visualization
-        this.waveContainer = container.createDiv('audio-wave');
-        for (let i = 0; i < 5; i++) {
-            this.waveContainer.createDiv('wave-bar');
-        }
-
-        // Start recording automatically
+        this.createTimerDisplay(container);
+        this.createControlButtons(container);
+        this.createAudioWave(container);
         this.initializeRecording();
     }
 
     /**
-     * Creates control buttons with icons and event handlers
+     * Creates the timer display element
      */
-    private createButtons(container: HTMLElement) {
-        // Create pause button
+    public createTimerDisplay(container: HTMLElement): void {
+        this.timerText = container.createDiv({
+            cls: 'neurovox-timer-display',
+            text: '00:00'
+        });
+    }
+
+    /**
+     * Creates the control buttons container and buttons
+     */
+    public createControlButtons(container: HTMLElement): void {
+        const controls = container.createDiv({
+            cls: 'neurovox-timer-controls'
+        });
+
         this.pauseButton = this.createButton(
-            container,
-            'timer-button pause-button',
+            controls,
+            ['neurovox-timer-button', 'neurovox-pause-button'],
             icons.pause,
             'Pause Recording',
             () => this.togglePause()
         );
 
-        // Create stop button
         this.stopButton = this.createButton(
-            container,
-            'timer-button stop-button',
+            controls,
+            ['neurovox-timer-button', 'neurovox-stop-button'],
             icons.stop,
             'Stop Recording',
             () => this.stopRecording()
@@ -80,17 +79,32 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Creates a button with icon and event handler
+     * Creates the audio wave visualization container and bars
      */
-    private createButton(
+    public createAudioWave(container: HTMLElement): void {
+        this.waveContainer = container.createDiv({
+            cls: 'neurovox-audio-wave'
+        });
+        
+        for (let i = 0; i < 5; i++) {
+            this.waveContainer.createDiv({
+                cls: 'neurovox-wave-bar'
+            });
+        }
+    }
+
+    /**
+     * Creates a button element with specified classes, icon, and handler
+     */
+    public createButton(
         container: HTMLElement,
-        className: string,
+        classNames: string[],
         icon: string,
         ariaLabel: string,
         onClick: () => void
     ): HTMLButtonElement {
         const button = container.createEl('button', {
-            cls: className,
+            cls: classNames,
             attr: { 'aria-label': ariaLabel }
         });
 
@@ -104,9 +118,9 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Creates an SVG element from SVG string
+     * Creates an SVG element from icon string
      */
-    private createSvgElement(svgIcon: string): SVGElement | null {
+    public createSvgElement(svgIcon: string): SVGElement | null {
         const parser = new DOMParser();
         const svgDoc = parser.parseFromString(svgIcon, 'image/svg+xml');
         return svgDoc.documentElement instanceof SVGElement 
@@ -115,9 +129,9 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Initializes the recording session
+     * Initializes the recording functionality
      */
-    private async initializeRecording() {
+    public async initializeRecording() {
         try {
             this.stream = await navigator.mediaDevices.getUserMedia({ 
                 audio: true 
@@ -140,15 +154,15 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Starts or resumes recording with updated UI states
+     * Manages recording state and UI updates when starting/resuming recording
      */
-    private startRecording() {
+    public startRecording() {
         if (!this.recorder) return;
 
         this.isRecording = true;
         this.isPaused = false;
         this.updateButtonState();
-        this.updateWaveState();
+        this.updateRecordingState('recording');
 
         if (this.recorder.state === 'inactive') {
             this.recorder.startRecording();
@@ -162,9 +176,18 @@ export class TimerModal extends Modal {
     }
 
     /**
+     * Updates the visual state of the recording interface
+     */
+    public updateRecordingState(state: 'recording' | 'paused' | 'stopped') {
+        const states = ['is-recording', 'is-paused', 'is-stopped'];
+        states.forEach(cls => this.waveContainer.removeClass(cls));
+        this.waveContainer.addClass(`is-${state}`);
+    }
+
+    /**
      * Toggles between pause and resume states
      */
-    private togglePause() {
+    public togglePause() {
         if (this.isPaused) {
             this.resumeRecording();
         } else {
@@ -173,9 +196,9 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Pauses recording and updates UI states
+     * Handles recording pause state and UI updates
      */
-    private pauseRecording() {
+    public pauseRecording() {
         if (!this.recorder || !this.isRecording) return;
 
         this.recorder.pauseRecording();
@@ -184,29 +207,29 @@ export class TimerModal extends Modal {
         this.isRecording = false;
         this.isPaused = true;
         this.updateButtonState();
-        this.updateWaveState();
+        this.updateRecordingState('paused');
         
         new Notice('Recording paused');
     }
 
     /**
-     * Resumes a paused recording
+     * Resumes recording from paused state
      */
-    private resumeRecording() {
+    public resumeRecording() {
         if (!this.recorder) return;
         this.startRecording();
         new Notice('Recording resumed');
     }
 
     /**
-     * Stops recording and processes the result
+     * Handles the stop recording process and cleanup
      */
-    private async stopRecording(): Promise<void> {
+    public async stopRecording(): Promise<void> {
         if (!this.recorder) return;
 
         this.isRecording = false;
         this.isPaused = false;
-        this.updateWaveState();
+        this.updateRecordingState('stopped');
 
         return new Promise<void>((resolve) => {
             if (!this.recorder) {
@@ -227,9 +250,9 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Starts the recording timer
+     * Initializes and starts the timer
      */
-    private startTimer() {
+    public startTimer() {
         this.seconds = 0;
         this.updateTimerDisplay();
         
@@ -245,59 +268,25 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Updates the timer display with current time
+     * Updates the timer display and warning state
      */
-    private updateTimerDisplay() {
+    public updateTimerDisplay() {
         const minutes = Math.floor(this.seconds / 60).toString().padStart(2, '0');
         const seconds = (this.seconds % 60).toString().padStart(2, '0');
         this.timerText.setText(`${minutes}:${seconds}`);
 
-        if (this.seconds >= this.MAX_RECORDING_DURATION - 60) {
-            this.timerText.addClass('warning');
+        const timeLeft = this.MAX_RECORDING_DURATION - this.seconds;
+        if (timeLeft <= 60) {
+            this.timerText.addClass('is-warning');
+        } else {
+            this.timerText.removeClass('is-warning');
         }
     }
 
     /**
-     * Updates the audio wave animation state
+     * Updates pause/play button state and icon
      */
-    private updateWaveState() {
-        if (!this.waveContainer) return;
-
-        this.waveContainer.removeClass('paused', 'stopped');
-
-        if (this.isPaused) {
-            this.waveContainer.addClass('paused');
-        } else if (!this.isRecording) {
-            this.waveContainer.addClass('stopped');
-        }
-    }
-
-    /**
-     * Pauses the timer
-     */
-    private pauseTimer() {
-        if (this.intervalId) {
-            window.clearInterval(this.intervalId);
-            this.intervalId = null;
-        }
-    }
-
-    /**
-     * Resumes the timer
-     */
-    private resumeTimer() {
-        if (!this.intervalId) {
-            this.intervalId = window.setInterval(() => {
-                this.seconds++;
-                this.updateTimerDisplay();
-            }, 1000);
-        }
-    }
-
-    /**
-     * Updates button states based on recording status
-     */
-    private updateButtonState() {
+    public updateButtonState() {
         const pauseIcon = this.isPaused ? icons.play : icons.pause;
         const pauseLabel = this.isPaused ? 'Resume Recording' : 'Pause Recording';
         
@@ -307,10 +296,34 @@ export class TimerModal extends Modal {
             this.pauseButton.appendChild(svgElement);
             this.pauseButton.setAttribute('aria-label', pauseLabel);
         }
+
+        this.pauseButton.toggleClass('is-paused', this.isPaused);
     }
 
     /**
-     * Cleans up resources when modal is closed
+     * Pauses the timer
+     */
+    public pauseTimer() {
+        if (this.intervalId) {
+            window.clearInterval(this.intervalId);
+            this.intervalId = null;
+        }
+    }
+
+    /**
+     * Resumes the timer
+     */
+    public resumeTimer() {
+        if (!this.intervalId) {
+            this.intervalId = window.setInterval(() => {
+                this.seconds++;
+                this.updateTimerDisplay();
+            }, 1000);
+        }
+    }
+
+    /**
+     * Performs cleanup when modal is closed
      */
     onClose() {
         if (this.isRecording || this.isPaused) {
@@ -322,7 +335,7 @@ export class TimerModal extends Modal {
     /**
      * Releases all resources used by the recorder
      */
-    private cleanupResources() {
+    public cleanupResources() {
         this.pauseTimer();
         
         if (this.recorder) {
