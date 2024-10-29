@@ -91,6 +91,63 @@ export default class NeuroVoxPlugin extends Plugin {
             name: 'Start NeuroVox Recording',
             callback: () => this.handleRecordingStart()
         });
+
+        this.addCommand({
+            id: 'process-audio-file',
+            name: 'Transcribe Existing Audio File',
+            checkCallback: (checking: boolean) => {
+                // Get the active file
+                const activeFile = this.app.workspace.getActiveFile();
+                
+                // Check if it's an audio file
+                const isAudioFile = activeFile?.extension === 'mp3' || 
+                                  activeFile?.extension === 'wav' ||
+                                  activeFile?.extension === 'webm';
+    
+                // If checking, return true if it's an audio file
+                if (checking) return isAudioFile;
+    
+                if (isAudioFile && activeFile) {
+                    this.processExistingAudioFile(activeFile);
+                }
+    
+                return false;
+            }
+        });
+    }
+
+    public async processExistingAudioFile(file: TFile): Promise<void> {
+        try {
+            // Read the audio file as an array buffer
+            const audioBuffer = await this.app.vault.readBinary(file);
+            
+            // Convert to blob for processing
+            const blob = new Blob([audioBuffer], { type: 'audio/wav' });
+            
+            // Create new markdown file name based on audio file
+            const newFileName = `${file.basename}-transcript.md`;
+            
+            // Create a new markdown file
+            const newFile = await this.app.vault.create(
+                newFileName,
+                '' // Initial empty content
+            );
+    
+            // Use existing recording processor to handle transcription and summary
+            await this.recordingProcessor.processRecording(
+                blob,
+                newFile,
+                { line: 0, ch: 0 } // Start at beginning of file
+            );
+    
+            // Open the new file
+            await this.app.workspace.getLeaf().openFile(newFile);
+            
+            new Notice('Audio file processed successfully!');
+        } catch (error) {
+            console.error('Error processing audio file:', error);
+            new Notice('Error processing audio file. Check console for details.');
+        }
     }
 
     public registerEvents(): void {
