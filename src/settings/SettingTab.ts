@@ -1,8 +1,10 @@
+// src/settings/SettingTab.ts
+
 import { App, PluginSettingTab } from 'obsidian';
 import { ModelHookupAccordion } from './accordions/ModelHookupAccordion';
 import { RecordingAccordion } from './accordions/RecordingAccordion';
 import { SummaryAccordion } from './accordions/SummaryAccordion';
-import { AIProvider, AIAdapter } from '../adapters/AIAdapter';
+import { AIProvider, AIAdapter, AIModels } from '../adapters/AIAdapter';
 import NeuroVoxPlugin from '../main'; // Corrected import as default
 
 export class NeuroVoxSettingTab extends PluginSettingTab {
@@ -36,13 +38,13 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
             this.plugin  // Pass plugin instance
         ).render();
     
-        // Summary Accordion - Fixed by adding plugin instance
+        // Summary Accordion
         const summaryContainer = containerEl.createDiv();
         new SummaryAccordion(
             summaryContainer,
             this.plugin.settings,
             (provider: AIProvider) => this.plugin.aiAdapters.get(provider)!,
-            this.plugin  // Add this line to pass plugin instance
+            this.plugin  // Pass plugin instance
         ).render();
     }
 }

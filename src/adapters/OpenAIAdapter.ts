@@ -1,121 +1,148 @@
-// src/adapters/OpenAIAdapter.ts
-
-import { AIAdapter, AIProvider, AIModels, AIModel } from './AIAdapter';
+import { AIAdapter, AIProvider, AIModels, getModelInfo } from './AIAdapter';
 import { NeuroVoxSettings } from '../settings/Settings';
-import { Notice, requestUrl } from 'obsidian';
 
-export class OpenAIAdapter implements AIAdapter {
-    public apiKey: string;
-    public models = AIModels[AIProvider.OpenAI];
-
-    constructor(public settings: NeuroVoxSettings) {
-        this.apiKey = settings.openaiApiKey;
+export class OpenAIAdapter extends AIAdapter {
+    constructor(settings: NeuroVoxSettings) {
+        super(settings, AIProvider.OpenAI);
     }
 
-    setApiKey(apiKey: string): void {
-        this.apiKey = apiKey;
+    public getApiKey(): string {
+        return this.settings.openaiApiKey;
+    }
+
+    public setApiKey(apiKey: string): void {
         this.settings.openaiApiKey = apiKey;
     }
 
-    getApiKey(): string {
-        return this.apiKey;
+    protected getApiBaseUrl(): string {
+        return 'https://api.openai.com/v1';
     }
 
-    async validateApiKey(): Promise<boolean> {
+    protected getTranscriptionEndpoint(): string {
+        return '/audio/transcriptions';
+    }
+
+    protected getTextGenerationEndpoint(): string {
+        return '/chat/completions';
+    }
+
+    protected parseTextGenerationResponse(response: any): string {
+        if (!response?.choices?.[0]?.message?.content) {
+            throw new Error('Invalid response format from OpenAI API');
+        }
+        return response.choices[0].message.content.trim();
+    }
+
+    protected parseTranscriptionResponse(response: any): string {
+        if (!response?.text) {
+            throw new Error('Invalid transcription response format from OpenAI API');
+        }
+        return response.text.trim();
+    }
+
+    public async generateResponse(prompt: string, model: string, options?: { maxTokens?: number, temperature?: number }): Promise<string> {
         try {
-            if (!this.apiKey) throw new Error('API key not set.');
-            // Simple request to validate the key by fetching models
-            const response = await requestUrl({
-                url: 'https://api.openai.com/v1/models',
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
+            const endpoint = `${this.getApiBaseUrl()}${this.getTextGenerationEndpoint()}`;
+            const modelInfo = getModelInfo(model);
+            
+            const body = {
+                model: model,
+                messages: [{ role: "user", content: prompt }],
+                max_tokens: options?.maxTokens || modelInfo?.maxTokens || 1000,
+                temperature: options?.temperature ?? 0.7,
+            };
+
+            const response = await this.makeAPIRequest(
+                endpoint,
+                'POST',
+                {
+                    'Content-Type': 'application/json',
                 },
-            });
+                JSON.stringify(body)
+            );
 
-            if (response.status !== 200) {
-                throw new Error(`Status ${response.status}`);
-            }
+            return this.parseTextGenerationResponse(response);
+        } catch (error) {
+            const errorMessage = this.getErrorMessage(error);
+            console.error('OpenAI API Error:', error);
+            throw new Error(`OpenAI API request failed: ${errorMessage}`);
+        }
+    }
 
-            return true;
+    public async transcribeAudio(audioArrayBuffer: ArrayBuffer, model: string): Promise<string> {
+        try {
+            const { headers, body } = await this.prepareTranscriptionRequest(audioArrayBuffer, model);
+            const endpoint = `${this.getApiBaseUrl()}${this.getTranscriptionEndpoint()}`;
+            
+            const response = await this.makeAPIRequest(
+                endpoint,
+                'POST',
+                headers,
+                body
+            );
+
+            return this.parseTranscriptionResponse(response);
+        } catch (error) {
+            const errorMessage = this.getErrorMessage(error);
+            console.error('OpenAI Transcription Error:', error);
+            throw new Error(`OpenAI transcription failed: ${errorMessage}`);
+        }
+    }
+
+    protected async validateApiKeyImpl(): Promise<boolean> {
+        try {
+            const response = await this.makeAPIRequest(
+                `${this.getApiBaseUrl()}/models`,
+                'GET',
+                {
+                    'Content-Type': 'application/json',
+                },
+                null
+            );
+            return Array.isArray(response.data);
         } catch (error) {
             console.error('OpenAI API Key Validation Error:', error);
-            new Notice('Invalid OpenAI API Key.');
             return false;
         }
     }
 
-    getAvailableModels(category: 'transcription' | 'language'): AIModel[] {
-        return this.models.filter(model => model.category === category);
-    }
-
-    isReady(): boolean {
-        return !!this.apiKey && this.getAvailableModels('transcription').length > 0 && this.getAvailableModels('language').length > 0;
-    }
-
-    async generateResponse(prompt: string, model: string, options?: { maxTokens?: number }): Promise<string> {
-        const endpoint = 'https://api.openai.com/v1/chat/completions';
-        const maxTokens = options?.maxTokens || 1000;
-
-        const requestBody = {
-            model: model,
-            messages: [
-                { role: 'system', content: this.settings.summaryPrompt },
-                { role: 'user', content: prompt }
-            ],
-            max_tokens: maxTokens
-        };
-
+    protected async makeAPIRequest(
+        endpoint: string,
+        method: string,
+        headers: Record<string, string>,
+        body: string | ArrayBuffer | null
+    ): Promise<any> {
         try {
-            const response = await requestUrl({
-                url: endpoint,
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            });
-
-            if (response.status !== 200) {
-                const errorMessage = response.json?.error?.message || 'Unknown error';
-                throw new Error(`API request failed: ${errorMessage}`);
+            const response = await super.makeAPIRequest(endpoint, method, headers, body);
+            
+            if (response.error) {
+                throw new Error(response.error.message || 'Unknown OpenAI API error');
             }
-
-            return response.json.choices[0].message.content.trim();
+            
+            return response;
         } catch (error) {
-            console.error('OpenAI Generate Response Error:', error);
-            throw new Error(`OpenAI Generate Response Failed: ${(error as Error).message}`);
+            const status = (error as any).status;
+            switch (status) {
+                case 401:
+                    throw new Error('Invalid OpenAI API key. Please check your credentials.');
+                case 429:
+                    throw new Error('OpenAI API rate limit exceeded. Please try again later.');
+                case 500:
+                    throw new Error('OpenAI API server error. Please try again later.');
+                case 503:
+                    throw new Error('OpenAI API service is temporarily unavailable. Please try again later.');
+                default:
+                    if (error instanceof Error) {
+                        throw error;
+                    }
+                    throw new Error('Unknown error occurred');
+            }
         }
     }
 
-    async transcribeAudio(audioBlob: Blob, model: string): Promise<string> {
-        const endpoint = 'https://api.openai.com/v1/audio/transcriptions';
-
-        const formData = new FormData();
-        formData.append('file', audioBlob, 'audio.wav');
-        formData.append('model', model);
-        // Optionally, append language or other parameters
-
-        try {
-            const response = await requestUrl({
-                url: endpoint,
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                },
-                body: formData as any // TypeScript fix: Cast to any to bypass type mismatch
-            });
-
-            if (response.status !== 200) {
-                const errorMessage = response.json?.error?.message || 'Unknown error';
-                throw new Error(`API request failed: ${errorMessage}`);
-            }
-
-            return response.json.text.trim();
-        } catch (error) {
-            console.error('OpenAI Transcribe Audio Error:', error);
-            throw new Error(`OpenAI Transcription Failed: ${(error as Error).message}`);
-        }
+    protected getErrorMessage(error: unknown): string {
+        if (error instanceof Error) return error.message;
+        if (typeof error === 'string') return error;
+        return 'Unknown error occurred';
     }
 }

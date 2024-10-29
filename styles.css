@@ -5,24 +5,31 @@
     /* Core Sizes */
     --neurovox-spacing-xs: 0.25rem;
     --neurovox-spacing-sm: 0.5rem;
-    --neurovox-spacing-md: 1rem;
-    --neurovox-spacing-lg: 1.5rem;
-    --neurovox-spacing-xl: 2rem;
+    --neurovox-spacing-md: 1.5rem;
+    --neurovox-spacing-lg: 2rem;
+    --neurovox-spacing-xl: 2.5rem;
 
     /* Component Sizes */
     --neurovox-button-size: 38px;
+    --neurovox-control-size: 48px;
     --neurovox-timer-size: 3rem;
     --neurovox-wave-width: 7px;
     --neurovox-wave-height: 40px;
     --neurovox-icon-size: 20px;
-    --neurovox-control-size: 48px;
     --neurovox-toggle-width: 40px;
     --neurovox-toggle-height: 20px;
+
+    /* Floating Button Specific Sizes */
+    --neurovox-floating-button-size: 48px;
+    --neurovox-floating-icon-size: 24px;
+    --neurovox-button-margin: 20px;
+    --neurovox-border-width: 2px;
 
     /* Animation Timing */
     --neurovox-transition-quick: 0.2s;
     --neurovox-transition-normal: 0.3s;
     --neurovox-animation-duration: 1.2s;
+    --neurovox-resize-delay: 100ms;
 
     /* Effects */
     --neurovox-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -30,6 +37,8 @@
     --neurovox-transition: all var(--neurovox-transition-quick) cubic-bezier(0.4, 0, 0.2, 1);
     --neurovox-border-radius: var(--radius-s);
     --neurovox-border-radius-lg: var(--radius-m);
+    --neurovox-hover-transform: -2px;
+    --neurovox-drag-scale: 1.1;
 }
 
 /************************************
@@ -126,7 +135,7 @@
  ************************************/
 .neurovox-audio-wave {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: center;
     gap: var(--neurovox-spacing-xs);
     height: calc(var(--neurovox-wave-height) + var(--neurovox-spacing-md));
@@ -165,17 +174,6 @@
 /************************************
  * FLOATING BUTTON
  ************************************/
- :root {
-    --neurovox-button-size: 48px;
-    --neurovox-button-margin: 20px;
-    --neurovox-resize-delay: 100ms;
-    --neurovox-icon-size: 24px;
-    --neurovox-border-width: 2px;
-    --neurovox-hover-transform: -2px;
-    --neurovox-drag-scale: 1.1;
-    --neurovox-transition-duration: 0.2s;
-}
-
 .neurovox-button-container {
     position: absolute;
     top: 0;
@@ -188,8 +186,8 @@
 
 .neurovox-button.floating {
     position: absolute;
-    width: var(--neurovox-button-size);
-    height: var(--neurovox-button-size);
+    width: var(--neurovox-floating-button-size);
+    height: var(--neurovox-floating-button-size);
     border-radius: 50%;
     background-color: var(--neurovox-button-color, var(--interactive-accent));
     border: var(--neurovox-border-width) solid var(--background-modifier-border);
@@ -202,7 +200,7 @@
     align-items: center;
     justify-content: center;
     box-shadow: var(--shadow-s);
-    transition: all var(--neurovox-transition-duration) ease;
+    transition: all var(--neurovox-transition-quick) ease;
     transform-origin: top left;
 }
 
@@ -218,10 +216,11 @@
 }
 
 .neurovox-button.floating svg {
-    width: var(--neurovox-icon-size);
-    height: var(--neurovox-icon-size);
+    width: var(--neurovox-floating-icon-size);
+    height: var(--neurovox-floating-icon-size);
     color: currentColor;
 }
+
 /************************************
  * TOOLBAR BUTTON
  ************************************/
@@ -251,6 +250,7 @@
     border-radius: var(--radius-m);
     overflow: hidden;
     transition: var(--neurovox-transition);
+    margin-bottom: var(--neurovox-spacing-sm);
 }
 
 .neurovox-accordion-header {
@@ -292,13 +292,14 @@
     flex-direction: column;
     gap: var(--neurovox-spacing-md);
     background-color: var(--background-primary);
-    height: 0;
+    max-height: 0;
     opacity: 0;
-    transition: all var(--neurovox-transition-normal) ease;
+    overflow: hidden;
+    transition: max-height var(--neurovox-transition-normal) ease, opacity var(--neurovox-transition-normal) ease;
 }
 
 .neurovox-accordion-open .neurovox-accordion-content {
-    height: auto;
+    max-height: 1000px;
     opacity: 1;
 }
 
@@ -403,6 +404,60 @@
 .neurovox-prompt-textarea:focus {
     border-color: var(--interactive-accent);
     outline: none;
+}
+
+.neurovox-confirmation-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--neurovox-spacing-sm);
+    margin-top: var(--neurovox-spacing-lg);
+}
+
+.neurovox-button-danger {
+    background-color: var(--text-error) !important;
+    color: var(--text-on-accent) !important;
+}
+
+.neurovox-button-primary {
+    background-color: var(--interactive-accent) !important;
+    color: var(--text-on-accent) !important;
+}
+
+.neurovox-button-danger:hover,
+.neurovox-button-primary:hover {
+    opacity: 0.9;
+}
+
+.neurovox-modal-toggle-setting {
+    margin-top: 0 !important;
+    margin-bottom: var(--neurovox-spacing-md);
+    opacity: 0.9;
+}
+
+.neurovox-modal-toggle-setting .setting-item-control {
+    padding-right: 2em;
+}
+
+/* Transition effect for settings */
+.neurovox-accordion-content .setting-item {
+    transition: opacity var(--neurovox-transition-normal) ease;
+}
+
+/* Recording Button Animation */
+.neurovox-button.recording {
+    animation: breathing 2s ease-in-out infinite;
+    background-color: var(--color-red) !important;
+}
+
+@keyframes breathing {
+    0%, 100% {
+        transform: scale(0.9);
+        opacity: 0.7;
+    }
+    50% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 /************************************

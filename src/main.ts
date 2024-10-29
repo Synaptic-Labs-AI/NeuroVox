@@ -3,10 +3,8 @@
 import { 
     Plugin, 
     Notice, 
-    TFile, 
-    EditorPosition, 
+    TFile,  
     MarkdownView, 
-    TFolder,
     TAbstractFile, 
     WorkspaceLeaf 
 } from 'obsidian';
@@ -18,22 +16,23 @@ import { TimerModal } from './modals/TimerModal';
 import { OpenAIAdapter } from './adapters/OpenAIAdapter';
 import { GroqAdapter } from './adapters/GroqAdapter';
 import { AIProvider, AIAdapter } from './adapters/AIAdapter';
-import { PluginData } from './types'; // Import PluginData
+import { PluginData } from './types';
+import { RecordingProcessor } from './utils/RecordingProcessor';
 
 export default class NeuroVoxPlugin extends Plugin {
     // Plugin state
     settings: NeuroVoxSettings;
     public aiAdapters: Map<AIProvider, AIAdapter>;
-    private pluginData: PluginData;
+    public pluginData: PluginData;
     
     // UI Components
     floatingButton: FloatingButton | null = null;
     toolbarButton: ToolbarButton | null = null;
     public activeLeaf: WorkspaceLeaf | null = null;
 
-    /**
-     * Plugin initialization
-     */
+    // Recording Processor
+    public recordingProcessor: RecordingProcessor;
+
     async onload(): Promise<void> {
         console.log('Loading NeuroVox plugin');
 
@@ -45,68 +44,55 @@ export default class NeuroVoxPlugin extends Plugin {
         }
     }
 
-    /**
-     * Initializes all plugin components
-     */
     public async initializePlugin(): Promise<void> {
-        await this.loadPluginData(); // Load all data at once
+        await this.loadPluginData();
         this.initializeAIAdapters();
         this.registerSettingsTab();
         this.registerCommands();
         this.registerEvents();
+        
+        // Initialize Recording Processor before UI
+        this.recordingProcessor = RecordingProcessor.getInstance(this, this.pluginData);
+        
+        // Initialize UI components
         this.initializeUI();
     }
 
-    /**
-     * Loads plugin data including button position
-     */
-    private async loadPluginData(): Promise<void> {
+    public async loadPluginData(): Promise<void> {
         const data = await this.loadData();
         this.pluginData = data ? { ...DEFAULT_SETTINGS, ...data } : { ...DEFAULT_SETTINGS };
-        this.settings = this.pluginData; // Ensure settings reference the same data
+        this.settings = this.pluginData;
         console.log('Plugin data loaded:', this.pluginData);
     }
 
-    /**
-     * Saves all plugin data including button position
-     */
     public async savePluginData(): Promise<void> {
         console.log('Saving plugin data:', this.pluginData);
         await this.saveData(this.pluginData);
         console.log('Plugin data saved successfully.');
     }
 
-    /**
-     * Initializes AI service adapters
-     */
     public initializeAIAdapters(): void {
-        this.aiAdapters = new Map([
-            [AIProvider.OpenAI, new OpenAIAdapter(this.settings)],
-            [AIProvider.Groq, new GroqAdapter(this.settings)]
-        ]);
+        const adapters: Array<[AIProvider, AIAdapter]> = [
+            [AIProvider.OpenAI, new OpenAIAdapter(this.pluginData)],
+            [AIProvider.Groq, new GroqAdapter(this.pluginData)]
+        ];
+        
+        this.aiAdapters = new Map<AIProvider, AIAdapter>(adapters);
     }
 
-    /**
-     * Registers the settings tab
-     */
     public registerSettingsTab(): void {
+        // Adjusted to pass only two arguments
         this.addSettingTab(new NeuroVoxSettingTab(this.app, this));
     }
 
-    /**
-     * Registers plugin commands
-     */
     public registerCommands(): void {
         this.addCommand({
             id: 'start-neurovox-recording',
             name: 'Start NeuroVox Recording',
-            callback: () => this.openRecordingModal()
+            callback: () => this.handleRecordingStart()
         });
     }
 
-    /**
-     * Registers workspace events
-     */
     public registerEvents(): void {
         this.registerEvent(
             this.app.workspace.on('active-leaf-change', this.handleActiveLeafChange.bind(this))
@@ -121,9 +107,6 @@ export default class NeuroVoxPlugin extends Plugin {
         );
     }
 
-    /**
-     * Handles active leaf changes
-     */
     public handleActiveLeafChange(leaf: WorkspaceLeaf | null): void {
         this.activeLeaf = leaf;
         
@@ -136,54 +119,38 @@ export default class NeuroVoxPlugin extends Plugin {
         }
     }
 
-    /**
-     * Handles workspace layout changes
-     */
     public handleLayoutChange(): void {
         if (this.floatingButton) {
             this.floatingButton.show();
         }
     }
 
-    /**
-     * Handles file deletion
-     */
     public handleFileDelete(file: TAbstractFile): void {
-        if (!(file instanceof TFile)) {
-            return;
+        if (file instanceof TFile) {
+            // Handle cleanup if needed
         }
-        // Handle any cleanup needed when files are deleted
     }
 
-    /**
-     * Initializes UI components
-     */
     public initializeUI(): void {
         console.log('Initializing UI components');
         
-        // Clean up existing UI elements
         this.cleanupUI();
 
-        // Initialize floating button if enabled
         if (this.pluginData.showFloatingButton) {
             console.log('Creating floating button');
             this.floatingButton = FloatingButton.getInstance(
                 this,
-                this.pluginData, // Use unified pluginData
-                () => this.openRecordingModal()
+                this.pluginData,
+                () => this.handleRecordingStart()
             );
         }
 
-        // Initialize toolbar button if enabled
         if (this.pluginData.showToolbarButton) {
             console.log('Creating toolbar button');
-            this.toolbarButton = new ToolbarButton(this, this.pluginData); // Use pluginData
+            this.toolbarButton = new ToolbarButton(this, this.pluginData);
         }
     }
 
-    /**
-     * Cleans up UI components
-     */
     public cleanupUI(): void {
         console.log('Cleaning up UI components');
         
@@ -200,191 +167,78 @@ export default class NeuroVoxPlugin extends Plugin {
         }
     }
 
-    /**
-     * Opens the recording modal
-     */
-    public async openRecordingModal(): Promise<void> {
+    private modalInstance: TimerModal | null = null;
+
+    public handleRecordingStart(): void {
         const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
         
         if (!activeView) {
             new Notice('No active note found to insert transcription.');
             return;
         }
-
-        const activeFile = activeView.file;
+    
+        const activeFile = activeView.file;  // Separate declaration for type narrowing
         if (!activeFile) {
-            new Notice('No active file to insert transcription.');
+            new Notice('No active file found.');
             return;
         }
+    
+        if (this.pluginData.useRecordingModal) {
+            // Check if modal is already open
+            if (this.modalInstance) {
+                return;
+            }
+            this.modalInstance = new TimerModal(this.app);
+            this.modalInstance.onStop = async (audioBlob: Blob) => {
+                await this.recordingProcessor.processRecording(
+                    audioBlob, 
+                    activeFile,  // Now TypeScript knows this is definitely a TFile
+                    activeView.editor.getCursor()
+                );
+            };
+            
+            // Fix async type mismatch
+            const originalOnClose = this.modalInstance.onClose?.bind(this.modalInstance);
+            this.modalInstance.onClose = async () => {
+                if (originalOnClose) {
+                    await originalOnClose();
+                }
+                this.modalInstance = null;
+                return Promise.resolve();
+            };
+            
+            this.modalInstance.open();
+        } else {
+            return;
+        }
+    }
 
+    public openRecordingModal(activeView: MarkdownView): void {
+        const file = activeView.file;
+        if (!file) {
+            new Notice('No active file found');
+            return;
+        }
+    
         const modal = new TimerModal(this.app);
-        modal.onStop = (audioBlob: Blob) => {
-            this.processRecording(audioBlob, activeFile, activeView.editor.getCursor());
+        modal.onStop = async (audioBlob: Blob) => {
+            await this.recordingProcessor.processRecording(
+                audioBlob, 
+                file,
+                activeView.editor.getCursor()
+            );
         };
         modal.open();
     }
 
-    /**
-     * Processes recorded audio into transcription and summary
-     */
-    public async processRecording(
-        audioBlob: Blob,
-        activeFile: TFile,
-        cursorPosition: EditorPosition
-    ): Promise<void> {
-        try {
-            const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
-            if (audioBlob.size > MAX_FILE_SIZE) {
-                new Notice('Recording is too long to process. Please record a shorter audio.');
-                return;
-            }
-
-            const audioFile = await this.saveAudioFile(
-                audioBlob,
-                `recording-${Date.now()}.wav`
-            );
-
-            const adapter = this.aiAdapters.get(this.pluginData.currentProvider);
-            if (!adapter?.isReady()) {
-                new Notice('Selected AI provider is not ready.');
-                return;
-            }
-
-            new Notice('Transcribing audio, please wait...');
-            const transcription = await adapter.transcribeAudio(
-                audioBlob,
-                this.pluginData.transcriptionModel
-            );
-
-            let summary = '';
-            if (this.pluginData.generateSummary) {
-                new Notice('Generating summary, please wait...');
-                summary = await adapter.generateResponse(
-                    transcription,
-                    this.pluginData.summaryModel,
-                    { maxTokens: this.pluginData.summaryMaxTokens }
-                );
-            }
-
-            const content = this.formatContent(audioFile, transcription, summary);
-            await this.insertContentIntoNote(activeFile, content, cursorPosition);
-
-            new Notice('Recording processed successfully.');
-        } catch (error) {
-            console.error('Error processing recording:', error);
-            new Notice('Failed to process recording.');
-        }
-    }
-
-    /**
-     * Saves audio file to vault
-     */
-    public async saveAudioFile(audioBlob: Blob, fileName: string): Promise<TFile> {
-        const folderPath = this.pluginData.recordingFolderPath;
-        await this.ensureRecordingFolder(folderPath);
-
-        const arrayBuffer = await this.blobToArrayBuffer(audioBlob);
-        return await this.app.vault.createBinary(`${folderPath}/${fileName}`, arrayBuffer);
-    }
-
-    /**
-     * Ensures recording folder exists
-     */
-    public async ensureRecordingFolder(folderPath: string): Promise<void> {
-        const folder = this.app.vault.getAbstractFileByPath(folderPath);
-        if (!folder) {
-            await this.app.vault.createFolder(folderPath);
-        } else if (!(folder instanceof TFolder)) {
-            throw new Error(`${folderPath} exists but is not a folder`);
-        }
-    }
-
-    /**
-     * Converts blob to array buffer
-     */
-    public async blobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as ArrayBuffer);
-            reader.onerror = reject;
-            reader.readAsArrayBuffer(blob);
-        });
-    }
-
-    /**
-     * Formats content for note insertion
-     */
-    public formatContent(audioFile: TFile, transcription: string, summary: string): string {
-        let content = `\n>[!info]- Transcription\n>![[${audioFile.path}]]\n>${transcription}\n\n`;
-        
-        if (this.pluginData.generateSummary && summary) {
-            content += `---\n\n>[!summary]- Summary\n>${summary}\n\n`;
-        }
-        
-        return content;
-    }
-
-    /**
-     * Inserts content into note
-     */
-    public async insertContentIntoNote(
-        file: TFile,
-        content: string,
-        cursorPosition?: EditorPosition
-    ): Promise<void> {
-        try {
-            const currentContent = await this.app.vault.read(file);
-            if (cursorPosition) {
-                // If cursor position provided, insert at that location
-                const beforeCursor = currentContent.slice(0, this.getOffsetFromPosition(currentContent, cursorPosition));
-                const afterCursor = currentContent.slice(this.getOffsetFromPosition(currentContent, cursorPosition));
-                await this.app.vault.modify(file, beforeCursor + content + afterCursor);
-            } else {
-                // Otherwise append to end
-                await this.app.vault.modify(file, currentContent + content);
-            }
-        } catch (error) {
-            console.error('Error inserting content into note:', error);
-            throw new Error('Failed to insert content into note');
-        }
-    }
-
-    /**
-     * Gets character offset from cursor position
-     */
-    public getOffsetFromPosition(content: string, position: EditorPosition): number {
-        const lines = content.split('\n');
-        let offset = 0;
-        
-        for (let i = 0; i < position.line; i++) {
-            offset += lines[i].length + 1; // +1 for newline character
-        }
-        
-        return offset + position.ch;
-    }
-
-    /**
-     * Plugin cleanup on unload
-     */
-    onunload() {
-        if (this.floatingButton) {
-            this.floatingButton.remove();
-            this.floatingButton = null;
-        }
-        
-        if (this.toolbarButton) {
-            this.toolbarButton.remove();
-            this.toolbarButton = null;
-        }
-    }
-
-    /**
-     * Saves plugin settings
-     */
     async saveSettings(): Promise<void> {
         console.log('Saving settings:', this.settings);
-        // Since settings and pluginData are the same, just save pluginData
         await this.savePluginData();
         this.initializeUI();
+    }
+
+    onunload() {
+        console.log('Unloading NeuroVox plugin...');
+        this.cleanupUI();
     }
 }

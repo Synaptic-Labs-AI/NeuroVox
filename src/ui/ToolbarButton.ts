@@ -31,8 +31,7 @@ export class ToolbarButton {
                 this.openRecordingModal();
             }
         );
-        this.ribbonIconEl.addClass('neurovox-toolbar-button');
-        this.updateButtonColor(); // Apply initial color
+        this.ribbonIconEl.addClass('neurovox-toolbar-button'); 
     }
 
     /**
@@ -51,20 +50,13 @@ export class ToolbarButton {
 
             const modal = new TimerModal(this.plugin.app);
             modal.onStop = (audioBlob: Blob) => {
-                this.plugin.processRecording(audioBlob, activeFile, cursorPosition);
+                // Use the RecordingProcessor instance
+                this.plugin.recordingProcessor.processRecording(audioBlob, activeFile, cursorPosition);
             };
             modal.open();
         } else {
             new Notice('No active note found to insert transcription.');
         }
-    }
-
-    /**
-     * Updates the toolbar button color based on settings.
-     */
-    public updateButtonColor(): void {
-        const color = this.pluginData.micButtonColor;
-        this.ribbonIconEl.style.backgroundColor = color;
     }
 
     /**

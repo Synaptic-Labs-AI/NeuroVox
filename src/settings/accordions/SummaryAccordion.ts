@@ -2,18 +2,20 @@
 
 import { BaseAccordion } from "./BaseAccordion";
 import { NeuroVoxSettings } from "../Settings";
-import { Setting, DropdownComponent, TextAreaComponent } from "obsidian";
+import { Setting, DropdownComponent, TextAreaComponent, SliderComponent } from "obsidian";
 import { AIAdapter, AIProvider, AIModels, getModelInfo } from "../../adapters/AIAdapter";
 import NeuroVoxPlugin from "../../main";
 
 export class SummaryAccordion extends BaseAccordion {
     public modelDropdown: DropdownComponent;
     public promptArea: TextAreaComponent;
+    public maxTokensSlider: SliderComponent;
+    public temperatureSlider: SliderComponent;
 
     constructor(
         containerEl: HTMLElement,
         public settings: NeuroVoxSettings,
-        public getAdapter: (provider: AIProvider) => AIAdapter,
+        public getAdapter: (provider: AIProvider) => AIAdapter | undefined,
         public plugin: NeuroVoxPlugin
     ) {
         super(
@@ -31,6 +33,9 @@ export class SummaryAccordion extends BaseAccordion {
         this.addTemperatureControl();
     }
 
+    /**
+     * Adds a toggle to enable or disable AI summary generation.
+     */
     public addEnableToggle(): void {
         new Setting(this.contentEl)
             .setName("Enable AI Summary")
@@ -45,6 +50,9 @@ export class SummaryAccordion extends BaseAccordion {
             });
     }
 
+    /**
+     * Adds a dropdown to select the AI model for summary generation.
+     */
     public addModelSelection(): void {
         new Setting(this.contentEl)
             .setName("Summary Model")
@@ -53,19 +61,24 @@ export class SummaryAccordion extends BaseAccordion {
                 this.modelDropdown = dropdown;
                 this.populateModelOptions(dropdown);
                 
-                dropdown
-                    .setValue(this.settings.summaryModel)
-                    .onChange(async (value) => {
+                dropdown.setValue(this.settings.summaryModel)
+                    .onChange(async (value: string) => {
                         this.settings.summaryModel = value;
-                        this.settings.summaryProvider = this.getProviderFromModel(value);
-                        await this.plugin.saveSettings();
-                        
+                        const provider = this.getProviderFromModel(value);
+                        if (provider) {
+                            this.settings.summaryProvider = provider;
+                            await this.plugin.saveSettings();
+                        }
+
                         // Update max tokens based on model capabilities
-                        this.updateMaxTokensLimit(value);
+                        await this.updateMaxTokensLimit(value);
                     });
             });
     }
 
+    /**
+     * Adds a textarea to customize the summary prompt template.
+     */
     public addPromptTemplate(): void {
         new Setting(this.contentEl)
             .setName("Summary Prompt Template")
@@ -86,11 +99,15 @@ export class SummaryAccordion extends BaseAccordion {
             });
     }
 
+    /**
+     * Adds a slider to set the maximum number of tokens for the summary.
+     */
     public addMaxTokens(): void {
         new Setting(this.contentEl)
             .setName("Maximum Summary Length")
             .setDesc("Set the maximum number of tokens for the generated summary")
             .addSlider(slider => {
+                this.maxTokensSlider = slider;
                 slider
                     .setLimits(100, 2000, 100)
                     .setValue(this.settings.summaryMaxTokens)
@@ -102,11 +119,15 @@ export class SummaryAccordion extends BaseAccordion {
             });
     }
 
+    /**
+     * Adds a slider to control the creativity level of the summary.
+     */
     public addTemperatureControl(): void {
         new Setting(this.contentEl)
             .setName("Summary Creativity")
             .setDesc("Adjust the creativity level of the summary (0 = more focused, 1 = more creative)")
             .addSlider(slider => {
+                this.temperatureSlider = slider;
                 slider
                     .setLimits(0, 1, 0.1)
                     .setValue(this.settings.summaryTemperature)
@@ -118,29 +139,27 @@ export class SummaryAccordion extends BaseAccordion {
             });
     }
 
+    /**
+     * Populates the model dropdown with available OpenAI and Groq models.
+     * @param dropdown The dropdown component to populate.
+     */
     public populateModelOptions(dropdown: DropdownComponent): void {
         // Clear existing options
         dropdown.selectEl.empty();
-        
-        // Add OpenAI Models if API key exists
-        if (this.settings.openaiApiKey) {
-            const openaiModels = AIModels[AIProvider.OpenAI].filter(
-                model => model.category === 'language'
-            );
-            if (openaiModels.length > 0) {
-                this.addModelGroup(dropdown, "OpenAI Models", openaiModels);
+
+        // Add OpenAI and Groq models
+        [AIProvider.OpenAI, AIProvider.Groq].forEach(provider => {
+            const apiKey = this.settings[`${provider}ApiKey` as keyof NeuroVoxSettings];
+            if (apiKey) {
+                const adapter = this.getAdapter(provider);
+                if (adapter) {
+                    const models = adapter.getAvailableModels('language');
+                    if (models.length > 0) {
+                        this.addModelGroup(dropdown, `${provider.toUpperCase()} Models`, models);
+                    }
+                }
             }
-        }
-        
-        // Add Groq Models if API key exists
-        if (this.settings.groqApiKey) {
-            const groqModels = AIModels[AIProvider.Groq].filter(
-                model => model.category === 'language'
-            );
-            if (groqModels.length > 0) {
-                this.addModelGroup(dropdown, "Groq Models", groqModels);
-            }
-        }
+        });
 
         // If no models are available, add a placeholder option
         if (dropdown.selectEl.options.length === 0) {
@@ -151,6 +170,12 @@ export class SummaryAccordion extends BaseAccordion {
         }
     }
 
+    /**
+     * Adds a group of models under a specific label in the dropdown.
+     * @param dropdown The dropdown component.
+     * @param groupName The name of the model group (e.g., "OpenAI Models").
+     * @param models The list of models to add.
+     */
     public addModelGroup(
         dropdown: DropdownComponent, 
         groupName: string, 
@@ -169,6 +194,11 @@ export class SummaryAccordion extends BaseAccordion {
         dropdown.selectEl.appendChild(group);
     }
 
+    /**
+     * Determines the AI provider based on the selected model ID.
+     * @param modelId The ID of the selected model.
+     * @returns The corresponding AIProvider or a default AIProvider if not found.
+     */
     public getProviderFromModel(modelId: string): AIProvider {
         for (const [provider, models] of Object.entries(AIModels)) {
             if (models.some(model => model.id === modelId)) {
@@ -179,20 +209,21 @@ export class SummaryAccordion extends BaseAccordion {
     }
 
     /**
-     * Updates the max tokens limit based on the selected model
+     * Updates the maximum tokens slider based on the selected model's capabilities.
+     * @param modelId The ID of the selected model.
      */
-    public updateMaxTokensLimit(modelId: string): void {
+    public async updateMaxTokensLimit(modelId: string): Promise<void> {
         const model = getModelInfo(modelId);
         const maxTokens = model?.maxTokens || 1000; // Fallback to 1000 if model not found
         
-        const tokenSlider = this.contentEl.querySelector('.neurovox-token-slider input[type="range"]') as HTMLInputElement;
-        
-        if (tokenSlider) {
-            tokenSlider.max = maxTokens.toString();
-            if (parseInt(tokenSlider.value) > maxTokens) {
-                tokenSlider.value = maxTokens.toString();
+        if (this.maxTokensSlider) {
+            this.maxTokensSlider.sliderEl.max = maxTokens.toString();
+            // Ensure the current value does not exceed the new max
+            const currentValue = parseInt(this.maxTokensSlider.sliderEl.value);
+            if (currentValue > maxTokens) {
+                this.maxTokensSlider.setValue(maxTokens);
                 this.settings.summaryMaxTokens = maxTokens;
-                this.plugin.saveSettings();
+                await this.plugin.saveSettings();
             }
         }
     }

@@ -5,32 +5,41 @@ import { PluginData, Position } from '../types';
 interface BoundHandlers {
     move: (e: MouseEvent) => void;
     end: (e: MouseEvent) => void;
+    touchMove: (e: TouchEvent) => void;
+    touchEnd: (e: TouchEvent) => void;
 }
 
 export class ButtonPositionManager {
-    private isDragging: boolean = false;
-    private hasMoved: boolean = false;
-    private dragStartX: number = 0;
-    private dragStartY: number = 0;
-    private currentX: number = 0;
-    private currentY: number = 0;
-    private _boundHandlers: BoundHandlers | null = null;
-    private lastContainerWidth: number | null = null;
-    private relativeX: number = 0;
-    private relativeY: number = 0;
+    public isDragging: boolean = false;
+    public hasMoved: boolean = false;
+    public dragStartX: number = 0;
+    public dragStartY: number = 0;
+    public currentX: number = 0;
+    public currentY: number = 0;
+    public _boundHandlers: BoundHandlers;
+    public lastContainerWidth: number | null = null;
+    public relativeX: number = 0;
+    public relativeY: number = 0;
 
-    private readonly DRAG_THRESHOLD: number = 5;
+    public readonly DRAG_THRESHOLD: number = 5;
 
     constructor(
-        private containerEl: HTMLElement,
-        private buttonEl: HTMLElement,
-        private activeContainer: HTMLElement | null,
-        private buttonSize: number,
-        private margin: number,
-        private onPositionChange: (x: number, y: number) => void,
-        private onDragEnd: (position: Position) => void,
-        private onClick: () => void
+        public containerEl: HTMLElement,
+        public buttonEl: HTMLElement,
+        public activeContainer: HTMLElement | null,
+        public buttonSize: number,
+        public margin: number,
+        public onPositionChange: (x: number, y: number) => void,
+        public onDragEnd: (position: Position) => void,
+        public onClick: () => void
     ) {
+        // Bind event handlers once and store their references
+        this._boundHandlers = {
+            move: this.handleDragMove.bind(this),
+            end: this.handleDragEnd.bind(this),
+            touchMove: this.handleTouchMove.bind(this),
+            touchEnd: this.handleTouchEnd.bind(this)
+        };
         this.setupEventListeners();
     }
 
@@ -98,25 +107,17 @@ export class ButtonPositionManager {
         this.constrainPosition();
     }
 
-    private setupEventListeners(): void {
-        const boundDragMove = this.handleDragMove.bind(this);
-        const boundDragEnd = this.handleDragEnd.bind(this);
-
+    public setupEventListeners(): void {
         this.buttonEl.addEventListener('mousedown', this.handleDragStart.bind(this));
-        document.addEventListener('mousemove', boundDragMove);
-        document.addEventListener('mouseup', boundDragEnd);
+        document.addEventListener('mousemove', this._boundHandlers.move);
+        document.addEventListener('mouseup', this._boundHandlers.end);
 
         this.buttonEl.addEventListener('touchstart', this.handleTouchStart.bind(this));
-        document.addEventListener('touchmove', this.handleTouchMove.bind(this));
-        document.addEventListener('touchend', this.handleTouchEnd.bind(this));
-
-        this._boundHandlers = {
-            move: boundDragMove,
-            end: boundDragEnd
-        };
+        document.addEventListener('touchmove', this._boundHandlers.touchMove);
+        document.addEventListener('touchend', this._boundHandlers.touchEnd);
     }
 
-    private handleDragStart = (e: MouseEvent): void => {
+    public handleDragStart = (e: MouseEvent): void => {
         if (e.button !== 0) return;
         e.preventDefault();
         
@@ -128,7 +129,7 @@ export class ButtonPositionManager {
         this.buttonEl.classList.add('is-dragging');
     };
 
-    private handleDragMove = (e: MouseEvent): void => {
+    public handleDragMove = (e: MouseEvent): void => {
         if (!this.isDragging) return;
         e.preventDefault();
 
@@ -145,7 +146,7 @@ export class ButtonPositionManager {
         this.constrainPosition();
     };
 
-    private handleDragEnd = (): void => {
+    public handleDragEnd = (): void => {
         if (!this.isDragging) return;
         
         this.isDragging = false;
@@ -161,7 +162,7 @@ export class ButtonPositionManager {
         }
     };
 
-    private handleTouchStart = (e: TouchEvent): void => {
+    public handleTouchStart = (e: TouchEvent): void => {
         if (e.touches.length !== 1) return;
         e.preventDefault();
         
@@ -174,7 +175,7 @@ export class ButtonPositionManager {
         this.buttonEl.classList.add('is-dragging');
     };
 
-    private handleTouchMove = (e: TouchEvent): void => {
+    public handleTouchMove = (e: TouchEvent): void => {
         if (!this.isDragging || e.touches.length !== 1) return;
         e.preventDefault();
         
@@ -192,7 +193,7 @@ export class ButtonPositionManager {
         this.constrainPosition();
     };
 
-    private handleTouchEnd = (): void => {
+    public handleTouchEnd = (): void => {
         if (!this.isDragging) return;
         
         this.isDragging = false;
@@ -216,14 +217,12 @@ export class ButtonPositionManager {
     }
 
     public cleanup(): void {
-        if (this._boundHandlers) {
-            document.removeEventListener('mousemove', this._boundHandlers.move);
-            document.removeEventListener('mouseup', this._boundHandlers.end);
-        }
+        // Remove mouse event listeners
+        document.removeEventListener('mousemove', this._boundHandlers.move);
+        document.removeEventListener('mouseup', this._boundHandlers.end);
 
-        document.removeEventListener('touchmove', this.handleTouchMove.bind(this));
-        document.removeEventListener('touchend', this.handleTouchEnd.bind(this));
-
-        this._boundHandlers = null;
+        // Remove touch event listeners
+        document.removeEventListener('touchmove', this._boundHandlers.touchMove);
+        document.removeEventListener('touchend', this._boundHandlers.touchEnd);
     }
 }

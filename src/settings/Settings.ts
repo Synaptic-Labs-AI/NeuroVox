@@ -11,18 +11,19 @@ export type NeuroVoxSettings = {
     recordingFolderPath: string;
     saveRecording: boolean;
     showFloatingButton: boolean;
+    useRecordingModal: boolean;
     showToolbarButton: boolean;
     micButtonColor: string;
     transcriptionModel: string;
-    transcriptionProvider: AIProvider;  // Added
+    transcriptionProvider: AIProvider;
 
     // Summary Settings
     generateSummary: boolean;
     summaryPrompt: string;
     summaryMaxTokens: number;
     summaryModel: string;
-    summaryProvider: AIProvider;  // Added
-    summaryTemperature: number;   // Added
+    summaryProvider: AIProvider;
+    summaryTemperature: number;
 
     // Current Provider
     currentProvider: AIProvider;
@@ -37,6 +38,7 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     recordingFolderPath: 'Recordings',
     saveRecording: true,
     showFloatingButton: true,
+    useRecordingModal: true,
     showToolbarButton: true,
     micButtonColor: '#4B4B4B',
     transcriptionModel: 'whisper-1',

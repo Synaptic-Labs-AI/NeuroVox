@@ -1,81 +1,125 @@
-// src/adapters/GroqAdapter.ts
-
-import { AIAdapter, AIProvider, AIModels, AIModel } from './AIAdapter';
+import { AIAdapter, AIProvider, AIModels, getModelInfo } from './AIAdapter';
 import { NeuroVoxSettings } from '../settings/Settings';
-import { Notice, requestUrl } from 'obsidian';
 
-export class GroqAdapter implements AIAdapter {
-    public apiKey: string;
-    public models = AIModels[AIProvider.Groq];
-    public readonly API_BASE_URL = 'https://api.groq.com/openai/v1';
-
-    constructor(public settings: NeuroVoxSettings) {
-        this.apiKey = settings.groqApiKey;
+export class GroqAdapter extends AIAdapter {
+    constructor(settings: NeuroVoxSettings) {
+        super(settings, AIProvider.Groq);
     }
 
-    setApiKey(apiKey: string): void {
-        this.apiKey = apiKey;
+    public getApiKey(): string {
+        return this.settings.groqApiKey;
+    }
+
+    public setApiKey(apiKey: string): void {
         this.settings.groqApiKey = apiKey;
     }
 
-    getApiKey(): string {
-        return this.apiKey;
+    protected getApiBaseUrl(): string {
+        return 'https://api.groq.com/openai/v1';  // Updated base URL
     }
 
-    async validateApiKey(): Promise<boolean> {
+    protected getTranscriptionEndpoint(): string {
+        return '/audio/transcriptions';
+    }
+
+    protected getTextGenerationEndpoint(): string {
+        return '/chat/completions';  // Updated to correct endpoint
+    }
+
+    protected parseTextGenerationResponse(response: any): string {
+        if (!response?.choices?.[0]?.message?.content) {
+            throw new Error('Invalid response format from Groq API');
+        }
+        return response.choices[0].message.content.trim();
+    }
+
+    protected parseTranscriptionResponse(response: any): string {
+        if (!response?.text) {
+            throw new Error('Invalid transcription response format from Groq API');
+        }
+        return response.text.trim();
+    }
+
+    public async generateResponse(prompt: string, model: string, options?: { maxTokens?: number, temperature?: number }): Promise<string> {
         try {
-            if (!this.apiKey) throw new Error('API key not set.');
-            // Attempt a simple transcription request with a small audio blob
-            const dummyBlob = new Blob([new Uint8Array([0])], { type: 'audio/wav' });
-            await this.transcribeAudio(dummyBlob, this.models[0].id);
-            return true;
+            const endpoint = `${this.getApiBaseUrl()}${this.getTextGenerationEndpoint()}`;
+            const modelInfo = getModelInfo(model);
+            
+            // Updated request body format for Groq chat completions
+            const body = {
+                model: model,
+                messages: [
+                    {
+                        role: "user",
+                        content: prompt
+                    }
+                ],
+                max_tokens: options?.maxTokens || modelInfo?.maxTokens || 1000,
+                temperature: options?.temperature ?? 0.7,
+            };
+
+            const response = await this.makeAPIRequest(
+                endpoint,
+                'POST',
+                {
+                    'Content-Type': 'application/json'
+                },
+                JSON.stringify(body)
+            );
+
+            return this.parseTextGenerationResponse(response);
+        } catch (error) {
+            console.error('Groq API Error:', error);
+            throw new Error(`Groq API request failed: ${(error as Error).message}`);
+        }
+    }
+
+    protected async validateApiKeyImpl(): Promise<boolean> {
+        try {
+            const response = await this.makeAPIRequest(
+                `${this.getApiBaseUrl()}/models`,
+                'GET',
+                {
+                    'Content-Type': 'application/json'
+                },
+                null
+            );
+            return Array.isArray(response.data);
         } catch (error) {
             console.error('Groq API Key Validation Error:', error);
-            new Notice('Invalid Groq API Key.');
             return false;
         }
     }
 
-    getAvailableModels(category: 'transcription' | 'language'): AIModel[] {
-        return this.models.filter(model => model.category === category);
-    }
-
-    isReady(): boolean {
-        return !!this.apiKey && this.getAvailableModels('transcription').length > 0;
-    }
-
-    async generateResponse(prompt: string, model: string, options?: { maxTokens?: number }): Promise<string> {
-        // Assuming Groq does not support language models currently
-        throw new Error('Groq does not support text generation.');
-    }
-
-    async transcribeAudio(audioBlob: Blob, model: string): Promise<string> {
-        const endpoint = `${this.API_BASE_URL}/audio/transcriptions`;
-
-        const formData = new FormData();
-        formData.append('file', audioBlob, 'audio.wav');
-        formData.append('model', model);
-        // Optionally, append language or other parameters
-
+    protected async makeAPIRequest(
+        endpoint: string,
+        method: string,
+        headers: Record<string, string>,
+        body: string | ArrayBuffer | null
+    ): Promise<any> {
         try {
-            const response = await requestUrl({
-                url: endpoint,
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                },
-                body: formData as any // TypeScript fix: Cast to any to bypass type mismatch
-            });
-
-            if (response.status !== 200) {
-                const errorMessage = response.json?.error?.message || 'Unknown error';
-                throw new Error(`API request failed: ${errorMessage}`);
+            const response = await super.makeAPIRequest(endpoint, method, headers, body);
+            
+            if (response.error) {
+                throw new Error(response.error.message || 'Unknown Groq API error');
             }
-
-            return response.json.text.trim();
+            
+            return response;
         } catch (error) {
-            console.error('Groq Transcribe Audio Error:', error);
-            throw new Error(`Groq Transcription Failed: ${(error as Error).message}`);
+            const status = (error as any).status;
+            switch (status) {
+                case 401:
+                    throw new Error('Invalid Groq API key. Please check your credentials.');
+                case 404:
+                    throw new Error('Groq API endpoint not found. Please check your model selection.');
+                case 429:
+                    throw new Error('Groq API rate limit exceeded. Please try again later.');
+                default:
+                    if (error instanceof Error) {
+                        throw error;
+                    }
+                    throw new Error('Unknown error occurred');
+            }
         }
     }
 }

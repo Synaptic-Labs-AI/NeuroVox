@@ -1,24 +1,29 @@
 // src/ui/FloatingButton.ts
 
-import { MarkdownView } from 'obsidian';
+import { MarkdownView, Notice } from 'obsidian';
 import NeuroVoxPlugin from '../main';
 import { icons } from '../assets/icons';
 import { ButtonPositionManager } from '../utils/ButtonPositionManager';
 import { PluginData, Position } from '../types'; // Import PluginData and Position
+import { AudioRecordingManager } from '../utils/RecordingManager';
+import { RecordingProcessor } from '../utils/RecordingProcessor';
 
 export class FloatingButton {
-    private static instance: FloatingButton | null = null;
-    private buttonEl: HTMLButtonElement;
-    private containerEl: HTMLDivElement;
-    private activeLeafContainer: HTMLElement | null = null;
-    private resizeObserver: ResizeObserver;
-    private positionManager: ButtonPositionManager;
-    private resizeTimeout: NodeJS.Timeout | null = null;
+    public static instance: FloatingButton | null = null;
+    public buttonEl: HTMLButtonElement;
+    public containerEl: HTMLDivElement;
+    public activeLeafContainer: HTMLElement | null = null;
+    public resizeObserver: ResizeObserver;
+    public positionManager: ButtonPositionManager;
+    public resizeTimeout: NodeJS.Timeout | null = null;
+    public audioManager: AudioRecordingManager | null = null;
+    public isRecording: boolean = false;
+    public isProcessing: boolean = false;
 
-    private constructor(
-        private plugin: NeuroVoxPlugin,
-        private pluginData: PluginData,
-        private onClickCallback: () => void
+    public constructor(
+        public plugin: NeuroVoxPlugin,
+        public pluginData: PluginData,
+        public onClickCallback: () => void
     ) {
         this.initializeComponents();
     }
@@ -34,28 +39,28 @@ export class FloatingButton {
         return FloatingButton.instance;
     }
 
-    private getComputedSize(): number {
+    public getComputedSize(): number {
         const computedStyle = getComputedStyle(document.documentElement);
         return parseInt(computedStyle.getPropertyValue('--neurovox-button-size')) || 48;
     }
 
-    private getComputedMargin(): number {
+    public getComputedMargin(): number {
         const computedStyle = getComputedStyle(document.documentElement);
         return parseInt(computedStyle.getPropertyValue('--neurovox-button-margin')) || 20;
     }
 
-    private getComputedResizeDelay(): number {
+    public getComputedResizeDelay(): number {
         const computedStyle = getComputedStyle(document.documentElement);
         return parseInt(computedStyle.getPropertyValue('--neurovox-resize-delay')) || 100;
     }
 
-    private initializeComponents(): void {
+    public initializeComponents(): void {
         this.setupResizeObserver();
         this.createElements();
         this.setupWorkspaceEvents();
     }
 
-    private setupResizeObserver(): void {
+    public setupResizeObserver(): void {
         this.resizeObserver = new ResizeObserver(() => {
             if (this.activeLeafContainer && this.pluginData.showFloatingButton) {
                 requestAnimationFrame(() => {
@@ -67,7 +72,7 @@ export class FloatingButton {
         });
     }
 
-    private createElements(): void {
+    public createElements(): void {
         this.createContainer();
         this.createButton();
         this.attachToActiveLeaf();
@@ -75,22 +80,25 @@ export class FloatingButton {
         // to ensure activeLeafContainer is available
     }
 
-    private createContainer(): void {
+    public createContainer(): void {
         this.containerEl = document.createElement('div');
         this.containerEl.classList.add('neurovox-button-container');
     }
 
-    private createButton(): void {
+    public createButton(): void {
         this.buttonEl = document.createElement('button');
         this.buttonEl.classList.add('neurovox-button', 'floating');
         this.buttonEl.setAttribute('aria-label', 'Start Recording (drag to move)');
         this.buttonEl.innerHTML = icons.microphone;
         
+        // Add click handler
+        this.buttonEl.addEventListener('click', () => this.handleClick());
+        
         this.updateButtonColor();
         this.containerEl.appendChild(this.buttonEl);
     }
 
-    private async initializePositionManager(): Promise<void> {
+    public async initializePositionManager(): Promise<void> {
         this.positionManager = new ButtonPositionManager(
             this.containerEl,
             this.buttonEl,
@@ -108,20 +116,20 @@ export class FloatingButton {
         }, 0);
     }
 
-    private handlePositionChange(x: number, y: number): void {
+    public handlePositionChange(x: number, y: number): void {
         requestAnimationFrame(() => {
             this.containerEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
         });
     }
 
-    private async handleDragEnd(position: Position): Promise<void> {
+    public async handleDragEnd(position: Position): Promise<void> {
         console.log('Drag ended. Position saved:', position);
         this.pluginData.buttonPosition = position; // Directly update pluginData
         await this.plugin.savePluginData(); // Save all data
         console.log('Position saved.');
     }
 
-    private async setInitialPosition(): Promise<void> {
+    public async setInitialPosition(): Promise<void> {
         const savedPosition = this.pluginData.buttonPosition;
         console.log('Loaded saved position:', savedPosition);
 
@@ -150,7 +158,7 @@ export class FloatingButton {
         }
     }
 
-    private async setDefaultPosition(): Promise<void> {
+    public async setDefaultPosition(): Promise<void> {
         if (!this.activeLeafContainer) {
             console.log('No activeLeafContainer. Cannot set default position.');
             return;
@@ -171,13 +179,13 @@ export class FloatingButton {
         });
     }
 
-    private setupWorkspaceEvents(): void {
+    public setupWorkspaceEvents(): void {
         this.registerActiveLeafChangeEvent();
         this.registerLayoutChangeEvent();
         this.registerResizeEvent();
     }
 
-    private registerActiveLeafChangeEvent(): void {
+    public registerActiveLeafChangeEvent(): void {
         this.plugin.registerEvent(
             this.plugin.app.workspace.on('active-leaf-change', () => {
                 requestAnimationFrame(() => this.attachToActiveLeaf());
@@ -185,7 +193,7 @@ export class FloatingButton {
         );
     }
 
-    private registerLayoutChangeEvent(): void {
+    public registerLayoutChangeEvent(): void {
         this.plugin.registerEvent(
             this.plugin.app.workspace.on('layout-change', () => {
                 requestAnimationFrame(() => {
@@ -197,7 +205,7 @@ export class FloatingButton {
         );
     }
 
-    private registerResizeEvent(): void {
+    public registerResizeEvent(): void {
         this.plugin.registerEvent(
             this.plugin.app.workspace.on('resize', () => {
                 if (this.resizeTimeout) {
@@ -214,7 +222,7 @@ export class FloatingButton {
         );
     }
 
-    private attachToActiveLeaf(): void {
+    public attachToActiveLeaf(): void {
         const activeLeaf = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
         if (!activeLeaf) {
             this.hide();
@@ -234,7 +242,7 @@ export class FloatingButton {
         this.updateActiveContainer(viewContent);
     }
 
-    private updateActiveContainer(newContainer: HTMLElement): void {
+    public updateActiveContainer(newContainer: HTMLElement): void {
         if (this.activeLeafContainer) {
             this.resizeObserver.unobserve(this.activeLeafContainer);
         }
@@ -294,15 +302,125 @@ export class FloatingButton {
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
         }
-
+    
         if (this.positionManager) {
             this.positionManager.cleanup();
         }
-
+    
+        // Clean up recording resources
+        this.cleanup();
+    
+        // Remove event listeners
+        this.buttonEl.removeEventListener('click', () => this.handleClick());
+    
         if (this.containerEl && this.containerEl.parentNode) {
             this.containerEl.remove();
         }
-
+    
         FloatingButton.instance = null;
+    }
+
+     /**
+     * Handles click based on current recording mode
+     */
+     public async handleClick() {
+        if (this.isProcessing) return;
+        
+        if (this.pluginData.useRecordingModal) {
+            // Stop event propagation
+            event?.stopPropagation();
+            this.onClickCallback();
+            return;
+        }
+    
+        // Direct recording mode
+        if (!this.isRecording) {
+            await this.startDirectRecording();
+        } else {
+            await this.stopDirectRecording();
+        }
+    }
+
+    /**
+     * Starts direct recording mode
+     */
+    public async startDirectRecording() {
+        try {
+            if (!this.audioManager) {
+                this.audioManager = new AudioRecordingManager();
+                await this.audioManager.initialize();
+            }
+    
+            this.audioManager.start();
+            this.isRecording = true;
+            this.updateRecordingState(true);
+            new Notice('Recording started');
+        } catch (error) {
+            console.error('Failed to start recording:', error);
+            new Notice('Failed to start recording');
+            this.cleanup();
+        }
+    }
+    
+    private async stopDirectRecording() {
+        try {
+            if (!this.audioManager) {
+                throw new Error('Audio manager not initialized');
+            }
+    
+            this.isProcessing = true;
+            this.updateProcessingState(true);
+            
+            const blob = await this.audioManager.stop();
+            if (blob) {
+                const activeView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+                if (!activeView || !activeView.file) {
+                    new Notice('No active file to insert recording');
+                    return;
+                }
+    
+                await this.plugin.recordingProcessor.processRecording(
+                    blob,
+                    activeView.file,  // Now TypeScript knows this is not null
+                    activeView.editor.getCursor()
+                );
+            }
+        } catch (error) {
+            console.error('Failed to stop recording:', error);
+            new Notice('Failed to stop recording');
+        } finally {
+            this.cleanup();
+        }
+    }
+
+    /**
+     * Updates the visual state for recording
+     */
+    private updateRecordingState(isRecording: boolean) {
+        if (isRecording) {
+            this.buttonEl.addClass('recording');
+        } else {
+            this.buttonEl.removeClass('recording');
+        }
+        
+        this.buttonEl.setAttribute('aria-label', 
+            isRecording ? 'Stop Recording' : 'Start Recording'
+        );
+    }
+    
+    private updateProcessingState(isProcessing: boolean) {
+        this.buttonEl.toggleClass('processing', isProcessing);
+    }
+    
+    private cleanup() {
+        this.isRecording = false;
+        this.isProcessing = false;
+        this.updateRecordingState(false);
+        this.updateProcessingState(false);
+        
+        if (this.audioManager) {
+            this.audioManager.cleanup();
+            this.audioManager = null;
+        }
     }
 }

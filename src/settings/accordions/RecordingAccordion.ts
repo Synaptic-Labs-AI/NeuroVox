@@ -3,8 +3,7 @@
 import { BaseAccordion } from "./BaseAccordion";
 import { NeuroVoxSettings } from "../Settings";
 import { Setting, DropdownComponent } from "obsidian";
-import { AIAdapter, AIProvider } from "../../adapters/AIAdapter";
-import type { AIModels } from "../../adapters/AIAdapter"; // Import as type
+import { AIAdapter, AIProvider, AIModels } from "../../adapters/AIAdapter";
 import NeuroVoxPlugin from "../../main";
 
 export class RecordingAccordion extends BaseAccordion {
@@ -13,7 +12,7 @@ export class RecordingAccordion extends BaseAccordion {
     constructor(
         containerEl: HTMLElement,
         public settings: NeuroVoxSettings,
-        public getAdapter: (provider: AIProvider) => AIAdapter,
+        public getAdapter: (provider: AIProvider) => AIAdapter | undefined,
         public plugin: NeuroVoxPlugin
     ) {
         super(containerEl, "🎙 Recording Settings", "Configure recording preferences and select a transcription model.");
@@ -28,6 +27,10 @@ export class RecordingAccordion extends BaseAccordion {
         
         // Floating Button Toggle
         this.createFloatingButtonSetting();
+
+        if (this.settings.showFloatingButton) {
+            this.createModalToggleSetting();
+        }
         
         // Toolbar Button Toggle
         this.createToolbarButtonSetting();
@@ -68,21 +71,48 @@ export class RecordingAccordion extends BaseAccordion {
     }
 
     public createFloatingButtonSetting(): void {
-        new Setting(this.contentEl)
+        const floatingBtnSetting = new Setting(this.contentEl)
             .setName("Show Floating Button")
             .setDesc("Show a floating microphone button for quick recording")
             .addToggle(toggle => {
                 toggle
                     .setValue(this.settings.showFloatingButton)
-                    .onChange(async (value: boolean) => {
-                        console.log('Floating button toggle changed:', value);
+                    .onChange(async (value) => {
                         this.settings.showFloatingButton = value;
                         await this.plugin.saveSettings();
                         
-                        // Reinitialize UI after settings are saved
-                        this.plugin.initializeUI();
+                        // Refresh the settings display to show/hide modal toggle
+                        this.refresh();
                     });
             });
+    }
+
+    public createModalToggleSetting(): void {
+        const modalToggleSetting = new Setting(this.contentEl)
+            .setName("Use Recording Modal")
+            .setDesc("When enabled, shows a modal with controls. When disabled, use direct recording through the mic button.")
+            .setClass('neurovox-modal-toggle-setting')
+            .addToggle(toggle => {
+                toggle
+                    .setValue(this.settings.useRecordingModal)
+                    .onChange(async (value) => {
+                        this.settings.useRecordingModal = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        // Add some indentation to show it's related to the floating button
+        modalToggleSetting.settingEl.style.paddingLeft = '2em';
+        modalToggleSetting.settingEl.style.borderLeft = '2px solid var(--background-modifier-border)';
+    }
+
+    /**
+     * Refreshes the accordion content
+     */
+    public refresh(): void {
+        const { contentEl } = this;
+        contentEl.empty();
+        this.render();
     }
 
     public createToolbarButtonSetting(): void {
@@ -150,38 +180,56 @@ export class RecordingAccordion extends BaseAccordion {
     }
 
     public populateModelDropdown(dropdown: DropdownComponent): void {
-        // Add OpenAI Models
-        if (this.settings.openaiApiKey) {
-            const adapter = this.getAdapter(AIProvider.OpenAI);
-            const openaiModels = adapter.getAvailableModels('transcription');
-            openaiModels.forEach((model) => {
-                dropdown.addOption(model.id, model.name);
-            });
-        }
-        
-        // Add Groq Models
-        if (this.settings.groqApiKey) {
-            const adapter = this.getAdapter(AIProvider.Groq);
-            const groqModels = adapter.getAvailableModels('transcription');
-            groqModels.forEach((model) => {
-                dropdown.addOption(model.id, model.name);
-            });
+        // Clear existing options
+        dropdown.selectEl.empty();
+
+        // Add OpenAI and Groq models
+        [AIProvider.OpenAI, AIProvider.Groq].forEach(provider => {
+            const apiKey = this.settings[`${provider}ApiKey` as keyof NeuroVoxSettings];
+            if (apiKey) {
+                const adapter = this.getAdapter(provider);
+                if (adapter) {
+                    const models = adapter.getAvailableModels('transcription');
+                    if (models.length > 0) {
+                        this.addModelGroup(dropdown, `${provider.toUpperCase()} Models`, models);
+                    }
+                }
+            }
+        });
+
+        // If no models are available, add a placeholder option
+        if (dropdown.selectEl.options.length === 0) {
+            dropdown.addOption("none", "No API Keys Configured");
+            dropdown.setDisabled(true);
+        } else {
+            dropdown.setDisabled(false);
         }
     }
 
-    public getProviderFromModel(modelId: string): AIProvider | null {
-        // Try OpenAI
-        const openaiAdapter = this.getAdapter(AIProvider.OpenAI);
-        if (openaiAdapter.getAvailableModels('transcription').some(model => model.id === modelId)) {
-            return AIProvider.OpenAI;
-        }
+    public addModelGroup(
+        dropdown: DropdownComponent, 
+        groupName: string, 
+        models: { id: string; name: string }[]
+    ): void {
+        const group = document.createElement("optgroup");
+        group.label = groupName;
         
-        // Try Groq
-        const groqAdapter = this.getAdapter(AIProvider.Groq);
-        if (groqAdapter.getAvailableModels('transcription').some(model => model.id === modelId)) {
-            return AIProvider.Groq;
-        }
+        models.forEach(model => {
+            const option = document.createElement("option");
+            option.value = model.id;
+            option.text = model.name;
+            group.appendChild(option);
+        });
+        
+        dropdown.selectEl.appendChild(group);
+    }
 
+    public getProviderFromModel(modelId: string): AIProvider | null {
+        for (const [provider, models] of Object.entries(AIModels)) {
+            if (models.some(model => model.id === modelId)) {
+                return provider as AIProvider;
+            }
+        }
         return null;
     }
 }

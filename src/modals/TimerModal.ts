@@ -1,258 +1,140 @@
 import { App, Modal, Notice } from 'obsidian';
-import { icons } from '../assets/icons';
-import RecordRTC from 'recordrtc';
+import { AudioRecordingManager } from '../utils/RecordingManager';  // Updated import
+import { RecordingUI, RecordingState } from '../ui/RecordingUI';
+import { ConfirmationModal } from './ConfirmationModal';
+
+interface TimerConfig {
+    maxDuration: number;
+    warningThreshold: number;
+    updateInterval: number;
+}
 
 /**
- * TimerModal provides a recording interface with integrated timer, controls, and audio visualization.
- * Uses CSS classes for styling and state management.
+ * Modal for managing audio recording with timer and controls
  */
 export class TimerModal extends Modal {
-    public recorder: RecordRTC | null = null;
-    public stream: MediaStream | null = null;
-    public intervalId: number | null = null;
-    public seconds: number = 0;
-    public isRecording: boolean = false;
-    public isPaused: boolean = false;
-    public timerText: HTMLElement;
-    public pauseButton: HTMLButtonElement;
-    public stopButton: HTMLButtonElement;
-    public waveContainer: HTMLElement;
-    
-    public readonly MAX_RECORDING_DURATION = 12 * 60;
+    private recordingManager: AudioRecordingManager;
+    private ui: RecordingUI;
+    private intervalId: number | null = null;
+    private seconds: number = 0;
+    private isClosing: boolean = false;
+    private currentState: RecordingState = 'inactive';
+
+    private readonly CONFIG: TimerConfig = {
+        maxDuration: 12 * 60,
+        warningThreshold: 60,
+        updateInterval: 1000
+    };
+
     public onStop: (audioBlob: Blob) => void;
 
     constructor(app: App) {
         super(app);
+        this.recordingManager = new AudioRecordingManager();
     }
 
     /**
-     * Initializes the modal interface with timer, controls, and audio wave visualization
+     * Initializes the modal and starts recording
      */
-    onOpen() {
-        const { contentEl } = this;
-        contentEl.empty();
-        contentEl.addClass('neurovox-timer-modal');
-
-        const container = contentEl.createDiv({
-            cls: 'neurovox-timer-content'
-        });
-
-        this.createTimerDisplay(container);
-        this.createControlButtons(container);
-        this.createAudioWave(container);
-        this.initializeRecording();
-    }
-
-    /**
-     * Creates the timer display element
-     */
-    public createTimerDisplay(container: HTMLElement): void {
-        this.timerText = container.createDiv({
-            cls: 'neurovox-timer-display',
-            text: '00:00'
-        });
-    }
-
-    /**
-     * Creates the control buttons container and buttons
-     */
-    public createControlButtons(container: HTMLElement): void {
-        const controls = container.createDiv({
-            cls: 'neurovox-timer-controls'
-        });
-
-        this.pauseButton = this.createButton(
-            controls,
-            ['neurovox-timer-button', 'neurovox-pause-button'],
-            icons.pause,
-            'Pause Recording',
-            () => this.togglePause()
-        );
-
-        this.stopButton = this.createButton(
-            controls,
-            ['neurovox-timer-button', 'neurovox-stop-button'],
-            icons.stop,
-            'Stop Recording',
-            () => this.stopRecording()
-        );
-    }
-
-    /**
-     * Creates the audio wave visualization container and bars
-     */
-    public createAudioWave(container: HTMLElement): void {
-        this.waveContainer = container.createDiv({
-            cls: 'neurovox-audio-wave'
-        });
-        
-        for (let i = 0; i < 5; i++) {
-            this.waveContainer.createDiv({
-                cls: 'neurovox-wave-bar'
-            });
-        }
-    }
-
-    /**
-     * Creates a button element with specified classes, icon, and handler
-     */
-    public createButton(
-        container: HTMLElement,
-        classNames: string[],
-        icon: string,
-        ariaLabel: string,
-        onClick: () => void
-    ): HTMLButtonElement {
-        const button = container.createEl('button', {
-            cls: classNames,
-            attr: { 'aria-label': ariaLabel }
-        });
-
-        const svgEl = this.createSvgElement(icon);
-        if (svgEl) {
-            button.appendChild(svgEl);
-        }
-
-        button.addEventListener('click', onClick);
-        return button;
-    }
-
-    /**
-     * Creates an SVG element from icon string
-     */
-    public createSvgElement(svgIcon: string): SVGElement | null {
-        const parser = new DOMParser();
-        const svgDoc = parser.parseFromString(svgIcon, 'image/svg+xml');
-        return svgDoc.documentElement instanceof SVGElement 
-            ? svgDoc.documentElement 
-            : null;
-    }
-
-    /**
-     * Initializes the recording functionality
-     */
-    public async initializeRecording() {
+    async onOpen(): Promise<void> {
         try {
-            this.stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: true 
-            });
-            
-            this.recorder = new RecordRTC(this.stream, {
-                type: 'audio',
-                mimeType: 'audio/wav',
-                recorderType: RecordRTC.StereoAudioRecorder,
-                numberOfAudioChannels: 1,
-                desiredSampRate: 16000
+            const { contentEl } = this;
+            contentEl.empty();
+            contentEl.addClass('neurovox-timer-modal');
+
+            const container = contentEl.createDiv({ 
+                cls: 'neurovox-timer-content' 
             });
 
+            this.ui = new RecordingUI(container, {
+                onPause: () => this.handlePauseToggle(),
+                onStop: () => this.handleStop()
+            });
+
+            await this.recordingManager.initialize();
             this.startRecording();
         } catch (error) {
-            console.error('Failed to initialize recording:', error);
-            new Notice('Failed to start recording. Please check microphone permissions.');
-            this.close();
+            this.handleError('Failed to initialize recording', error);
         }
     }
 
     /**
-     * Manages recording state and UI updates when starting/resuming recording
+     * Starts or resumes recording
      */
-    public startRecording() {
-        if (!this.recorder) return;
-
-        this.isRecording = true;
-        this.isPaused = false;
-        this.updateButtonState();
-        this.updateRecordingState('recording');
-
-        if (this.recorder.state === 'inactive') {
-            this.recorder.startRecording();
-            this.startTimer();
-        } else {
-            this.recorder.resumeRecording();
-            this.resumeTimer();
+    private async startRecording(): Promise<void> {
+        try {
+            if (this.currentState === 'paused') {
+                this.recordingManager.resume();
+                this.resumeTimer();
+            } else {
+                this.recordingManager.start();
+                this.startTimer();
+            }
+            
+            this.currentState = 'recording';
+            this.ui.updateState(this.currentState);
+            new Notice('Recording started');
+        } catch (error) {
+            this.handleError('Failed to start recording', error);
         }
-
-        new Notice('Recording started');
     }
 
     /**
-     * Updates the visual state of the recording interface
+     * Handles pause/resume toggle
      */
-    public updateRecordingState(state: 'recording' | 'paused' | 'stopped') {
-        const states = ['is-recording', 'is-paused', 'is-stopped'];
-        states.forEach(cls => this.waveContainer.removeClass(cls));
-        this.waveContainer.addClass(`is-${state}`);
-    }
-
-    /**
-     * Toggles between pause and resume states
-     */
-    public togglePause() {
-        if (this.isPaused) {
-            this.resumeRecording();
+    private handlePauseToggle(): void {
+        if (this.currentState === 'paused') {
+            void this.startRecording();
         } else {
             this.pauseRecording();
         }
     }
 
     /**
-     * Handles recording pause state and UI updates
+     * Pauses the current recording
      */
-    public pauseRecording() {
-        if (!this.recorder || !this.isRecording) return;
-
-        this.recorder.pauseRecording();
-        this.pauseTimer();
-        
-        this.isRecording = false;
-        this.isPaused = true;
-        this.updateButtonState();
-        this.updateRecordingState('paused');
-        
-        new Notice('Recording paused');
+    private pauseRecording(): void {
+        try {
+            this.recordingManager.pause();
+            this.pauseTimer();
+            
+            this.currentState = 'paused';
+            this.ui.updateState(this.currentState);
+            new Notice('Recording paused');
+        } catch (error) {
+            this.handleError('Failed to pause recording', error);
+        }
     }
 
     /**
-     * Resumes recording from paused state
+     * Handles stop button click
      */
-    public resumeRecording() {
-        if (!this.recorder) return;
-        this.startRecording();
-        new Notice('Recording resumed');
+    private async handleStop(): Promise<void> {
+        await this.stopRecording();
+        this.close();
     }
 
     /**
-     * Handles the stop recording process and cleanup
+     * Stops recording and processes the result
      */
-    public async stopRecording(): Promise<void> {
-        if (!this.recorder) return;
-
-        this.isRecording = false;
-        this.isPaused = false;
-        this.updateRecordingState('stopped');
-
-        return new Promise<void>((resolve) => {
-            if (!this.recorder) {
-                resolve();
-                return;
+    private async stopRecording(): Promise<void> {
+        try {
+            const blob = await this.recordingManager.stop();
+            if (blob && this.onStop) {
+                this.onStop(blob);
             }
-
-            this.recorder.stopRecording(() => {
-                const blob = this.recorder?.getBlob();
-                if (blob && this.onStop) {
-                    this.onStop(blob);
-                }
-                this.cleanupResources();
-                this.close();
-                resolve();
-            });
-        });
+            
+            this.currentState = 'stopped';
+            this.ui.updateState(this.currentState);
+        } catch (error) {
+            this.handleError('Failed to stop recording', error);
+        }
     }
 
     /**
-     * Initializes and starts the timer
+     * Manages the recording timer
      */
-    public startTimer() {
+    private startTimer(): void {
         this.seconds = 0;
         this.updateTimerDisplay();
         
@@ -260,96 +142,84 @@ export class TimerModal extends Modal {
             this.seconds++;
             this.updateTimerDisplay();
 
-            if (this.seconds >= this.MAX_RECORDING_DURATION) {
-                this.stopRecording();
+            if (this.seconds >= this.CONFIG.maxDuration) {
+                void this.handleStop();
                 new Notice('Maximum recording duration reached');
             }
-        }, 1000);
+        }, this.CONFIG.updateInterval);
     }
 
-    /**
-     * Updates the timer display and warning state
-     */
-    public updateTimerDisplay() {
-        const minutes = Math.floor(this.seconds / 60).toString().padStart(2, '0');
-        const seconds = (this.seconds % 60).toString().padStart(2, '0');
-        this.timerText.setText(`${minutes}:${seconds}`);
-
-        const timeLeft = this.MAX_RECORDING_DURATION - this.seconds;
-        if (timeLeft <= 60) {
-            this.timerText.addClass('is-warning');
-        } else {
-            this.timerText.removeClass('is-warning');
-        }
+    private updateTimerDisplay(): void {
+        this.ui.updateTimer(
+            this.seconds,
+            this.CONFIG.maxDuration,
+            this.CONFIG.warningThreshold
+        );
     }
 
-    /**
-     * Updates pause/play button state and icon
-     */
-    public updateButtonState() {
-        const pauseIcon = this.isPaused ? icons.play : icons.pause;
-        const pauseLabel = this.isPaused ? 'Resume Recording' : 'Pause Recording';
-        
-        const svgElement = this.createSvgElement(pauseIcon);
-        if (svgElement && this.pauseButton) {
-            this.pauseButton.empty();
-            this.pauseButton.appendChild(svgElement);
-            this.pauseButton.setAttribute('aria-label', pauseLabel);
-        }
-
-        this.pauseButton.toggleClass('is-paused', this.isPaused);
-    }
-
-    /**
-     * Pauses the timer
-     */
-    public pauseTimer() {
+    private pauseTimer(): void {
         if (this.intervalId) {
             window.clearInterval(this.intervalId);
             this.intervalId = null;
         }
     }
 
-    /**
-     * Resumes the timer
-     */
-    public resumeTimer() {
+    private resumeTimer(): void {
         if (!this.intervalId) {
             this.intervalId = window.setInterval(() => {
                 this.seconds++;
                 this.updateTimerDisplay();
-            }, 1000);
+            }, this.CONFIG.updateInterval);
         }
     }
 
     /**
-     * Performs cleanup when modal is closed
+     * Handles modal close with confirmation
      */
-    onClose() {
-        if (this.isRecording || this.isPaused) {
-            this.stopRecording();
-        }
-        this.cleanupResources();
-    }
-
-    /**
-     * Releases all resources used by the recorder
-     */
-    public cleanupResources() {
-        this.pauseTimer();
+    async onClose(): Promise<void> {
+        if (this.isClosing) return;
         
-        if (this.recorder) {
-            this.recorder.destroy();
-            this.recorder = null;
+        if (this.currentState === 'recording' || this.currentState === 'paused') {
+            this.isClosing = true;
+            
+            try {
+                const confirmModal = new ConfirmationModal(this.app, {
+                    title: 'Save Recording?',
+                    message: 'Do you want to save the current recording?'
+                });
+                confirmModal.open();
+                
+                const shouldSave = await confirmModal.getResult();
+                if (shouldSave) {
+                    await this.stopRecording();
+                }
+            } catch (error) {
+                this.handleError('Error handling close', error);
+            } finally {
+                this.cleanup();
+                this.isClosing = false;
+            }
+        } else {
+            this.cleanup();
         }
+    }
 
-        if (this.stream) {
-            this.stream.getTracks().forEach(track => track.stop());
-            this.stream = null;
-        }
+    /**
+     * Cleans up all resources
+     */
+    private cleanup(): void {
+        this.pauseTimer();
+        this.recordingManager.cleanup();
+        this.ui?.cleanup();
+    }
 
-        this.seconds = 0;
-        this.isRecording = false;
-        this.isPaused = false;
+    /**
+     * Handles errors with user feedback
+     */
+    private handleError(message: string, error: unknown): void {
+        console.error(message, error);
+        new Notice(`${message}. Please try again.`);
+        this.cleanup();
+        this.close();
     }
 }
