@@ -1,11 +1,9 @@
 // src/ui/ToolbarButton.ts
 
-import { MarkdownView, Notice } from 'obsidian';
+import { MarkdownView, Notice, setIcon } from 'obsidian';
 import NeuroVoxPlugin from '../main';
 import { TimerModal } from '../modals/TimerModal';
 import { PluginData } from '../types';
-import { icons } from '../assets/icons'; // Ensure you have imported icons
-
 /**
  * ToolbarButton handles the creation and functionality of the toolbar microphone button.
  */
@@ -25,8 +23,8 @@ export class ToolbarButton {
      */
     public createButton(): void {
         this.ribbonIconEl = this.plugin.addRibbonIcon(
-            'microphone', // Icon ID, ensure 'microphone' is a valid icon in Obsidian
-            'Start NeuroVox Recording', // Tooltip
+            'microphone', 
+            'Start NeuroVox Recording',
             (evt: MouseEvent) => {
                 this.openRecordingModal();
             }

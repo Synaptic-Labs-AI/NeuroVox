@@ -1,8 +1,7 @@
 // src/ui/FloatingButton.ts
 
-import { MarkdownView, Notice } from 'obsidian';
+import { MarkdownView, Notice, setIcon } from 'obsidian';
 import NeuroVoxPlugin from '../main';
-import { icons } from '../assets/icons';
 import { ButtonPositionManager } from '../utils/ButtonPositionManager';
 import { PluginData, Position } from '../types'; // Import PluginData and Position
 import { AudioRecordingManager } from '../utils/RecordingManager';
@@ -92,7 +91,7 @@ export class FloatingButton {
         this.buttonEl = document.createElement('button');
         this.buttonEl.classList.add('neurovox-button', 'floating');
         this.buttonEl.setAttribute('aria-label', 'Start Recording (drag to move)');
-        this.buttonEl.innerHTML = icons.microphone;
+        setIcon(this.buttonEl, 'mic');
         
         // Modify click handler to check drag state
         this.buttonEl.addEventListener('click', (event: MouseEvent) => {
@@ -134,15 +133,12 @@ export class FloatingButton {
     }
 
     public async handleDragEnd(position: Position): Promise<void> {
-        console.log('Drag ended. Position saved:', position);
         this.pluginData.buttonPosition = position; // Directly update pluginData
         await this.plugin.savePluginData(); // Save all data
-        console.log('Position saved.');
     }
 
     public async setInitialPosition(): Promise<void> {
         const savedPosition = this.pluginData.buttonPosition;
-        console.log('Loaded saved position:', savedPosition);
 
         if (savedPosition && this.activeLeafContainer) {
             const containerRect = this.activeLeafContainer.getBoundingClientRect();
@@ -157,21 +153,16 @@ export class FloatingButton {
                 containerRect.height - this.getComputedSize() - this.getComputedMargin()
             );
 
-            console.log('Setting initial position to:', { x, y });
-
             requestAnimationFrame(() => {
                 this.positionManager.setPosition(x, y, true);
-                console.log('Initial position set.');
             });
         } else {
-            console.log('No saved position found. Setting to default.');
             await this.setDefaultPosition();
         }
     }
 
     public async setDefaultPosition(): Promise<void> {
         if (!this.activeLeafContainer) {
-            console.log('No activeLeafContainer. Cannot set default position.');
             return;
         }
 
@@ -179,14 +170,11 @@ export class FloatingButton {
         const x = containerRect.width - this.getComputedSize() - this.getComputedMargin();
         const y = containerRect.height - this.getComputedSize() - this.getComputedMargin();
 
-        console.log('Setting default position to:', { x, y });
-
         requestAnimationFrame(() => {
             this.positionManager.setPosition(x, y, true);
             // Save default position to pluginData
             this.pluginData.buttonPosition = { x, y };
             this.plugin.savePluginData();
-            console.log('Default position saved.');
         });
     }
 

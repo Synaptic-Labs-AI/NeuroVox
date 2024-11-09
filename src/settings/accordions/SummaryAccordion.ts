@@ -20,7 +20,7 @@ export class SummaryAccordion extends BaseAccordion {
     ) {
         super(
             containerEl, 
-            "📝 Summary Settings", 
+            "📝 Summarize", 
             "Configure AI summary generation preferences and customize the prompt template."
         );
     }
@@ -109,7 +109,7 @@ export class SummaryAccordion extends BaseAccordion {
             .addSlider(slider => {
                 this.maxTokensSlider = slider;
                 slider
-                    .setLimits(100, 2000, 100)
+                    .setLimits(100, 4096, 100)
                     .setValue(this.settings.summaryMaxTokens)
                     .setDynamicTooltip()
                     .onChange(async (value) => {

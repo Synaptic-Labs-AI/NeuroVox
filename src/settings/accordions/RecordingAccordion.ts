@@ -15,7 +15,7 @@ export class RecordingAccordion extends BaseAccordion {
         public getAdapter: (provider: AIProvider) => AIAdapter | undefined,
         public plugin: NeuroVoxPlugin
     ) {
-        super(containerEl, "🎙 Recording Settings", "Configure recording preferences and select a transcription model.");
+        super(containerEl, "🎙 Recording", "Configure recording preferences and select a transcription model.");
     }
 
     render(): void {

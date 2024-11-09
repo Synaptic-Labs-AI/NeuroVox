@@ -34,8 +34,6 @@ export default class NeuroVoxPlugin extends Plugin {
     public recordingProcessor: RecordingProcessor;
 
     async onload(): Promise<void> {
-        console.log('Loading NeuroVox plugin');
-
         try {
             await this.initializePlugin();
         } catch (error) {
@@ -62,13 +60,10 @@ export default class NeuroVoxPlugin extends Plugin {
         const data = await this.loadData();
         this.pluginData = data ? { ...DEFAULT_SETTINGS, ...data } : { ...DEFAULT_SETTINGS };
         this.settings = this.pluginData;
-        console.log('Plugin data loaded:', this.pluginData);
     }
 
     public async savePluginData(): Promise<void> {
-        console.log('Saving plugin data:', this.pluginData);
         await this.saveData(this.pluginData);
-        console.log('Plugin data saved successfully.');
     }
 
     public initializeAIAdapters(): void {
@@ -85,13 +80,36 @@ export default class NeuroVoxPlugin extends Plugin {
         this.addSettingTab(new NeuroVoxSettingTab(this.app, this));
     }
 
+    /**
+     * Registers plugin commands with proper conditional checks
+     * Commands will only be available when appropriate conditions are met
+     */
     public registerCommands(): void {
+        // Command to start a new recording
         this.addCommand({
             id: 'start-neurovox-recording',
-            name: 'Start NeuroVox Recording',
-            callback: () => this.handleRecordingStart()
+            name: 'Start Recording',
+            checkCallback: (checking: boolean) => {
+                // Get active markdown view
+                const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+                
+                // Check if we have an active markdown file
+                if (!activeView?.file) {
+                    return false;
+                }
+
+                // If just checking, return true since conditions are met
+                if (checking) {
+                    return true;
+                }
+
+                // Execute the command
+                this.handleRecordingStart();
+                return true;
+            }
         });
 
+        // Command to process existing audio files
         this.addCommand({
             id: 'process-audio-file',
             name: 'Transcribe Existing Audio File',
@@ -99,21 +117,36 @@ export default class NeuroVoxPlugin extends Plugin {
                 // Get the active file
                 const activeFile = this.app.workspace.getActiveFile();
                 
-                // Check if it's an audio file
-                const isAudioFile = activeFile?.extension === 'mp3' || 
-                                  activeFile?.extension === 'wav' ||
-                                  activeFile?.extension === 'webm';
-    
-                // If checking, return true if it's an audio file
-                if (checking) return isAudioFile;
-    
-                if (isAudioFile && activeFile) {
-                    this.processExistingAudioFile(activeFile);
+                // Check if we have a file and it's an audio file
+                const isValidAudioFile = this.isValidAudioFile(activeFile);
+                
+                // If conditions aren't met, command isn't available
+                if (!activeFile || !isValidAudioFile) {
+                    return false;
                 }
-    
-                return false;
+
+                // If just checking, return true since conditions are met
+                if (checking) {
+                    return true;
+                }
+
+                // Execute the command
+                void this.processExistingAudioFile(activeFile);
+                return true;
             }
         });
+    }
+
+    /**
+     * Checks if a file is a valid audio file for transcription
+     * @param file - The file to check
+     * @returns boolean indicating if file is a valid audio file
+     */
+    private isValidAudioFile(file: TFile | null): boolean {
+        if (!file) return false;
+
+        const validExtensions = ['mp3', 'wav', 'webm'];
+        return validExtensions.includes(file.extension);
     }
 
     public async processExistingAudioFile(file: TFile): Promise<void> {
@@ -189,12 +222,9 @@ export default class NeuroVoxPlugin extends Plugin {
     }
 
     public initializeUI(): void {
-        console.log('Initializing UI components');
-        
         this.cleanupUI();
 
         if (this.pluginData.showFloatingButton) {
-            console.log('Creating floating button');
             this.floatingButton = FloatingButton.getInstance(
                 this,
                 this.pluginData,
@@ -203,22 +233,17 @@ export default class NeuroVoxPlugin extends Plugin {
         }
 
         if (this.pluginData.showToolbarButton) {
-            console.log('Creating toolbar button');
             this.toolbarButton = new ToolbarButton(this, this.pluginData);
         }
     }
 
-    public cleanupUI(): void {
-        console.log('Cleaning up UI components');
-        
+    public cleanupUI(): void { 
         if (this.floatingButton) {
-            console.log('Removing floating button');
             this.floatingButton.remove();
             this.floatingButton = null;
         }
         
         if (this.toolbarButton) {
-            console.log('Removing toolbar button');
             this.toolbarButton.remove();
             this.toolbarButton = null;
         }
@@ -289,13 +314,11 @@ export default class NeuroVoxPlugin extends Plugin {
     }
 
     async saveSettings(): Promise<void> {
-        console.log('Saving settings:', this.settings);
         await this.savePluginData();
         this.initializeUI();
     }
 
     onunload() {
-        console.log('Unloading NeuroVox plugin...');
         this.cleanupUI();
     }
 }

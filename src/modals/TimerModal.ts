@@ -1,5 +1,5 @@
 import { App, Modal, Notice } from 'obsidian';
-import { AudioRecordingManager } from '../utils/RecordingManager';  // Updated import
+import { AudioRecordingManager } from '../utils/RecordingManager';
 import { RecordingUI, RecordingState } from '../ui/RecordingUI';
 import { ConfirmationModal } from './ConfirmationModal';
 
@@ -10,7 +10,8 @@ interface TimerConfig {
 }
 
 /**
- * Modal for managing audio recording with timer and controls
+ * Modal for managing audio recording with timer and controls.
+ * Handles recording state, UI updates, and proper cleanup on close.
  */
 export class TimerModal extends Modal {
     private recordingManager: AudioRecordingManager;
@@ -31,6 +32,83 @@ export class TimerModal extends Modal {
     constructor(app: App) {
         super(app);
         this.recordingManager = new AudioRecordingManager();
+        this.setupCloseHandlers();
+    }
+
+    /**
+     * Sets up handlers for modal closing via escape key and clicking outside
+     */
+    private setupCloseHandlers(): void {
+        // Handle clicking outside the modal
+        this.modalEl.addEventListener('click', (event: MouseEvent) => {
+            if (event.target === this.modalEl) {
+                event.preventDefault();
+                event.stopPropagation();
+                this.requestClose();
+            }
+        });
+
+        // Handle escape key
+        this.scope.register([], 'Escape', () => {
+            this.requestClose();
+            return false;
+        });
+    }
+
+    /**
+     * Override the built-in close method to use our custom close handler
+     */
+    close(): void {
+        if (!this.isClosing) {
+            void this.requestClose();
+        }
+    }
+
+    /**
+     * Handles all close attempts, ensuring proper cleanup and save prompts
+     */
+    private async requestClose(): Promise<void> {
+        if (this.isClosing) return;
+
+        if (this.currentState === 'recording' || this.currentState === 'paused') {
+            this.isClosing = true;
+            
+            try {
+                const shouldSave = await this.showSaveConfirmation();
+                if (shouldSave) {
+                    await this.stopRecording();
+                }
+            } catch (error) {
+                this.handleError('Error during close handling', error);
+            } finally {
+                await this.finalizeClose();
+            }
+        } else {
+            await this.finalizeClose();
+        }
+    }
+
+    /**
+     * Shows the save confirmation dialog
+     */
+    private async showSaveConfirmation(): Promise<boolean> {
+        const confirmModal = new ConfirmationModal(this.app, {
+            title: 'Save Recording?',
+            message: 'Do you want to save the current recording?',
+            confirmText: 'Save Recording',
+            cancelText: "Don't Save"
+        });
+        confirmModal.open();
+        return await confirmModal.getResult();
+    }
+
+    /**
+     * Performs final cleanup and closes the modal
+     */
+    private async finalizeClose(): Promise<void> {
+        this.cleanup();
+        this.isClosing = false;
+        super.close();
     }
 
     /**
@@ -52,7 +130,7 @@ export class TimerModal extends Modal {
             });
 
             await this.recordingManager.initialize();
-            this.startRecording();
+            await this.startRecording();
         } catch (error) {
             this.handleError('Failed to initialize recording', error);
         }
@@ -111,7 +189,7 @@ export class TimerModal extends Modal {
      */
     private async handleStop(): Promise<void> {
         await this.stopRecording();
-        this.close();
+        await this.requestClose();
     }
 
     /**
@@ -149,6 +227,9 @@ export class TimerModal extends Modal {
         }, this.CONFIG.updateInterval);
     }
 
+    /**
+     * Updates the timer display
+     */
     private updateTimerDisplay(): void {
         this.ui.updateTimer(
             this.seconds,
@@ -157,6 +238,9 @@ export class TimerModal extends Modal {
         );
     }
 
+    /**
+     * Pauses the timer
+     */
     private pauseTimer(): void {
         if (this.intervalId) {
             window.clearInterval(this.intervalId);
@@ -164,43 +248,15 @@ export class TimerModal extends Modal {
         }
     }
 
+    /**
+     * Resumes the timer
+     */
     private resumeTimer(): void {
         if (!this.intervalId) {
             this.intervalId = window.setInterval(() => {
                 this.seconds++;
                 this.updateTimerDisplay();
             }, this.CONFIG.updateInterval);
-        }
-    }
-
-    /**
-     * Handles modal close with confirmation
-     */
-    async onClose(): Promise<void> {
-        if (this.isClosing) return;
-        
-        if (this.currentState === 'recording' || this.currentState === 'paused') {
-            this.isClosing = true;
-            
-            try {
-                const confirmModal = new ConfirmationModal(this.app, {
-                    title: 'Save Recording?',
-                    message: 'Do you want to save the current recording?'
-                });
-                confirmModal.open();
-                
-                const shouldSave = await confirmModal.getResult();
-                if (shouldSave) {
-                    await this.stopRecording();
-                }
-            } catch (error) {
-                this.handleError('Error handling close', error);
-            } finally {
-                this.cleanup();
-                this.isClosing = false;
-            }
-        } else {
-            this.cleanup();
         }
     }
 
@@ -220,6 +276,6 @@ export class TimerModal extends Modal {
         console.error(message, error);
         new Notice(`${message}. Please try again.`);
         this.cleanup();
-        this.close();
+        void this.requestClose();
     }
 }

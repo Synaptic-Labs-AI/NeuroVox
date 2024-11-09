@@ -4,7 +4,7 @@ import { App, PluginSettingTab } from 'obsidian';
 import { ModelHookupAccordion } from './accordions/ModelHookupAccordion';
 import { RecordingAccordion } from './accordions/RecordingAccordion';
 import { SummaryAccordion } from './accordions/SummaryAccordion';
-import { AIProvider, AIAdapter, AIModels } from '../adapters/AIAdapter';
+import { AIProvider } from '../adapters/AIAdapter';
 import NeuroVoxPlugin from '../main'; // Corrected import as default
 
 export class NeuroVoxSettingTab extends PluginSettingTab {
@@ -18,8 +18,6 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
-    
-        containerEl.createEl('h2', { text: 'NeuroVox Settings' });
     
         // ModelHookup Accordion
         const modelHookupContainer = containerEl.createDiv();

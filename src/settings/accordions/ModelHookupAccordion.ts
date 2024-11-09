@@ -3,7 +3,6 @@
 import { BaseAccordion } from "./BaseAccordion";
 import { NeuroVoxSettings } from "../Settings";
 import { Setting } from "obsidian";
-import { AIProvider } from "../../adapters/AIAdapter";
 import NeuroVoxPlugin from '../../main';
 
 export class ModelHookupAccordion extends BaseAccordion {
@@ -12,7 +11,7 @@ export class ModelHookupAccordion extends BaseAccordion {
         public settings: NeuroVoxSettings,
         public plugin: NeuroVoxPlugin
     ) {
-        super(containerEl, "🔌 AI Provider API Keys", "Configure your API keys for OpenAI and Groq services.");
+        super(containerEl, "🔌 AI Provider Hookup", "Configure your API keys for OpenAI and Groq services.");
     }
 
     render(): void {

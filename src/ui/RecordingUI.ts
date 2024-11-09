@@ -1,4 +1,4 @@
-import { icons } from '../assets/icons';
+import { setIcon } from 'obsidian';
 
 export type RecordingState = 'recording' | 'paused' | 'stopped' | 'inactive';
 
@@ -7,9 +7,6 @@ export interface RecordingUIHandlers {
     onStop: () => void;
 }
 
-/**
- * Manages the visual components and state of the recording interface
- */
 export class RecordingUI {
     private timerText: HTMLElement;
     private pauseButton: HTMLButtonElement;
@@ -24,18 +21,12 @@ export class RecordingUI {
         this.initializeComponents();
     }
 
-    /**
-     * Creates all UI components
-     */
     private initializeComponents(): void {
         this.createTimerDisplay();
         this.createControls();
         this.createWaveform();
     }
 
-    /**
-     * Creates the timer display component
-     */
     private createTimerDisplay(): void {
         this.timerText = this.container.createDiv({
             cls: 'neurovox-timer-display',
@@ -43,9 +34,6 @@ export class RecordingUI {
         });
     }
 
-    /**
-     * Creates the control buttons
-     */
     private createControls(): void {
         const controls = this.container.createDiv({
             cls: 'neurovox-timer-controls'
@@ -54,7 +42,7 @@ export class RecordingUI {
         this.pauseButton = this.createButton(
             controls,
             ['neurovox-timer-button', 'neurovox-pause-button'],
-            icons.pause,
+            'pause',
             'Pause Recording',
             () => this.handlers.onPause()
         );
@@ -62,15 +50,12 @@ export class RecordingUI {
         this.stopButton = this.createButton(
             controls,
             ['neurovox-timer-button', 'neurovox-stop-button'],
-            icons.stop,
+            'square',
             'Stop Recording',
             () => this.handlers.onStop()
         );
     }
 
-    /**
-     * Creates the audio waveform visualization
-     */
     private createWaveform(): void {
         this.waveContainer = this.container.createDiv({
             cls: 'neurovox-audio-wave'
@@ -83,13 +68,10 @@ export class RecordingUI {
         }
     }
 
-    /**
-     * Creates a button with specified properties
-     */
     private createButton(
         container: HTMLElement,
         classNames: string[],
-        icon: string,
+        iconName: string,
         ariaLabel: string,
         onClick: () => void
     ): HTMLButtonElement {
@@ -98,29 +80,11 @@ export class RecordingUI {
             attr: { 'aria-label': ariaLabel }
         });
 
-        const svgEl = this.createSvgElement(icon);
-        if (svgEl) {
-            button.appendChild(svgEl);
-        }
-
+        setIcon(button, iconName);
         button.addEventListener('click', onClick);
         return button;
     }
 
-    /**
-     * Creates an SVG element from icon string
-     */
-    private createSvgElement(svgIcon: string): SVGElement | null {
-        const parser = new DOMParser();
-        const svgDoc = parser.parseFromString(svgIcon, 'image/svg+xml');
-        return svgDoc.documentElement instanceof SVGElement 
-            ? svgDoc.documentElement 
-            : null;
-    }
-
-    /**
-     * Updates the timer display
-     */
     public updateTimer(seconds: number, maxDuration: number, warningThreshold: number): void {
         const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
         const remainingSeconds = (seconds % 60).toString().padStart(2, '0');
@@ -131,35 +95,23 @@ export class RecordingUI {
         this.timerText.toggleClass('is-warning', timeLeft <= warningThreshold);
     }
 
-    /**
-     * Updates the recording state and UI
-     */
     public updateState(state: RecordingState): void {
         this.currentState = state;
         
-        // Update wave animation state
         const states = ['is-recording', 'is-paused', 'is-stopped', 'is-inactive'];
         states.forEach(cls => this.waveContainer.removeClass(cls));
         this.waveContainer.addClass(`is-${state}`);
 
-        // Update pause button state
         const isPaused = state === 'paused';
-        const icon = isPaused ? icons.play : icons.pause;
+        const iconName = isPaused ? 'play' : 'pause';
         const label = isPaused ? 'Resume Recording' : 'Pause Recording';
         
-        const svgElement = this.createSvgElement(icon);
-        if (svgElement) {
-            this.pauseButton.empty();
-            this.pauseButton.appendChild(svgElement);
-            this.pauseButton.setAttribute('aria-label', label);
-        }
-
+        this.pauseButton.empty();
+        setIcon(this.pauseButton, iconName);
+        this.pauseButton.setAttribute('aria-label', label);
         this.pauseButton.toggleClass('is-paused', isPaused);
     }
 
-    /**
-     * Cleans up UI resources
-     */
     public cleanup(): void {
         this.container.empty();
     }

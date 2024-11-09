@@ -1,28 +1,50 @@
-// src/processing/RecordingProcessor.ts
-
-import { Plugin, Notice, TFile, EditorPosition } from 'obsidian';
+import { Plugin, Notice, TFile, EditorPosition, TFolder } from 'obsidian';
 import { AIProvider, AIAdapter } from '../adapters/AIAdapter';
 import { PluginData } from '../types';
 import NeuroVoxPlugin from '../main';
 
+/**
+ * Represents a single step in the processing pipeline
+ */
 interface ProcessingStep {
     name: string;
     startTime: number;
     endTime?: number;
 }
 
+/**
+ * Configuration for the processing pipeline
+ */
+interface ProcessingConfig {
+    maxRetries: number;
+    retryDelay: number;
+}
+
+/**
+ * Result of the processing pipeline
+ */
 interface ProcessingResult {
     transcription: string;
     summary?: string;
     timings: Record<string, number>;
-    audioBlob: Blob
+    audioFilePath: string;
+    audioBlob: Blob;
 }
 
+/**
+ * Handles the processing of audio recordings including saving,
+ * transcription, summarization, and file insertion
+ */
 export class RecordingProcessor {
     private static instance: RecordingProcessor | null = null;
-    private isProcessing: boolean = false;
+    private isProcessing = false;
     private currentStep: ProcessingStep | null = null;
     private steps: ProcessingStep[] = [];
+
+    private readonly config: ProcessingConfig = {
+        maxRetries: 3,
+        retryDelay: 1000
+    };
 
     private constructor(
         private plugin: NeuroVoxPlugin,
@@ -33,71 +55,52 @@ export class RecordingProcessor {
      * Gets the singleton instance of RecordingProcessor
      */
     public static getInstance(plugin: NeuroVoxPlugin, pluginData: PluginData): RecordingProcessor {
-        if (!RecordingProcessor.instance) {
-            RecordingProcessor.instance = new RecordingProcessor(plugin, pluginData);
-        }
-        return RecordingProcessor.instance;
+        return this.instance ??= new RecordingProcessor(plugin, pluginData);
     }
 
     /**
-     * Main processing pipeline for audio recording
+     * Main processing pipeline for audio recordings
      */
     public async processRecording(
-        audioBlob: Blob, 
-        activeFile: TFile, 
+        audioBlob: Blob,
+        activeFile: TFile,
         cursorPosition: EditorPosition
     ): Promise<void> {
         if (this.isProcessing) {
             throw new Error('Recording is already in progress.');
         }
-    
+
         try {
             this.isProcessing = true;
             this.steps = [];
-    
-            // Validate requirements before processing
+            
             await this.validateRequirements();
-    
-            // Process the recording
-            const result = await this.executeProcessingPipeline(audioBlob);
-    
-            // Insert the results into the note - now passing audioBlob from result
-            await this.insertResults(
-                result,
-                activeFile,
-                cursorPosition,
-                audioBlob
-            );
-    
-            // Show success message
+            const savedFilePath = await this.saveAudioFile(audioBlob);
+            const result = await this.executeProcessingPipeline(audioBlob, savedFilePath);
+            await this.insertResults(result, activeFile, cursorPosition);
             this.showSuccessMessage(result.timings);
-    
         } catch (error) {
             this.handleError('Processing failed', error);
             throw error;
         } finally {
-            this.isProcessing = false;
-            this.currentStep = null;
+            this.cleanup();
         }
     }
 
     /**
-     * Validates all requirements before processing starts
+     * Validates all requirements before processing
      */
     private async validateRequirements(): Promise<void> {
-        // Get and validate transcription adapter
         const transcriptionAdapter = this.getAdapter(
             this.pluginData.transcriptionProvider,
             'transcription'
         );
 
-        // If summary is enabled, validate summary adapter
         if (this.pluginData.generateSummary) {
-            const summaryAdapter = this.getAdapter(
-                this.pluginData.summaryProvider,
-                'language'
-            );
+            this.getAdapter(this.pluginData.summaryProvider, 'language');
         }
+
+        await this.ensureRecordingFolderExists();
     }
 
     /**
@@ -105,7 +108,6 @@ export class RecordingProcessor {
      */
     private getAdapter(provider: AIProvider, category: 'transcription' | 'language'): AIAdapter {
         const adapter = this.plugin.aiAdapters.get(provider);
-        
         if (!adapter) {
             throw new Error(`${provider} adapter not found`);
         }
@@ -116,8 +118,7 @@ export class RecordingProcessor {
                 throw new Error(`${provider} API key is not configured`);
             }
             throw new Error(
-                `${provider} adapter is not ready for ${category}. ` +
-                'Please check your settings and model availability.'
+                `${provider} adapter is not ready for ${category}. Please check your settings and model availability.`
             );
         }
 
@@ -125,69 +126,108 @@ export class RecordingProcessor {
     }
 
     /**
-     * Executes the main processing pipeline
+     * Ensures the recording folder exists
      */
-    private async executeProcessingPipeline(audioBlob: Blob): Promise<ProcessingResult> {
-        const timings: Record<string, number> = {};
-        
-        // Step 1: Convert audio
-        const audioBuffer = await this.executeStep(
-            'Audio Conversion',
-            () => this.blobToArrayBuffer(audioBlob)
-        );
-        
-        // Step 2: Transcribe
-        const transcription = await this.executeStep(
-            'Transcription',
-            () => this.transcribeAudio(audioBuffer)
-        );
-        
-        // Step 3: Summarize (if enabled)
-        let summary: string | undefined;
-        if (this.pluginData.generateSummary) {
-            summary = await this.executeStep(
-                'Summarization',
-                () => this.generateSummary(transcription)
-            );
-        }
+    private async ensureRecordingFolderExists(): Promise<void> {
+        const folderPath = this.pluginData.recordingFolderPath;
+        if (!folderPath) return;
 
-        return {
-            transcription,
-            summary,
-            timings: this.calculateTimings(),
-            audioBlob
-        };
+        const parts = folderPath.split('/').filter(Boolean);
+        let currentPath = '';
+
+        for (const part of parts) {
+            currentPath = currentPath ? `${currentPath}/${part}` : part;
+            const folder = this.plugin.app.vault.getAbstractFileByPath(currentPath);
+            
+            if (!folder) {
+                await this.plugin.app.vault.createFolder(currentPath);
+            } else if (!(folder instanceof TFolder)) {
+                throw new Error(`${currentPath} exists but is not a folder`);
+            }
+        }
     }
 
     /**
-     * Executes a processing step with timing and progress tracking
+     * Saves the audio file to the configured location
      */
-    private async executeStep<T>(
-        stepName: string, 
-        operation: () => Promise<T>
-    ): Promise<T> {
-        this.startStep(stepName);
-        
+    private async saveAudioFile(audioBlob: Blob): Promise<string> {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `recording-${timestamp}.wav`;
+        const folderPath = this.pluginData.recordingFolderPath || '';
+        const filePath = folderPath ? `${folderPath}/${fileName}` : fileName;
+
         try {
-            const result = await operation();
-            this.completeStep();
-            return result;
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            const file = await this.plugin.app.vault.createBinary(
+                filePath,
+                new Uint8Array(arrayBuffer)
+            );
+
+            if (!file) {
+                throw new Error('Failed to create audio file');
+            }
+
+            return file.path;
         } catch (error) {
-            this.handleError(`${stepName} failed`, error);
+            this.handleError('Failed to save audio file', error);
             throw error;
         }
     }
 
     /**
-     * Converts blob to array buffer
+     * Executes the main processing pipeline
      */
-    private async blobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as ArrayBuffer);
-            reader.onerror = reject;
-            reader.readAsArrayBuffer(blob);
-        });
+    private async executeProcessingPipeline(
+        audioBlob: Blob,
+        audioFilePath: string
+    ): Promise<ProcessingResult> {
+        const audioBuffer = await this.executeStep(
+            'Audio Conversion',
+            async () => await audioBlob.arrayBuffer()
+        );
+
+        const transcription = await this.executeStep(
+            'Transcription',
+            () => this.transcribeAudio(audioBuffer)
+        );
+
+        const summary = this.pluginData.generateSummary
+            ? await this.executeStep(
+                'Summarization',
+                () => this.generateSummary(transcription)
+            )
+            : undefined;
+
+        return {
+            transcription,
+            summary,
+            timings: this.calculateTimings(),
+            audioFilePath,
+            audioBlob
+        };
+    }
+
+    /**
+     * Executes a single processing step with retry logic
+     */
+    private async executeStep<T>(
+        stepName: string,
+        operation: () => Promise<T>,
+        retryCount = 0
+    ): Promise<T> {
+        this.startStep(stepName);
+        try {
+            const result = await operation();
+            this.completeStep();
+            return result;
+        } catch (error) {
+            if (retryCount < this.config.maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, this.config.retryDelay));
+                return this.executeStep(stepName, operation, retryCount + 1);
+            }
+            this.handleError(`${stepName} failed after ${retryCount} retries`, error);
+            throw error;
+        }
     }
 
     /**
@@ -205,96 +245,66 @@ export class RecordingProcessor {
         const adapter = this.getAdapter(this.pluginData.summaryProvider, 'language');
         const prompt = `${this.pluginData.summaryPrompt}\n\n${transcription}`;
         
-        return adapter.generateResponse(
-            prompt,
-            this.pluginData.summaryModel,
-            {
-                maxTokens: this.pluginData.summaryMaxTokens,
-                temperature: this.pluginData.summaryTemperature
-            }
-        );
+        return adapter.generateResponse(prompt, this.pluginData.summaryModel, {
+            maxTokens: this.pluginData.summaryMaxTokens,
+            temperature: this.pluginData.summaryTemperature
+        });
     }
 
     /**
-     * Formats content for insertion
+     * Formats content for insertion into note
      */
-    private formatContent(
-        audioBlob: Blob, 
-        transcription: string, 
-        summary?: string
-    ): string {
-        const blobName = (audioBlob as any).name || 'audio.wav';
-        let content = `\n>[!info]- Transcription\n>![[${blobName}]]\n>${transcription}\n`;
+    private formatContent(result: ProcessingResult): string {
+        let content = `\n>[!info]- Transcription\n>![[${result.audioFilePath}]]\n>${result.transcription}\n`;
         
-        if (this.pluginData.generateSummary && summary) {
-            content += `---\n\n>[!summary]- Summary\n>${summary}\n\n`;
+        if (this.pluginData.generateSummary && result.summary) {
+            content += `---\n>[!summary]- Summary\n>${result.summary}\n\n`;
         }
         
         return content;
     }
 
     /**
-     * Inserts processed content into note
+     * Inserts results into the specified note
      */
-    /**
- * Inserts processed content into note
- */
-private async insertResults(
-    result: ProcessingResult,
-    file: TFile,
-    cursorPosition: EditorPosition,
-    audioBlob: Blob  // Add audioBlob parameter
-): Promise<void> {
-    const content = this.formatContent(
-        audioBlob,           // Pass the blob first
-        result.transcription,
-        result.summary
-    );
+    private async insertResults(
+        result: ProcessingResult,
+        file: TFile,
+        cursorPosition: EditorPosition
+    ): Promise<void> {
+        const content = this.formatContent(result);
 
-    await this.executeStep(
-        'Content Insertion',
-        async () => {
+        await this.executeStep('Content Insertion', async () => {
             const currentContent = await this.plugin.app.vault.read(file);
-            if (cursorPosition) {
-                const offset = this.getOffsetFromPosition(currentContent, cursorPosition);
-                const beforeCursor = currentContent.slice(0, offset);
-                const afterCursor = currentContent.slice(offset);
-                await this.plugin.app.vault.modify(
-                    file, 
-                    beforeCursor + content + afterCursor
-                );
-            } else {
-                await this.plugin.app.vault.modify(
-                    file, 
-                    currentContent + content
-                );
-            }
-        }
-    );
-}
-
-    /**
-     * Calculates offset for cursor position
-     */
-    private getOffsetFromPosition(content: string, position: EditorPosition): number {
-        const lines = content.split('\n');
-        let offset = 0;
-        
-        for (let i = 0; i < position.line; i++) {
-            offset += lines[i].length + 1;
-        }
-        
-        return offset + position.ch;
+            const newContent = cursorPosition
+                ? this.insertAtPosition(currentContent, content, cursorPosition)
+                : currentContent + content;
+            
+            await this.plugin.app.vault.modify(file, newContent);
+        });
     }
 
     /**
-     * Timing and progress tracking methods
+     * Inserts content at specific position in text
+     */
+    private insertAtPosition(
+        content: string,
+        newContent: string,
+        position: EditorPosition
+    ): string {
+        const lines = content.split('\n');
+        const offset = lines
+            .slice(0, position.line)
+            .reduce((acc, line) => acc + line.length + 1, 0) + position.ch;
+        
+        return content.slice(0, offset) + newContent + content.slice(offset);
+    }
+
+    /**
+     * Step tracking methods
      */
     private startStep(name: string): void {
-        this.currentStep = {
-            name,
-            startTime: performance.now()
-        };
+        this.currentStep = { name, startTime: performance.now() };
         this.steps.push(this.currentStep);
     }
 
@@ -305,19 +315,15 @@ private async insertResults(
     }
 
     private calculateTimings(): Record<string, number> {
-        const timings: Record<string, number> = {};
-        
-        this.steps.forEach(step => {
-            if (step.endTime) {
-                timings[step.name] = step.endTime - step.startTime;
-            }
-        });
-        
-        return timings;
+        return Object.fromEntries(
+            this.steps
+                .filter(step => step.endTime)
+                .map(step => [step.name, step.endTime! - step.startTime])
+        );
     }
 
     /**
-     * Error handling and notification methods
+     * Error handling and notifications
      */
     private handleError(context: string, error: unknown): void {
         const message = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -326,11 +332,16 @@ private async insertResults(
     }
 
     private showSuccessMessage(timings: Record<string, number>): void {
-        let message = 'Recording processed successfully.\n';
-        Object.entries(timings).forEach(([step, time]) => {
-            message += `${step}: ${time.toFixed(2)} ms\n`;
-        });
-        new Notice(message);
+        const timingMessages = Object.entries(timings)
+            .map(([step, time]) => `${step}: ${time.toFixed(2)} ms`)
+            .join('\n');
+            
+        new Notice(`Recording processed successfully.\n${timingMessages}`);
         console.log('Processing completed with timings:', timings);
+    }
+
+    private cleanup(): void {
+        this.isProcessing = false;
+        this.currentStep = null;
     }
 }

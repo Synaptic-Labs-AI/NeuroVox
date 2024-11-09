@@ -80,8 +80,6 @@ export class ButtonPositionManager {
         const x = Math.max(this.margin, Math.min(targetX, maxX));
         const y = Math.max(this.margin, Math.min(targetY, maxY));
 
-        console.log('Constraining position to:', { x, y });
-
         this.setPosition(x, y, false);
     }
 
