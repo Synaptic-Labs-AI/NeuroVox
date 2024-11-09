@@ -120,6 +120,7 @@ export class ButtonPositionManager {
     public handleDragStart = (e: MouseEvent): void => {
         if (e.button !== 0) return;
         e.preventDefault();
+        e.stopPropagation(); // Stop event propagation
         
         this.isDragging = true;
         this.hasMoved = false;
@@ -128,39 +129,48 @@ export class ButtonPositionManager {
         
         this.buttonEl.classList.add('is-dragging');
     };
-
-    public handleDragMove = (e: MouseEvent): void => {
+    
+    public handleDragEnd = (e?: MouseEvent): void => {
         if (!this.isDragging) return;
-        e.preventDefault();
-
-        const newX = e.clientX - this.dragStartX;
-        const newY = e.clientY - this.dragStartY;
-
-        if (!this.hasMoved && 
-            (Math.abs(newX - this.currentX) > this.DRAG_THRESHOLD || 
-             Math.abs(newY - this.currentY) > this.DRAG_THRESHOLD)) {
-            this.hasMoved = true;
+        
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
         }
-
-        this.setPosition(newX, newY);
-        this.constrainPosition();
-    };
-
-    public handleDragEnd = (): void => {
-        if (!this.isDragging) return;
         
         this.isDragging = false;
         this.buttonEl.classList.remove('is-dragging');
         
-        if (!this.hasMoved) {
-            this.onClick();
-        } else {
+        if (this.hasMoved) {
             this.onDragEnd({
                 x: this.currentX,
                 y: this.currentY
             });
         }
+    
+        // Reset hasMoved after a short delay
+        setTimeout(() => {
+            this.hasMoved = false;
+        }, 100);
     };
+    
+    public handleDragMove = (e: MouseEvent): void => {
+        if (!this.isDragging) return;
+        e.preventDefault();
+        e.stopPropagation();
+    
+        const newX = e.clientX - this.dragStartX;
+        const newY = e.clientY - this.dragStartY;
+    
+        if (!this.hasMoved && 
+            (Math.abs(newX - this.currentX) > this.DRAG_THRESHOLD || 
+             Math.abs(newY - this.currentY) > this.DRAG_THRESHOLD)) {
+            this.hasMoved = true;
+        }
+    
+        this.setPosition(newX, newY);
+        this.constrainPosition();
+    };   
 
     public handleTouchStart = (e: TouchEvent): void => {
         if (e.touches.length !== 1) return;

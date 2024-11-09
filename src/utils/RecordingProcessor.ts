@@ -224,7 +224,7 @@ export class RecordingProcessor {
         summary?: string
     ): string {
         const blobName = (audioBlob as any).name || 'audio.wav';
-        let content = `\n>[!info]- Transcription\n>![[${blobName}]]\n>${transcription}\n\n`;
+        let content = `\n>[!info]- Transcription\n>![[${blobName}]]\n>${transcription}\n`;
         
         if (this.pluginData.generateSummary && summary) {
             content += `---\n\n>[!summary]- Summary\n>${summary}\n\n`;

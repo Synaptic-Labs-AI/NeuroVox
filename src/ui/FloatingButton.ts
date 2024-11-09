@@ -85,14 +85,25 @@ export class FloatingButton {
         this.containerEl.classList.add('neurovox-button-container');
     }
 
+    /* Handles button click events independently of drag behavior.
+    * This ensures recording only starts on direct clicks, not after drags.
+    */
     public createButton(): void {
         this.buttonEl = document.createElement('button');
         this.buttonEl.classList.add('neurovox-button', 'floating');
         this.buttonEl.setAttribute('aria-label', 'Start Recording (drag to move)');
         this.buttonEl.innerHTML = icons.microphone;
         
-        // Add click handler
-        this.buttonEl.addEventListener('click', () => this.handleClick());
+        // Modify click handler to check drag state
+        this.buttonEl.addEventListener('click', (event: MouseEvent) => {
+            // Stop if we're dragging or just finished dragging
+            if (this.positionManager?.isDragging || this.positionManager?.hasMoved) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+            this.handleClick();
+        });
         
         this.updateButtonColor();
         this.containerEl.appendChild(this.buttonEl);
