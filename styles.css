@@ -241,7 +241,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--neurovox-spacing-md);
-    padding: var(--neurovox-spacing-sm);
+    padding: var(--neurovox-spacing-xs);
 }
 
 .neurovox-accordion {

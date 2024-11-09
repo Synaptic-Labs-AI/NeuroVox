@@ -15,14 +15,14 @@ export interface AIModel {
 
 export const AIModels: Record<AIProvider, AIModel[]> = {
     [AIProvider.OpenAI]: [
-        { id: 'whisper-1', name: 'Whisper 1', category: 'transcription' },
+        { id: 'whisper-1', name: 'OpenAI', category: 'transcription' },
         { id: 'gpt-4o', name: 'GPT 4o', category: 'language', maxTokens: 8192 },
         { id: 'gpt-4o-mini', name: 'GPT 4o Mini', category: 'language', maxTokens: 4096 },
         { id: 'o1-preview', name: 'o1 Preview', category: 'language', maxTokens: 2048 },
         { id: 'o1-mini', name: 'o1 Mini', category: 'language', maxTokens: 1024 },
     ],
     [AIProvider.Groq]: [
-        { id: 'distil-whisper-large-v3-en', name: 'Distil-Whisper English', category: 'transcription' },
+        { id: 'distil-whisper-large-v3-en', name: 'Groq', category: 'transcription' },
         // { id: 'whisper-large-v3-turbo', name: 'Whisper Large V3 Turbo', category: 'transcription' },
         // { id: 'whisper-large-v3', name: 'Whisper large-v3', category: 'transcription' },
         { id: 'gemma2-9b-it', name: 'Gemma 2 9B IT', category: 'language', maxTokens: 4096 },
