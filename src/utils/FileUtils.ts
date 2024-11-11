@@ -65,11 +65,9 @@ export async function saveAudioFile(
             throw new Error('File creation failed');
         }
 
-        console.log(`Audio file saved successfully at: ${filePath}`);
         return file;
 
     } catch (error) {
-        console.error('Error saving audio file:', error);
         throw error;
     }
 }

@@ -8,12 +8,6 @@
 	"authorUrl": "https://www.synapticlabs.ai",
 	"fundingUrl": "https://donate.stripe.com/bIY4gsgDo2mJ5kkfZ6",
 	"isDesktopOnly": false,
-	"commands": [
-		{
-			"id": "start-neurovox-recording",
-			"name": "Start NeuroVox Recording"
-		}
-	],
 	"settings": {
 		"showFloatingButton": true
 	}

@@ -44,7 +44,7 @@ export class RecordingAccordion extends BaseAccordion {
 
     public createRecordingPathSetting(): void {
         new Setting(this.contentEl)
-            .setName("Recording Path")
+            .setName("Recording path")
             .setDesc('Specify the folder path to save recordings relative to the vault root')
             .addText(text => {
                 text.setPlaceholder("Recordings")
@@ -58,7 +58,7 @@ export class RecordingAccordion extends BaseAccordion {
 
     public createSaveRecordingSetting(): void {
         new Setting(this.contentEl)
-            .setName("Save Recording")
+            .setName("Save recording")
             .setDesc("Save the audio file after recording")
             .addToggle(toggle => {
                 toggle
@@ -72,7 +72,7 @@ export class RecordingAccordion extends BaseAccordion {
 
     public createFloatingButtonSetting(): void {
         const floatingBtnSetting = new Setting(this.contentEl)
-            .setName("Show Floating Button")
+            .setName("Show floating button")
             .setDesc("Show a floating microphone button for quick recording")
             .addToggle(toggle => {
                 toggle
@@ -89,7 +89,7 @@ export class RecordingAccordion extends BaseAccordion {
 
     public createModalToggleSetting(): void {
         const modalToggleSetting = new Setting(this.contentEl)
-            .setName("Use Recording Modal")
+            .setName("Use recording modal")
             .setDesc("When enabled, shows a modal with controls. When disabled, use direct recording through the mic button.")
             .setClass('neurovox-modal-toggle-setting')
             .addToggle(toggle => {
@@ -117,7 +117,7 @@ export class RecordingAccordion extends BaseAccordion {
 
     public createToolbarButtonSetting(): void {
         new Setting(this.contentEl)
-            .setName("Show Toolbar Button")
+            .setName("Show toolbar button")
             .setDesc("Show a microphone button in the toolbar")
             .addToggle(toggle => {
                 toggle
@@ -143,7 +143,7 @@ export class RecordingAccordion extends BaseAccordion {
 
     public createMicButtonColorSetting(): void {
         new Setting(this.contentEl)
-            .setName("Mic Button Color")
+            .setName("Mic button color")
             .setDesc("Choose the color for the microphone buttons")
             .addColorPicker(color => {
                 color
@@ -161,7 +161,7 @@ export class RecordingAccordion extends BaseAccordion {
 
     public createTranscriptionModelSetting(): void {
         new Setting(this.contentEl)
-            .setName("Transcription Model")
+            .setName("Transcription model")
             .setDesc("Select the AI model for transcription")
             .addDropdown(dropdown => {
                 this.modelDropdown = dropdown;
@@ -199,7 +199,7 @@ export class RecordingAccordion extends BaseAccordion {
 
         // If no models are available, add a placeholder option
         if (dropdown.selectEl.options.length === 0) {
-            dropdown.addOption("none", "No API Keys Configured");
+            dropdown.addOption("none", "No API keys configured");
             dropdown.setDisabled(true);
         } else {
             dropdown.setDisabled(false);

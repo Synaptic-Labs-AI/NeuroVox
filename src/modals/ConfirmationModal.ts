@@ -23,9 +23,9 @@ export class ConfirmationModal extends Modal {
 
         // Set default values for optional properties
         this.options = {
-            title: 'Confirm Action',
-            confirmText: 'Save Recording',
-            cancelText: "Don't Save",
+            title: 'Confirm action',
+            confirmText: 'Save recording',
+            cancelText: "Don't save",
             ...options
         };
 

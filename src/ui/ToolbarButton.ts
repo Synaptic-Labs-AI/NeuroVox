@@ -24,7 +24,7 @@ export class ToolbarButton {
     public createButton(): void {
         this.ribbonIconEl = this.plugin.addRibbonIcon(
             'microphone', 
-            'Start NeuroVox Recording',
+            'Start recording',
             (evt: MouseEvent) => {
                 this.openRecordingModal();
             }

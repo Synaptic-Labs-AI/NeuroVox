@@ -336,8 +336,7 @@ export class RecordingProcessor {
             .map(([step, time]) => `${step}: ${time.toFixed(2)} ms`)
             .join('\n');
             
-        new Notice(`Recording processed successfully.\n${timingMessages}`);
-        console.log('Processing completed with timings:', timings);
+        new Notice(`Recording processed successfully.`);
     }
 
     private cleanup(): void {

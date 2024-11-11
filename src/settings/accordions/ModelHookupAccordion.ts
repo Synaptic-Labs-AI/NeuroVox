@@ -11,13 +11,13 @@ export class ModelHookupAccordion extends BaseAccordion {
         public settings: NeuroVoxSettings,
         public plugin: NeuroVoxPlugin
     ) {
-        super(containerEl, "🔌 AI Provider Hookup", "Configure your API keys for OpenAI and Groq services.");
+        super(containerEl, "🔌 AI provider hookup", "Configure your API keys for OpenAI and Groq services.");
     }
 
     render(): void {
         // OpenAI API Key Input
         new Setting(this.contentEl)
-            .setName("OpenAI API Key")
+            .setName("OpenAI API key")
             .setDesc("Enter your OpenAI API key for transcription and summarization")
             .addText(text => {
                 text.setPlaceholder("sk-...")
@@ -30,7 +30,7 @@ export class ModelHookupAccordion extends BaseAccordion {
 
         // Groq API Key Input
         new Setting(this.contentEl)
-            .setName("Groq API Key")
+            .setName("Groq API key")
             .setDesc("Enter your Groq API key for faster processing")
             .addText(text => {
                 text.setPlaceholder("gsk_...")

@@ -7,7 +7,7 @@ export type NeuroVoxSettings = {
     openaiApiKey: string;
     groqApiKey: string;
 
-    // Recording Settings
+    // Recording
     recordingFolderPath: string;
     saveRecording: boolean;
     showFloatingButton: boolean;
@@ -17,7 +17,7 @@ export type NeuroVoxSettings = {
     transcriptionModel: string;
     transcriptionProvider: AIProvider;
 
-    // Summary Settings
+    // Summary
     generateSummary: boolean;
     summaryPrompt: string;
     summaryMaxTokens: number;
@@ -34,7 +34,7 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     openaiApiKey: '',
     groqApiKey: '',
 
-    // Recording Settings
+    // Recording
     recordingFolderPath: 'Recordings',
     saveRecording: true,
     showFloatingButton: true,
@@ -44,7 +44,7 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     transcriptionModel: 'whisper-1',
     transcriptionProvider: AIProvider.OpenAI,
 
-    // Summary Settings
+    // Summary
     generateSummary: true,
     summaryPrompt: 'Summarize the following transcript concisely, capturing the main points and key details.',
     summaryMaxTokens: 500,

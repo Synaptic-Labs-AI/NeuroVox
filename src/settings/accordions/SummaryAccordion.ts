@@ -38,7 +38,7 @@ export class SummaryAccordion extends BaseAccordion {
      */
     public addEnableToggle(): void {
         new Setting(this.contentEl)
-            .setName("Enable AI Summary")
+            .setName("Enable AI summary")
             .setDesc("Automatically generate an AI summary after transcription")
             .addToggle(toggle => {
                 toggle
@@ -55,7 +55,7 @@ export class SummaryAccordion extends BaseAccordion {
      */
     public addModelSelection(): void {
         new Setting(this.contentEl)
-            .setName("Summary Model")
+            .setName("Summary model")
             .setDesc("Select the AI model for generating summaries")
             .addDropdown(dropdown => {
                 this.modelDropdown = dropdown;
@@ -81,7 +81,7 @@ export class SummaryAccordion extends BaseAccordion {
      */
     public addPromptTemplate(): void {
         new Setting(this.contentEl)
-            .setName("Summary Prompt Template")
+            .setName("Summary prompt template")
             .setDesc("Customize the prompt used for generating summaries. Use {transcript} as a placeholder for the transcribed text.")
             .addTextArea(text => {
                 this.promptArea = text;
@@ -104,7 +104,7 @@ export class SummaryAccordion extends BaseAccordion {
      */
     public addMaxTokens(): void {
         new Setting(this.contentEl)
-            .setName("Maximum Summary Length")
+            .setName("Maximum summary length")
             .setDesc("Set the maximum number of tokens for the generated summary")
             .addSlider(slider => {
                 this.maxTokensSlider = slider;
@@ -124,7 +124,7 @@ export class SummaryAccordion extends BaseAccordion {
      */
     public addTemperatureControl(): void {
         new Setting(this.contentEl)
-            .setName("Summary Creativity")
+            .setName("Summary creativity")
             .setDesc("Adjust the creativity level of the summary (0 = more focused, 1 = more creative)")
             .addSlider(slider => {
                 this.temperatureSlider = slider;
@@ -163,7 +163,7 @@ export class SummaryAccordion extends BaseAccordion {
 
         // If no models are available, add a placeholder option
         if (dropdown.selectEl.options.length === 0) {
-            dropdown.addOption("none", "No API Keys Configured");
+            dropdown.addOption("none", "No API keys configured");
             dropdown.setDisabled(true);
         } else {
             dropdown.setDisabled(false);

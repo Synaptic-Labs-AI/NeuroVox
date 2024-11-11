@@ -43,7 +43,7 @@ export class RecordingUI {
             controls,
             ['neurovox-timer-button', 'neurovox-pause-button'],
             'pause',
-            'Pause Recording',
+            'Pause recording',
             () => this.handlers.onPause()
         );
 
@@ -104,7 +104,7 @@ export class RecordingUI {
 
         const isPaused = state === 'paused';
         const iconName = isPaused ? 'play' : 'pause';
-        const label = isPaused ? 'Resume Recording' : 'Pause Recording';
+        const label = isPaused ? 'Resume recording' : 'Pause Recording';
         
         this.pauseButton.empty();
         setIcon(this.pauseButton, iconName);

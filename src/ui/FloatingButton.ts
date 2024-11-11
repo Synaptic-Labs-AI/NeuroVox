@@ -90,7 +90,7 @@ export class FloatingButton {
     public createButton(): void {
         this.buttonEl = document.createElement('button');
         this.buttonEl.classList.add('neurovox-button', 'floating');
-        this.buttonEl.setAttribute('aria-label', 'Start Recording (drag to move)');
+        this.buttonEl.setAttribute('aria-label', 'Start recording (drag to move)');
         setIcon(this.buttonEl, 'mic');
         
         // Modify click handler to check drag state
@@ -403,7 +403,7 @@ export class FloatingButton {
         }
         
         this.buttonEl.setAttribute('aria-label', 
-            isRecording ? 'Stop Recording' : 'Start Recording'
+            isRecording ? 'Stop recording' : 'Start recording'
         );
     }
     

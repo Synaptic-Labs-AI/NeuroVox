@@ -87,8 +87,8 @@ export default class NeuroVoxPlugin extends Plugin {
     public registerCommands(): void {
         // Command to start a new recording
         this.addCommand({
-            id: 'start-neurovox-recording',
-            name: 'Start Recording',
+            id: 'start-recording',
+            name: 'Start recording',
             checkCallback: (checking: boolean) => {
                 // Get active markdown view
                 const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -112,7 +112,7 @@ export default class NeuroVoxPlugin extends Plugin {
         // Command to process existing audio files
         this.addCommand({
             id: 'process-audio-file',
-            name: 'Transcribe Existing Audio File',
+            name: 'Transcribe existing audio file',
             checkCallback: (checking: boolean) => {
                 // Get the active file
                 const activeFile = this.app.workspace.getActiveFile();
