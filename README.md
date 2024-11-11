@@ -5,37 +5,18 @@ NeuroVox is an Obsidian plugin that enhances your note-taking with voice transcr
 ## Features
 
 - **Voice Recording**: Insert a code block with three backticks, the word `record`, and three backticks again. A mic icon will appear in your note, which you can press to record.
-- **Transcription**: Automatically transcribes your voice recordings using the [OpenAI Whisper API](https://openai.com/index/whisper/).
+- **Transcription**: Automatically transcribes your voice recordings using the [OpenAI Whisper API](https://openai.com/index/whisper/) along with Groq.
 - **Custom Prompts**: Apply custom prompts to the transcription to summarize, extract to-dos, or other actions.
 - **Audio Playback**: Embeds the audio file in your note for easy access.
-- **Embedded Output**: Transcriptions and AI-generated outputs are embedded in your note with headings.
+- **Embedded Output**: Transcriptions and AI-generated outputs are embedded in your notes as callouts wherever your cursor is.
 
 ## Installation
 
-1. Download the NeuroVox plugin.
-2. Move the plugin files to your Obsidian plugins directory (.obsidian/plugins).
-3. Enable the plugin from the Obsidian settings by toggling it on.
-4. Input your OpenAI API key (instructions below).
-
-## Usage
-
-1. **Recording**:
-    - Insert a code block with three backticks, the word `record`, and three backticks again.
-      
-![neurovox record](https://github.com/Synaptic-Labs-AI/NeuroVox/assets/131487882/2996f6a1-fc1e-41cd-bd98-5d3218f260c3)
-
-2. **Transcription**:
-   	- Click the microphone icon to start recording.  
-    - The plugin automatically transcribes your recording.
-
-![neurovox mic button](https://github.com/Synaptic-Labs-AI/NeuroVox/assets/131487882/0ac849c9-46f2-43ab-b3ec-b282d3a4f4a8)
-
-
-4. **Applying Prompts**:
-    - Use custom prompts to process the transcription by going to settings and filling in the `Prompt` field.
-
-5. **Embedded Output**:
-    - The transcription and AI-generated content are embedded in your note with headings.
+1. Download the NeuroVox plugin from Community Plugins.
+2. Enable the plugin from the Obsidian settings by toggling it on.
+3. Input your OpenAI and/or Groq API Key (instructions below).
+4. Choose a folder to save the Recordings.
+5. Turn on the Floating Button Mic (optional), or otherwise use the toolbar icon or command pallette to start a recording.
 
 ## API Key Setup
 
@@ -79,13 +60,6 @@ Contributions are welcome! Please fork the repository, make your changes, and op
 ## Support
 
 For support or to report issues, use the GitHub Issues page for this repository.
-
-## Roadmap
-
-- Add personalization options.
-- Improve the user interface for easier configuration.
-- Extend functionality with more AI-driven features.
-- Add dynamic frontmatter generation
 
 ## Acknowledgments
 
