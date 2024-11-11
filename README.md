@@ -1,6 +1,6 @@
 # NeuroVox
 
-NeuroVox is an Obsidian plugin that enhances your note-taking with voice transcription and AI capabilities. Simply insert a special code block to record your voice, transcribe it, and apply custom AI prompts to the transcription.
+NeuroVox is an Obsidian plugin that enhances your note-taking with voice transcription and AI capabilities. Record your voice, transcribe it, and apply custom AI prompts to the transcription.
 
 ## Features
 
@@ -22,36 +22,26 @@ NeuroVox is an Obsidian plugin that enhances your note-taking with voice transcr
 
 If you need to obtain an OpenAI API key, follow the steps below:
 
-### Steps to Get an OpenAI API Key
+### Steps to Get an API Key
 
 1. **Create an Account**:
-    - Visit the [OpenAI website](https://www.openai.com) and sign up for an account.
+    - Visit the [OpenAI website](https://platform.openai.com) and sign up for an account.
+    - Visit the [Groq website](https://console.groq.com/)
 
 2. **Access API Keys**:
-    - Log in to your OpenAI account.
-    - Click on your profile icon in the top right corner and select "API Keys" from the dropdown menu.
-      ![Access API Keys](path/to/access-api-keys.png)
-      *Image showing the dropdown menu to access API Keys.*
+    - Log in to your account.
+    - **OpenAI**: Click on the ⚙️ in the top right corner and select "API Keys" from the dropdown menu.
+    - **Groq**: Click "API Keys" on the left sidebar.
 
 3. **Create a New Key**:
     - On the API Keys page, click "Create new secret key."
-      ![Create New Secret Key](path/to/create-new-key.png)
-      *Image showing the button to create a new secret key.*
 
 4. **Secure Your API Key**:
-    - Copy the newly generated API key and save it in a secure location. Treat this key like a password and do not share it with anyone.
-      ![Secure API Key](path/to/secure-api-key.png)
-      *Image showing copying and saving the API key securely.*
+    - Copy the newly generated API key into the "🔌 AI Provider Keys" accordion in the Neurovox Settings. Treat this key like a password and do not share it with anyone.
 
 5. **Billing Information**:
-    - Note that you need to add billing information to your OpenAI account to make API calls. You start with a $5 credit, but further usage will be billed according to OpenAI's pricing.
-      ![Billing Information](path/to/billing-info.png)
-      *Image showing where to add billing information.*
-
-### Important Notes
-
-- **Security**: Do not share your API key with anyone. Treat it as your personal password for accessing OpenAI services.
-- **Usage Costs**: Be aware of the costs associated with API usage.
+    - You need to add billing information to your OpenAI account to make API calls.
+    - Groq is currently free.
 
 ## Contribution
 
