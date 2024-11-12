@@ -26,7 +26,7 @@ If you need to obtain an OpenAI API key, follow the steps below:
 
 1. **Create an Account**:
     - Visit the [OpenAI website](https://platform.openai.com) and sign up for an account.
-    - Visit the [Groq website](https://console.groq.com/)
+    - Or visit the [Groq website](https://console.groq.com/) to get an account there.
 
 2. **Access API Keys**:
     - Log in to your account.
