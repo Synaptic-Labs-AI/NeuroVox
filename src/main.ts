@@ -197,6 +197,9 @@ export default class NeuroVoxPlugin extends Plugin {
         );
     }
 
+    /**
+     * Handles changes in the active leaf (note)
+     */
     public handleActiveLeafChange(leaf: WorkspaceLeaf | null): void {
         this.activeLeaf = leaf;
         
@@ -223,7 +226,7 @@ export default class NeuroVoxPlugin extends Plugin {
 
     public initializeUI(): void {
         this.cleanupUI();
-
+    
         if (this.pluginData.showFloatingButton) {
             this.floatingButton = FloatingButton.getInstance(
                 this,
@@ -231,12 +234,15 @@ export default class NeuroVoxPlugin extends Plugin {
                 () => this.handleRecordingStart()
             );
         }
-
+    
         if (this.pluginData.showToolbarButton) {
             this.toolbarButton = new ToolbarButton(this, this.pluginData);
         }
     }
-
+    
+    /**
+     * Cleans up UI components before reinitializing
+     */
     public cleanupUI(): void { 
         if (this.floatingButton) {
             this.floatingButton.remove();

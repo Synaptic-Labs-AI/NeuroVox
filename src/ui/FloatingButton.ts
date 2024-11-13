@@ -241,7 +241,11 @@ export class FloatingButton {
         this.updateActiveContainer(viewContent);
     }
 
+    /**
+     * Handles updating the active container when switching notes
+     */
     public updateActiveContainer(newContainer: HTMLElement): void {
+        // Remove resize observer from old container
         if (this.activeLeafContainer) {
             this.resizeObserver.unobserve(this.activeLeafContainer);
         }
@@ -252,7 +256,7 @@ export class FloatingButton {
 
         if (this.pluginData.showFloatingButton) {
             this.show();
-            // Initialize Position Manager now that the container is attached
+            // Initialize Position Manager after container is attached
             this.initializePositionManager();
             requestAnimationFrame(() => {
                 if (this.positionManager) {
@@ -294,28 +298,33 @@ export class FloatingButton {
     }
 
     public remove(): void {
+        // Clear any existing timeouts
         if (this.resizeTimeout) {
             clearTimeout(this.resizeTimeout);
         }
         
+        // Disconnect resize observer
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
         }
-    
+        
+        // Clean up position manager
         if (this.positionManager) {
             this.positionManager.cleanup();
         }
-    
-        // Clean up recording resources
+        
+        // Clean up audio resources
         this.cleanup();
-    
+        
         // Remove event listeners
         this.buttonEl.removeEventListener('click', () => this.handleClick());
-    
+        
+        // Remove the container element if it exists
         if (this.containerEl && this.containerEl.parentNode) {
             this.containerEl.remove();
         }
-    
+        
+        // Reset singleton instance
         FloatingButton.instance = null;
     }
 

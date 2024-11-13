@@ -128,6 +128,9 @@ export class ButtonPositionManager {
         this.buttonEl.classList.add('is-dragging');
     };
     
+    /**
+     * Handles the end of a drag operation
+     */
     public handleDragEnd = (e?: MouseEvent): void => {
         if (!this.isDragging) return;
         
@@ -152,6 +155,9 @@ export class ButtonPositionManager {
         }, 100);
     };
     
+    /**
+     * Handles drag movement and determines if threshold is met
+     */
     public handleDragMove = (e: MouseEvent): void => {
         if (!this.isDragging) return;
         e.preventDefault();
@@ -170,6 +176,9 @@ export class ButtonPositionManager {
         this.constrainPosition();
     };   
 
+    /**
+     * Handles touch events for mobile support
+     */
     public handleTouchStart = (e: TouchEvent): void => {
         if (e.touches.length !== 1) return;
         e.preventDefault();
@@ -224,6 +233,9 @@ export class ButtonPositionManager {
         };
     }
 
+    /**
+     * Handles cleanup of position manager resources
+     */
     public cleanup(): void {
         // Remove mouse event listeners
         document.removeEventListener('mousemove', this._boundHandlers.move);
