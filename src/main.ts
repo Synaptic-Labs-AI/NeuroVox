@@ -26,9 +26,10 @@ export default class NeuroVoxPlugin extends Plugin {
     public pluginData: PluginData;
     
     // UI Components
-    floatingButton: FloatingButton | null = null;
+    private buttonMap: Map<string, FloatingButton> = new Map();
     toolbarButton: ToolbarButton | null = null;
     public activeLeaf: WorkspaceLeaf | null = null;
+    settingTab: NeuroVoxSettingTab | null = null;
 
     // Recording Processor
     public recordingProcessor: RecordingProcessor;
@@ -76,8 +77,30 @@ export default class NeuroVoxPlugin extends Plugin {
     }
 
     public registerSettingsTab(): void {
-        // Adjusted to pass only two arguments
-        this.addSettingTab(new NeuroVoxSettingTab(this.app, this));
+        this.settingTab = new NeuroVoxSettingTab(this.app, this);
+        this.addSettingTab(this.settingTab);
+    }
+
+    public refreshModelDropdowns(): void {
+        if (!this.settingTab?.containerEl) return;
+
+        const containers = this.settingTab.containerEl.querySelectorAll('.neurovox-accordion');
+        containers.forEach(container => {
+            const header = container.querySelector('.neurovox-accordion-title');
+            if (!header?.textContent) return;
+
+            if (header.textContent.includes('Recording')) {
+                const recordingAccordion = this.settingTab?.getRecordingAccordion();
+                if (recordingAccordion?.modelDropdown) {
+                    recordingAccordion.populateModelDropdown(recordingAccordion.modelDropdown);
+                }
+            } else if (header.textContent.includes('Summarize')) {
+                const summaryAccordion = this.settingTab?.getSummaryAccordion();
+                if (summaryAccordion?.modelDropdown) {
+                    summaryAccordion.populateModelOptions(summaryAccordion.modelDropdown);
+                }
+            }
+        });
     }
 
     /**
@@ -203,51 +226,72 @@ export default class NeuroVoxPlugin extends Plugin {
     public handleActiveLeafChange(leaf: WorkspaceLeaf | null): void {
         this.activeLeaf = leaf;
         
-        if (this.floatingButton) {
-            if (leaf?.view instanceof MarkdownView) {
-                this.floatingButton.show();
-            } else {
-                this.floatingButton.hide();
-            }
+        // Clean up ALL existing buttons
+        this.buttonMap.forEach((button, path) => {
+            button.remove();
+        });
+        this.buttonMap.clear();
+        
+        // Only create new button for markdown views with valid files
+        if (leaf?.view instanceof MarkdownView && leaf.view.file) {
+            this.createButtonForFile(leaf.view.file);
         }
     }
 
     public handleLayoutChange(): void {
-        if (this.floatingButton) {
-            this.floatingButton.show();
+        // Get current active file's button and show it
+        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (activeView?.file) {
+            const button = this.buttonMap.get(activeView.file.path);
+            button?.show();
         }
     }
 
     public handleFileDelete(file: TAbstractFile): void {
         if (file instanceof TFile) {
-            // Handle cleanup if needed
+            const button = this.buttonMap.get(file.path);
+            if (button) {
+                button.remove();
+                this.buttonMap.delete(file.path);
+            }
         }
     }
 
     public initializeUI(): void {
         this.cleanupUI();
     
-        if (this.pluginData.showFloatingButton) {
-            this.floatingButton = FloatingButton.getInstance(
-                this,
-                this.pluginData,
-                () => this.handleRecordingStart()
-            );
-        }
-    
         if (this.pluginData.showToolbarButton) {
             this.toolbarButton = new ToolbarButton(this, this.pluginData);
         }
+    }
+    
+    private createButtonForFile(file: TFile): void {
+        if (!this.pluginData.showFloatingButton) return;
+        
+        // Remove any existing button for this file first
+        const existingButton = this.buttonMap.get(file.path);
+        if (existingButton) {
+            existingButton.remove();
+            this.buttonMap.delete(file.path);
+        }
+        
+        // Create new button instance
+        const button = new FloatingButton(
+            this,
+            this.pluginData,
+            () => this.handleRecordingStart()
+        );
+        
+        this.buttonMap.set(file.path, button);
     }
     
     /**
      * Cleans up UI components before reinitializing
      */
     public cleanupUI(): void { 
-        if (this.floatingButton) {
-            this.floatingButton.remove();
-            this.floatingButton = null;
-        }
+        // Clean up all buttons
+        this.buttonMap.forEach(button => button.remove());
+        this.buttonMap.clear();
         
         if (this.toolbarButton) {
             this.toolbarButton.remove();
@@ -322,6 +366,12 @@ export default class NeuroVoxPlugin extends Plugin {
     async saveSettings(): Promise<void> {
         await this.savePluginData();
         this.initializeUI();
+    }
+
+    public updateAllButtonColors(): void {
+        this.buttonMap.forEach(button => {
+            button.updateButtonColor();
+        });
     }
 
     onunload() {

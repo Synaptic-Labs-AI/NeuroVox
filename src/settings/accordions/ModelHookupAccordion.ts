@@ -25,6 +25,7 @@ export class ModelHookupAccordion extends BaseAccordion {
                     .onChange(async (value: string) => {
                         this.settings.openaiApiKey = value.trim();
                         await this.plugin.saveSettings();
+                        this.plugin.refreshModelDropdowns();
                     });
             });
 
@@ -38,6 +39,7 @@ export class ModelHookupAccordion extends BaseAccordion {
                     .onChange(async (value: string) => {
                         this.settings.groqApiKey = value.trim();
                         await this.plugin.saveSettings();
+                        this.plugin.refreshModelDropdowns();
                     });
             });
     }

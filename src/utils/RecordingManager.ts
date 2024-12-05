@@ -39,7 +39,7 @@ export class AudioRecordingManager {
         mimeType: "audio/wav",  // Default to WAV for best compatibility
         recorderType: RecordRTC.StereoAudioRecorder,
         numberOfAudioChannels: 1 as AudioChannels, // Explicitly type as 1 or 2
-        desiredSampRate: 16000,   // Optimal for voice recognition
+        desiredSampRate: 44000,   // Optimal for voice recognition
         timeSlice: 1000           // Update each second
     };
 
