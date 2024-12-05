@@ -43,6 +43,11 @@ If you need to obtain an OpenAI API key, follow the steps below:
     - You need to add billing information to your OpenAI account to make API calls.
     - Groq is currently free.
 
+## Roadmap
+- Allow users to customize the callouts
+- Allow users to decide whether or not to keep the recording
+- Improve ability to transcribe videos
+
 ## Contribution
 
 Contributions are welcome! Please fork the repository, make your changes, and open a pull request.
