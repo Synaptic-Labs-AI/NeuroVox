@@ -44,9 +44,10 @@ If you need to obtain an OpenAI API key, follow the steps below:
     - Groq is currently free.
 
 ## Roadmap
-- Allow users to customize the callouts
-- Allow users to decide whether or not to keep the recording
-- Improve ability to transcribe videos
+- [ ] Allow users to customize the callouts (titles and collapsed/uncollapsed default)
+- [ ] Allow users to decide whether or not to keep the recording
+- [ ] Improve ability to transcribe videos
+- [ ] Add chunking of audio to do unlimited length and size files
 
 ## Contribution
 
