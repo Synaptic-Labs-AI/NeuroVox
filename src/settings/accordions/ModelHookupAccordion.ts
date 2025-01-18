@@ -40,6 +40,7 @@ export class ModelHookupAccordion extends BaseAccordion {
                         }
                         
                         await this.plugin.saveSettings();
+                        this.plugin.refreshModelDropdowns();
                     });
             });
 
@@ -67,6 +68,7 @@ export class ModelHookupAccordion extends BaseAccordion {
                         }
                         
                         await this.plugin.saveSettings();
+                        this.plugin.refreshModelDropdowns();
                     });
             });
 

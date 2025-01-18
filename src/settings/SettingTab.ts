@@ -9,6 +9,8 @@ import NeuroVoxPlugin from '../main'; // Corrected import as default
 
 export class NeuroVoxSettingTab extends PluginSettingTab {
     plugin: NeuroVoxPlugin;
+    private recordingAccordion: RecordingAccordion | null = null;
+    private summaryAccordion: SummaryAccordion | null = null;
 
     constructor(app: App, plugin: NeuroVoxPlugin) {
         super(app, plugin);
@@ -29,20 +31,30 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
     
         // Recording Accordion
         const recordingContainer = containerEl.createDiv();
-        new RecordingAccordion(
+        this.recordingAccordion = new RecordingAccordion(
             recordingContainer,
             this.plugin.settings,
             (provider: AIProvider) => this.plugin.aiAdapters.get(provider)!,
-            this.plugin  // Pass plugin instance
-        ).render();
+            this.plugin
+        );
+        this.recordingAccordion.render();
     
         // Summary Accordion
         const summaryContainer = containerEl.createDiv();
-        new SummaryAccordion(
+        this.summaryAccordion = new SummaryAccordion(
             summaryContainer,
             this.plugin.settings,
             (provider: AIProvider) => this.plugin.aiAdapters.get(provider)!,
-            this.plugin  // Pass plugin instance
-        ).render();
+            this.plugin
+        );
+        this.summaryAccordion.render();
+    }
+
+    getRecordingAccordion(): RecordingAccordion | null {
+        return this.recordingAccordion;
+    }
+
+    getSummaryAccordion(): SummaryAccordion | null {
+        return this.summaryAccordion;
     }
 }

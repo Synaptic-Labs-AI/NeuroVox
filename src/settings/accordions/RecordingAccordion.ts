@@ -153,10 +153,8 @@ export class RecordingAccordion extends BaseAccordion {
                     .setValue(this.settings.micButtonColor)
                     .onChange(async (value: string) => {
                         this.settings.micButtonColor = value;
-                        // Update floating button color if it exists
-                        if (this.plugin.floatingButton) {
-                            this.plugin.floatingButton.updateButtonColor();
-                        }
+                        // Update all floating button colors using public method
+                        this.plugin.updateAllButtonColors();
                         await this.plugin.saveSettings();
                     });
             });
