@@ -38,6 +38,9 @@ export class RecordingAccordion extends BaseAccordion {
         // Mic Button Color
         this.createMicButtonColorSetting();
         
+        // Add this before createTranscriptionModelSetting
+        this.createTranscriptionFormatSetting();
+
         // Transcription Model Selection
         this.createTranscriptionModelSetting();
     }
@@ -156,6 +159,22 @@ export class RecordingAccordion extends BaseAccordion {
                         }
                         await this.plugin.saveSettings();
                     });
+            });
+    }
+
+    public createTranscriptionFormatSetting(): void {
+        new Setting(this.contentEl)
+            .setName("Transcription format")
+            .setDesc("Customize the transcription callout format. Use {audioPath} for audio file path and {transcription} for the transcribed text")
+            .addTextArea(text => {
+                text.setPlaceholder(">[!info]- Transcription\n>![[{audioPath}]]\n>{transcription}")
+                    .setValue(this.settings.transcriptionCalloutFormat)
+                    .onChange(async (value) => {
+                        this.settings.transcriptionCalloutFormat = value;
+                        await this.plugin.saveSettings();
+                    });
+                text.inputEl.rows = 4;
+                text.inputEl.style.width = "100%";
             });
     }
 

@@ -1,36 +1,45 @@
 import { App, Modal, ButtonComponent } from 'obsidian';
 
-/**
- * Interface for configuration options of the confirmation dialog
- */
 export interface ConfirmationOptions {
     title?: string;
     message: string;
     confirmText?: string;
+    processOnlyText?: string;  // New option
     cancelText?: string;
 }
 
-/**
- * A reusable confirmation dialog modal that returns a promise with the user's choice
- */
+export enum ConfirmationResult {
+    SaveAndProcess,
+    ProcessOnly,
+    Cancel
+}
+
 export class ConfirmationModal extends Modal {
-    private result: Promise<boolean>;
-    private resolvePromise: (value: boolean) => void;
+    private result: Promise<ConfirmationResult>;
+    private resolvePromise: (value: ConfirmationResult) => void;
     private options: Required<ConfirmationOptions>;
 
     constructor(app: App, options: ConfirmationOptions) {
         super(app);
 
-        // Set default values for optional properties
         this.options = {
-            title: 'Confirm action',
-            confirmText: 'Save recording',
-            cancelText: "Don't save",
+            title: 'Recording Options',
+            confirmText: 'Save and Process',
+            processOnlyText: 'Process Only',
+            cancelText: 'Cancel',
             ...options
         };
 
         this.result = new Promise((resolve) => {
             this.resolvePromise = resolve;
+        });
+
+        // Handle escape key and clicking outside modal
+        this.modalEl.addEventListener('click', (event: MouseEvent) => {
+            if (event.target === this.modalEl) {
+                this.resolvePromise(ConfirmationResult.Cancel);
+                this.close();
+            }
         });
     }
 
@@ -51,19 +60,28 @@ export class ConfirmationModal extends Modal {
         // Cancel button
         new ButtonComponent(buttonContainer)
             .setButtonText(this.options.cancelText)
-            .setClass('neurovox-button-danger')
+            .setClass('neurovox-button-secondary')
             .onClick(() => {
-                this.resolvePromise(false);
+                this.resolvePromise(ConfirmationResult.Cancel);
                 this.close();
             });
 
-        // Confirm button
+        // Process only button
+        new ButtonComponent(buttonContainer)
+            .setButtonText(this.options.processOnlyText)
+            .setClass('neurovox-button-warning')
+            .onClick(() => {
+                this.resolvePromise(ConfirmationResult.ProcessOnly);
+                this.close();
+            });
+
+        // Save and process button
         new ButtonComponent(buttonContainer)
             .setButtonText(this.options.confirmText)
             .setClass('neurovox-button-primary')
             .setCta()
             .onClick(() => {
-                this.resolvePromise(true);
+                this.resolvePromise(ConfirmationResult.SaveAndProcess);
                 this.close();
             });
     }
@@ -72,12 +90,17 @@ export class ConfirmationModal extends Modal {
      * Gets the user's choice from the confirmation dialog
      * @returns Promise resolving to true if confirmed, false if cancelled
      */
-    public async getResult(): Promise<boolean> {
+    public async getResult(): Promise<ConfirmationResult> {
         return this.result;
     }
 
     onClose() {
         const { contentEl } = this;
         contentEl.empty();
+        
+        // Ensure promise is resolved if modal is closed without selection
+        if (this.resolvePromise) {
+            this.resolvePromise(ConfirmationResult.Cancel);
+        }
     }
 }

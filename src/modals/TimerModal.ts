@@ -69,37 +69,13 @@ export class TimerModal extends Modal {
      */
     private async requestClose(): Promise<void> {
         if (this.isClosing) return;
+        this.isClosing = true;
 
         if (this.currentState === 'recording' || this.currentState === 'paused') {
-            this.isClosing = true;
-            
-            try {
-                const shouldSave = await this.showSaveConfirmation();
-                if (shouldSave) {
-                    await this.stopRecording();
-                }
-            } catch (error) {
-                this.handleError('Error during close handling', error);
-            } finally {
-                await this.finalizeClose();
-            }
-        } else {
-            await this.finalizeClose();
+            await this.stopRecording();
         }
-    }
-
-    /**
-     * Shows the save confirmation dialog
-     */
-    private async showSaveConfirmation(): Promise<boolean> {
-        const confirmModal = new ConfirmationModal(this.app, {
-            title: 'Save Recording?',
-            message: 'Do you want to save the current recording?',
-            confirmText: 'Save Recording',
-            cancelText: "Don't Save"
-        });
-        confirmModal.open();
-        return await confirmModal.getResult();
+        
+        await this.finalizeClose();
     }
 
     /**
@@ -197,14 +173,39 @@ export class TimerModal extends Modal {
      */
     private async stopRecording(): Promise<void> {
         try {
+            console.log('🎙️ Stopping recording...');
             const blob = await this.recordingManager.stop();
-            if (blob && this.onStop) {
-                this.onStop(blob);
+            
+            if (!blob) {
+                throw new Error('No audio data received from recorder');
             }
+
+            console.log('✅ Recording stopped:', {
+                size: `${(blob.size / (1024 * 1024)).toFixed(2)}MB`,
+                type: blob.type
+            });
             
             this.currentState = 'stopped';
             this.ui.updateState(this.currentState);
+
+            if (this.onStop) {
+                try {
+                    await this.onStop(blob);
+                    console.log('✅ Recording processed successfully');
+                } catch (error) {
+                    console.error('❌ Error in onStop callback:', error);
+                    throw error;
+                }
+            } else {
+                console.warn('⚠️ No onStop callback provided');
+            }
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('❌ Failed to stop recording:', {
+                error,
+                message: errorMessage,
+                stack: error instanceof Error ? error.stack : undefined
+            });
             this.handleError('Failed to stop recording', error);
         }
     }
@@ -273,8 +274,14 @@ export class TimerModal extends Modal {
      * Handles errors with user feedback
      */
     private handleError(message: string, error: unknown): void {
-        console.error(message, error);
-        new Notice(`${message}. Please try again.`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('❌ Error:', {
+            context: message,
+            error,
+            message: errorMessage,
+            stack: error instanceof Error ? error.stack : undefined
+        });
+        new Notice(`${message}: ${errorMessage}`);
         this.cleanup();
         void this.requestClose();
     }

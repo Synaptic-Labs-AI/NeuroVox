@@ -204,10 +204,12 @@ export class ButtonPositionManager {
     public handleTouchEnd = (): void => {
         if (!this.isDragging) return;
         
+        const wasDragging = this.hasMoved;
+        
         this.isDragging = false;
         this.buttonEl.classList.remove('is-dragging');
         
-        if (!this.hasMoved) {
+        if (!wasDragging) {
             this.onClick();
         } else {
             this.onDragEnd({
@@ -215,6 +217,9 @@ export class ButtonPositionManager {
                 y: this.currentY
             });
         }
+
+        // Reset hasMoved immediately for better responsiveness
+        this.hasMoved = false;
     };
 
     public getCurrentPosition(): Position {
@@ -225,11 +230,13 @@ export class ButtonPositionManager {
     }
 
     public cleanup(): void {
-        // Remove mouse event listeners
+        // Remove button-specific event listeners
+        this.buttonEl.removeEventListener('mousedown', this.handleDragStart);
+        this.buttonEl.removeEventListener('touchstart', this.handleTouchStart);
+
+        // Remove document event listeners
         document.removeEventListener('mousemove', this._boundHandlers.move);
         document.removeEventListener('mouseup', this._boundHandlers.end);
-
-        // Remove touch event listeners
         document.removeEventListener('touchmove', this._boundHandlers.touchMove);
         document.removeEventListener('touchend', this._boundHandlers.touchEnd);
     }

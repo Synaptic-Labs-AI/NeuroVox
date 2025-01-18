@@ -8,7 +8,7 @@ import { AudioRecordingManager } from '../utils/RecordingManager';
 import { RecordingProcessor } from '../utils/RecordingProcessor';
 
 export class FloatingButton {
-    public static instance: FloatingButton | null = null;
+    private static instance: FloatingButton | null = null;
     public buttonEl: HTMLButtonElement;
     public containerEl: HTMLDivElement;
     public activeLeafContainer: HTMLElement | null = null;
@@ -24,6 +24,10 @@ export class FloatingButton {
         public pluginData: PluginData,
         public onClickCallback: () => void
     ) {
+        // Ensure only one instance exists
+        if (FloatingButton.instance) {
+            FloatingButton.instance.remove();
+        }
         this.initializeComponents();
     }
 
@@ -32,10 +36,17 @@ export class FloatingButton {
         pluginData: PluginData,
         onClickCallback: () => void
     ): FloatingButton {
-        if (!FloatingButton.instance) {
+        if (!FloatingButton.instance || FloatingButton.instance.isInvalid()) {
+            if (FloatingButton.instance) {
+                FloatingButton.instance.remove();
+            }
             FloatingButton.instance = new FloatingButton(plugin, pluginData, onClickCallback);
         }
         return FloatingButton.instance;
+    }
+
+    private isInvalid(): boolean {
+        return !this.containerEl?.isConnected || !this.buttonEl?.isConnected;
     }
 
     public getComputedSize(): number {
@@ -234,6 +245,13 @@ export class FloatingButton {
             return;
         }
 
+        // Remove any existing floating buttons in the view
+        viewContent.querySelectorAll('.neurovox-button-container').forEach(el => {
+            if (el !== this.containerEl) {
+                el.remove();
+            }
+        });
+
         if (this.containerEl.parentNode) {
             this.containerEl.remove();
         }
@@ -315,7 +333,10 @@ export class FloatingButton {
         if (this.containerEl && this.containerEl.parentNode) {
             this.containerEl.remove();
         }
-    
+
+        // Ensure all floating buttons are removed from the document
+        document.querySelectorAll('.neurovox-button-container').forEach(el => el.remove());
+
         FloatingButton.instance = null;
     }
 
@@ -367,23 +388,29 @@ export class FloatingButton {
                 throw new Error('Audio manager not initialized');
             }
     
+            // Immediately update recording state
+            this.isRecording = false;
+            this.updateRecordingState(false);
+    
+            // Get the audio blob
+            const blob = await this.audioManager.stop();
+            if (!blob) return;
+    
+            // Then start processing
             this.isProcessing = true;
             this.updateProcessingState(true);
             
-            const blob = await this.audioManager.stop();
-            if (blob) {
-                const activeView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
-                if (!activeView || !activeView.file) {
-                    new Notice('No active file to insert recording');
-                    return;
-                }
-    
-                await this.plugin.recordingProcessor.processRecording(
-                    blob,
-                    activeView.file,  // Now TypeScript knows this is not null
-                    activeView.editor.getCursor()
-                );
+            const activeView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+            if (!activeView || !activeView.file) {
+                new Notice('No active file to insert recording');
+                return;
             }
+    
+            await this.plugin.recordingProcessor.processRecording(
+                blob,
+                activeView.file,
+                activeView.editor.getCursor()
+            );
         } catch (error) {
             console.error('Failed to stop recording:', error);
             new Notice('Failed to stop recording');

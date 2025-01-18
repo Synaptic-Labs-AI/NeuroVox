@@ -16,6 +16,7 @@ export type NeuroVoxSettings = {
     micButtonColor: string;
     transcriptionModel: string;
     transcriptionProvider: AIProvider;
+    transcriptionCalloutFormat: string;
 
     // Summary
     generateSummary: boolean;
@@ -24,6 +25,7 @@ export type NeuroVoxSettings = {
     summaryModel: string;
     summaryProvider: AIProvider;
     summaryTemperature: number;
+    summaryCalloutFormat: string;
 
     // Current Provider
     currentProvider: AIProvider;
@@ -43,6 +45,7 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     micButtonColor: '#4B4B4B',
     transcriptionModel: 'whisper-1',
     transcriptionProvider: AIProvider.OpenAI,
+    transcriptionCalloutFormat: '>[!info]- Transcription\n>![[{audioPath}]]\n>{transcription}',
 
     // Summary
     generateSummary: true,
@@ -51,6 +54,7 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     summaryModel: 'gpt-4o-mini',
     summaryProvider: AIProvider.OpenAI,
     summaryTemperature: 0.7,
+    summaryCalloutFormat: '>[!summary]- Summary\n>{summary}',
 
     // Current Provider
     currentProvider: AIProvider.OpenAI,

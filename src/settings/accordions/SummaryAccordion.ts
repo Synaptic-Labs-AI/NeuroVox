@@ -29,6 +29,7 @@ export class SummaryAccordion extends BaseAccordion {
         this.addEnableToggle();
         this.addModelSelection();
         this.addPromptTemplate();
+        this.addSummaryFormat();
         this.addMaxTokens();
         this.addTemperatureControl();
     }
@@ -94,6 +95,25 @@ export class SummaryAccordion extends BaseAccordion {
                     });
                 
                 // Style the textarea
+                text.inputEl.rows = 4;
+                text.inputEl.style.width = "100%";
+            });
+    }
+
+    /**
+     * Adds a textarea to customize the summary callout format.
+     */
+    public addSummaryFormat(): void {
+        new Setting(this.contentEl)
+            .setName("Summary format")
+            .setDesc("Customize the summary callout format. Use {summary} for the generated summary")
+            .addTextArea(text => {
+                text.setPlaceholder(">[!summary]- Summary\n>{summary}")
+                    .setValue(this.settings.summaryCalloutFormat)
+                    .onChange(async (value) => {
+                        this.settings.summaryCalloutFormat = value;
+                        await this.plugin.saveSettings();
+                    });
                 text.inputEl.rows = 4;
                 text.inputEl.style.width = "100%";
             });

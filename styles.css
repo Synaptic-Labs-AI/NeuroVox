@@ -105,6 +105,33 @@
     padding: 0;
     box-shadow: var(--neurovox-shadow);
     will-change: transform;
+    touch-action: manipulation; /* Prevent double-tap zoom on mobile */
+    -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+}
+
+/* Mobile-optimized button states */
+.neurovox-timer-button[data-state="processing"] {
+    opacity: 0.7;
+    cursor: not-allowed;
+    animation: processing 1s infinite;
+}
+
+.neurovox-timer-button[data-state="error"] {
+    background-color: var(--text-error);
+    animation: shake 0.5s ease-in-out;
+}
+
+/* Processing animation */
+@keyframes processing {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(0.95); }
+}
+
+/* Error animation */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
 }
 
 .neurovox-timer-button:hover {
