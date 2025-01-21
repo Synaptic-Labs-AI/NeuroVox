@@ -73,7 +73,6 @@ export class AudioRecordingManager {
             });
 
         } catch (error) {
-            console.error('Failed to initialize audio recorder:', error);
             throw new Error('Failed to access microphone');
         }
     }
@@ -110,16 +109,12 @@ export class AudioRecordingManager {
      */
     async stop(): Promise<Blob | null> {
         if (!this.recorder) {
-            console.warn('⚠️ No recorder instance found');
             return this.recordingBackup;
         }
 
         if (this.recorder.state === 'inactive') {
-            console.warn('⚠️ Recorder already stopped');
             return this.recordingBackup;
         }
-
-        console.log('🎙️ Stopping recording...');
 
         // Set a flag to track if we're in the stopping process
         let isStoppingInProgress = false;
@@ -128,7 +123,6 @@ export class AudioRecordingManager {
             try {
                 // Prevent multiple stop attempts
                 if (isStoppingInProgress) {
-                    console.warn('🚫 Stop already in progress, ignoring duplicate request');
                     return;
                 }
 
@@ -136,7 +130,6 @@ export class AudioRecordingManager {
 
                 // Set a timeout to prevent hanging
                 const timeoutId = setTimeout(() => {
-                    console.warn('⏰ Recording stop timeout - using backup');
                     this.cleanup();
                     resolve(this.recordingBackup);
                 }, 5000); // 5 second timeout
@@ -155,11 +148,6 @@ export class AudioRecordingManager {
                                 throw new Error('Failed to get recording blob');
                             }
 
-                            console.log('✅ Got recording blob:', {
-                                size: `${(blob.size / (1024 * 1024)).toFixed(2)}MB`,
-                                type: blob.type
-                            });
-
                             // Set the appropriate filename and type
                             Object.defineProperty(blob, 'name', {
                                 value: `recording-${new Date().getTime()}.wav`,
@@ -168,12 +156,10 @@ export class AudioRecordingManager {
 
                             // Verify blob is valid
                             if (blob.size === 0) {
-                                console.warn('Using backup recording due to empty blob');
                                 blob = this.recordingBackup;
                             }
 
                         } catch (error) {
-                            console.error('🔴 Error getting blob:', error);
                             this.cleanup();
                             resolve(this.recordingBackup);
                             return;
@@ -183,13 +169,11 @@ export class AudioRecordingManager {
                         this.cleanup();
                         resolve(blob);
                     } catch (error) {
-                        console.error('🔴 Error in stop callback:', error);
                         this.cleanup();
                         resolve(this.recordingBackup);
                     }
                 });
             } catch (error) {
-                console.error('🔴 Error stopping recording:', error);
                 this.cleanup();
                 resolve(this.recordingBackup);
             }
@@ -201,19 +185,15 @@ export class AudioRecordingManager {
      * 🧹 Aggressively cleans up resources to prevent memory leaks
      */
     cleanup(): void {
-        console.log('🧹 Starting cleanup of recording resources');
-        
         // Clean up recorder
         if (this.recorder) {
             try {
                 // Force stop recording if still active
                 if (this.recorder.state !== 'inactive') {
-                    console.log('⚠️ Forcing recorder to stop before cleanup');
                     this.recorder.stopRecording();
                 }
                 this.recorder.destroy();
             } catch (error) {
-                console.error('🔴 Error destroying audio recorder:', error);
             } finally {
                 this.recorder = null;
             }
@@ -228,11 +208,9 @@ export class AudioRecordingManager {
                         track.stop();
                         this.stream?.removeTrack(track);
                     } catch (error) {
-                        console.error('🔴 Error stopping track:', error);
+                        // Silently handle individual track cleanup errors
                     }
                 });
-            } catch (error) {
-                console.error('🔴 Error stopping audio tracks:', error);
             } finally {
                 this.stream = null;
             }
@@ -243,7 +221,7 @@ export class AudioRecordingManager {
             try {
                 window.gc();
             } catch (error) {
-                console.warn('⚠️ Manual GC not available');
+                // Silently ignore GC errors
             }
         }
 
@@ -253,8 +231,6 @@ export class AudioRecordingManager {
         }
         
         this.recordingBackup = null;
-        
-        console.log('✨ Cleanup completed');
     }
 
     /**

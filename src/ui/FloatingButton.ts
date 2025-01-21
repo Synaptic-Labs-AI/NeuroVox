@@ -9,8 +9,8 @@ import { RecordingProcessor } from '../utils/RecordingProcessor';
 
 export class FloatingButton {
     private static instance: FloatingButton | null = null;
-    public buttonEl: HTMLButtonElement;
-    public containerEl: HTMLDivElement;
+    public buttonEl: HTMLButtonElement | null;
+    public containerEl: HTMLDivElement | null;
     public activeLeafContainer: HTMLElement | null = null;
     public resizeObserver: ResizeObserver | null = null;
     public positionManager: ButtonPositionManager | null = null;
@@ -28,6 +28,8 @@ export class FloatingButton {
         if (FloatingButton.instance) {
             FloatingButton.instance.remove();
         }
+        this.buttonEl = null;
+        this.containerEl = null;
         this.initializeComponents();
     }
 
@@ -219,14 +221,8 @@ export class FloatingButton {
         this.plugin.registerEvent(
             this.plugin.app.workspace.on('layout-change', () => {
                 requestAnimationFrame(() => {
-                    if (this.activeLeafContainer && this.positionManager) {
-                        if (this.positionManager && this.activeLeafContainer) {
-                            if (this.positionManager && this.activeLeafContainer) {
-                                if (this.positionManager && this.activeLeafContainer) {
-                                    this.positionManager.updateContainer(this.activeLeafContainer);
-                                }
-                            }
-                        }
+                    if (this.positionManager && this.activeLeafContainer) {
+                        this.positionManager.updateContainer(this.activeLeafContainer);
                     }
                 });
             })
@@ -272,7 +268,7 @@ export class FloatingButton {
             }
         });
 
-        if (this.containerEl.parentNode) {
+        if (this.containerEl?.parentNode) {
             this.containerEl.remove();
         }
 
@@ -361,7 +357,9 @@ export class FloatingButton {
         // Remove event listeners and element
         if (this.buttonEl) {
             const newButton = this.buttonEl.cloneNode(true);
-            this.buttonEl.replaceWith(newButton);
+            if (this.buttonEl.parentNode) {
+                this.buttonEl.parentNode.replaceChild(newButton, this.buttonEl);
+            }
             this.buttonEl = null;
         }
         
@@ -377,10 +375,10 @@ export class FloatingButton {
         FloatingButton.instance = null;
     }
 
-     /**
+    /**
      * Handles click based on current recording mode
      */
-     public async handleClick() {
+    public async handleClick() {
         if (this.isProcessing) return;
         
         if (this.pluginData.useRecordingModal) {
@@ -413,7 +411,6 @@ export class FloatingButton {
             this.updateRecordingState(true);
             new Notice('Recording started');
         } catch (error) {
-            console.error('Failed to start recording:', error);
             new Notice('Failed to start recording');
             this.cleanup();
         }
@@ -449,7 +446,6 @@ export class FloatingButton {
                 activeView.editor.getCursor()
             );
         } catch (error) {
-            console.error('Failed to stop recording:', error);
             new Notice('Failed to stop recording');
         } finally {
             this.cleanup();

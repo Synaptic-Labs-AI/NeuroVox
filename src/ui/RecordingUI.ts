@@ -99,12 +99,10 @@ export class RecordingUI {
 
         setIcon(button, iconName);
         
-        // Add debounced click handler with visual feedback
         button.addEventListener('click', async (e) => {
             e.preventDefault(); // Prevent double tap zoom on mobile
             
             if (this.isProcessingAction) {
-                console.log('🚫 Action in progress, ignoring click');
                 return;
             }
 
@@ -130,7 +128,6 @@ export class RecordingUI {
                 }, this.DEBOUNCE_TIME);
 
             } catch (error) {
-                console.error('🔴 Error in button action:', error);
                 // Reset state on error
                 this.isProcessingAction = false;
                 button.setAttribute('data-state', 'error');
@@ -203,7 +200,5 @@ export class RecordingUI {
 
         // Clear container
         this.container.empty();
-        
-        console.log('✨ UI cleanup completed');
     }
 }

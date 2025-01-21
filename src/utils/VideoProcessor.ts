@@ -41,7 +41,7 @@ export class VideoProcessor {
 
         try {
             this.isProcessing = true;
-            new Notice('Starting video processing...');
+            new Notice('🎥 Starting video processing...');
 
             // Create output markdown file
             const transcriptFile = await this.createTranscriptFile(file);
@@ -60,12 +60,12 @@ export class VideoProcessor {
                 file.path
             );
 
-            new Notice('Video transcription completed successfully.');
+            new Notice('✨ Video transcription completed');
             await this.plugin.app.workspace.getLeaf().openFile(transcriptFile);
 
         } catch (error) {
-            console.error('Video processing failed:', error);
-            new Notice('Video processing failed. Check console for details.');
+            const message = error instanceof Error ? error.message : 'Unknown error occurred';
+            new Notice('❌ Video processing failed: ' + message);
             throw error;
         } finally {
             this.isProcessing = false;
@@ -79,7 +79,7 @@ export class VideoProcessor {
     }
 
     private async extractAudioFromVideo(file: TFile): Promise<ArrayBuffer> {
-        new Notice('Extracting audio from video...');
+        new Notice('🎵 Extracting audio from video...');
         
         try {
             const videoData = await this.plugin.app.vault.readBinary(file);
@@ -111,8 +111,8 @@ export class VideoProcessor {
             return (data as Uint8Array).buffer;
             
         } catch (error) {
-            console.error('Audio extraction failed:', error);
-            throw new Error('Failed to extract audio from video');
+            const message = error instanceof Error ? error.message : 'Unknown error occurred';
+            throw new Error('Failed to extract audio: ' + message);
         }
     }
 

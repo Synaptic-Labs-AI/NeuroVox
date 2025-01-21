@@ -1,5 +1,3 @@
-// src/main.ts
-
 import { 
     Plugin, 
     Notice, 
@@ -53,18 +51,12 @@ class AudioFileSuggestModal extends FuzzySuggestModal<TFile> {
             return;
         }
 
-        // Store the resolve callback and file before closing
         const resolve = this.resolvePromise;
         const selectedFile = file;
         
-        // Clear the promise first
         this.resolvePromise = null;
-        
-        // Close the modal
-        
         this.close();
         
-        // Resolve with the selected file after modal is closed
         if (resolve) {
             setTimeout(() => resolve(selectedFile), 50);
         }
@@ -73,16 +65,13 @@ class AudioFileSuggestModal extends FuzzySuggestModal<TFile> {
     renderSuggestion(match: FuzzyMatch<TFile>, el: HTMLElement): void {
         const file = match.item;
         
-        // Create container for better styling
         const container = el.createDiv({ cls: 'neurovox-suggestion' });
         
-        // File path with icon
         container.createEl('div', {
             text: `📄 ${file.path}`,
             cls: 'neurovox-suggestion-path'
         });
         
-        // File info
         container.createEl('div', {
             text: `Modified: ${new Date(file.stat.mtime).toLocaleString()} • Size: ${(file.stat.size / (1024 * 1024)).toFixed(2)}MB`,
             cls: 'neurovox-suggestion-info'
@@ -100,7 +89,6 @@ class AudioFileSuggestModal extends FuzzySuggestModal<TFile> {
         if (this.resolvePromise) {
             const resolve = this.resolvePromise;
             this.resolvePromise = null;
-            // Only resolve with null if we actually need to
             setTimeout(() => resolve(null), 50);
         }
         super.onClose();
@@ -108,26 +96,21 @@ class AudioFileSuggestModal extends FuzzySuggestModal<TFile> {
 }
 
 export default class NeuroVoxPlugin extends Plugin {
-    // Plugin state
     settings: NeuroVoxSettings;
     public aiAdapters: Map<AIProvider, AIAdapter>;
     public pluginData: PluginData;
     
-    // UI Components
     private buttonMap: Map<string, FloatingButton> = new Map();
     toolbarButton: ToolbarButton | null = null;
     public activeLeaf: WorkspaceLeaf | null = null;
     settingTab: NeuroVoxSettingTab | null = null;
 
-    // Recording Processor
     public recordingProcessor: RecordingProcessor;
 
     async onload(): Promise<void> {
         try {
             await this.initializePlugin();
         } catch (error) {
-            console.error('Failed to initialize NeuroVox plugin:', error);
-            new Notice('Failed to initialize NeuroVox plugin');
         }
     }
 
@@ -138,10 +121,7 @@ export default class NeuroVoxPlugin extends Plugin {
         this.registerCommands();
         this.registerEvents();
         
-        // Initialize Recording Processor before UI
         this.recordingProcessor = RecordingProcessor.getInstance(this, this.pluginData);
-        
-        // Initialize UI components
         this.initializeUI();
     }
 
@@ -169,7 +149,6 @@ export default class NeuroVoxPlugin extends Plugin {
     }
 
     public registerCommands(): void {
-        // Command to start a new recording
         this.addCommand({
             id: 'start-recording',
             name: 'Start recording',
@@ -182,7 +161,6 @@ export default class NeuroVoxPlugin extends Plugin {
             }
         });
 
-        // Command to transcribe any audio file
         this.addCommand({
             id: 'transcribe-audio',
             name: 'Transcribe audio file',
@@ -197,7 +175,6 @@ export default class NeuroVoxPlugin extends Plugin {
             }
         });
 
-        // Add video transcription command
         this.addCommand({
             id: 'transcribe-video',
             name: 'Transcribe video file',
@@ -246,12 +223,6 @@ export default class NeuroVoxPlugin extends Plugin {
     }
 
     public async processExistingAudioFile(file: TFile): Promise<void> {
-        console.log('📝 Processing file:', {
-            name: file.basename,
-            path: file.path,
-            size: file.stat.size
-        });
-
         try {
             const adapter = this.aiAdapters.get(this.pluginData.transcriptionProvider);
             if (!adapter) {
@@ -262,11 +233,6 @@ export default class NeuroVoxPlugin extends Plugin {
                 throw new Error(`API key not set for ${this.pluginData.transcriptionProvider}`);
             }
 
-            console.log('🔑 Validated API configuration:', {
-                provider: this.pluginData.transcriptionProvider,
-                model: this.pluginData.transcriptionModel
-            });
-
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
             const sanitizedName = file.basename.replace(/[\\/:*?"<>|]/g, '');
             const transcriptsFolder = 'Transcripts';
@@ -274,21 +240,16 @@ export default class NeuroVoxPlugin extends Plugin {
             let newFileName = baseFileName;
             let count = 1;
 
-            console.log('📁 Creating transcripts folder...');
             const normalizedPath = normalizePath(transcriptsFolder);
             if (!await this.app.vault.adapter.exists(normalizedPath)) {
                 await this.app.vault.createFolder(normalizedPath);
-                console.log('✅ Created transcripts folder');
             }
 
-            console.log('📄 Generating unique filename...');
             while (await this.app.vault.adapter.exists(newFileName)) {
                 newFileName = `Transcripts/${timestamp}-${sanitizedName}-${count}.md`;
                 count++;
             }
-            console.log('✅ Using filename:', newFileName);
 
-            console.log('📝 Creating initial note...');
             const initialContent = [
                 '---',
                 `source: ${file.path}`,
@@ -304,26 +265,13 @@ export default class NeuroVoxPlugin extends Plugin {
 
             const newFile = await this.app.vault.create(newFileName, initialContent);
             await this.app.workspace.getLeaf().openFile(newFile);
-            console.log('✅ Created and opened note:', newFileName);
 
-            console.log('🎵 Reading audio file...');
             const audioBuffer = await this.app.vault.readBinary(file);
-            console.log('✅ Read audio file:', {
-                size: `${(audioBuffer.byteLength / (1024 * 1024)).toFixed(2)}MB`,
-                type: this.getAudioMimeType(file.extension)
-            });
-
             const blob = new Blob([audioBuffer], { 
                 type: this.getAudioMimeType(file.extension) 
             });
 
             new Notice('🎙️ Processing audio file...');
-            console.log('🚀 Starting transcription process with:', {
-                provider: this.pluginData.transcriptionProvider,
-                model: this.pluginData.transcriptionModel,
-                generateSummary: this.pluginData.generateSummary,
-                summaryModel: this.pluginData.generateSummary ? this.pluginData.summaryModel : 'disabled'
-            });
 
             await this.recordingProcessor.processRecording(
                 blob,
@@ -336,11 +284,6 @@ export default class NeuroVoxPlugin extends Plugin {
             
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            console.error('❌ Error processing audio file:', {
-                error,
-                message: errorMessage,
-                stack: error instanceof Error ? error.stack : undefined
-            });
             new Notice(`❌ Failed to process audio file: ${errorMessage}`);
             throw error;
         }
@@ -351,8 +294,7 @@ export default class NeuroVoxPlugin extends Plugin {
             const videoProcessor = await VideoProcessor.getInstance(this, this.pluginData);
             await videoProcessor.processVideo(file);
         } catch (error) {
-            console.error('Error processing video file:', error);
-            new Notice('Failed to process video file. Please check console for details.');
+            new Notice('❌ Failed to process video file');
             throw error;
         }
     }
@@ -371,26 +313,20 @@ export default class NeuroVoxPlugin extends Plugin {
         );
     }
 
-    /**
-     * Handles changes in the active leaf (note)
-     */
     public handleActiveLeafChange(leaf: WorkspaceLeaf | null): void {
         this.activeLeaf = leaf;
         
-        // Clean up ALL existing buttons
         this.buttonMap.forEach((button, path) => {
             button.remove();
         });
         this.buttonMap.clear();
         
-        // Only create new button for markdown views with valid files
         if (leaf?.view instanceof MarkdownView && leaf.view.file) {
             this.createButtonForFile(leaf.view.file);
         }
     }
 
     public handleLayoutChange(): void {
-        // Get current active file's button and show it
         const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (activeView?.file) {
             const button = this.buttonMap.get(activeView.file.path);
@@ -419,14 +355,12 @@ export default class NeuroVoxPlugin extends Plugin {
     private createButtonForFile(file: TFile): void {
         if (!this.pluginData.showFloatingButton) return;
         
-        // Remove any existing button for this file first
         const existingButton = this.buttonMap.get(file.path);
         if (existingButton) {
             existingButton.remove();
             this.buttonMap.delete(file.path);
         }
         
-        // Create new button instance
         const button = new FloatingButton(
             this,
             this.pluginData,
@@ -436,11 +370,7 @@ export default class NeuroVoxPlugin extends Plugin {
         this.buttonMap.set(file.path, button);
     }
     
-    /**
-     * Cleans up UI components before reinitializing
-     */
     public cleanupUI(): void { 
-        // Clean up all buttons
         this.buttonMap.forEach(button => button.remove());
         this.buttonMap.clear();
         
@@ -455,13 +385,13 @@ export default class NeuroVoxPlugin extends Plugin {
     public handleRecordingStart(): void {
         const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (!activeView) {
-            new Notice('No active note found to insert transcription.');
+            new Notice('❌ No active note found to insert transcription.');
             return;
         }
     
         const activeFile = activeView.file;
         if (!activeFile) {
-            new Notice('No active file found.');
+            new Notice('❌ No active file found.');
             return;
         }
     
@@ -471,11 +401,6 @@ export default class NeuroVoxPlugin extends Plugin {
             this.modalInstance = new TimerModal(this.app);
             this.modalInstance.onStop = async (audioBlob: Blob) => {
                 try {
-                    console.log('🎙️ Recording stopped, processing audio:', {
-                        size: `${(audioBlob.size / (1024 * 1024)).toFixed(2)}MB`,
-                        type: audioBlob.type
-                    });
-
                     const adapter = this.aiAdapters.get(this.pluginData.transcriptionProvider);
                     if (!adapter) {
                         throw new Error(`Transcription provider ${this.pluginData.transcriptionProvider} not found`);
@@ -485,11 +410,6 @@ export default class NeuroVoxPlugin extends Plugin {
                         throw new Error(`API key not set for ${this.pluginData.transcriptionProvider}`);
                     }
 
-                    console.log('🔑 Using transcription provider:', {
-                        provider: this.pluginData.transcriptionProvider,
-                        model: this.pluginData.transcriptionModel
-                    });
-
                     await this.recordingProcessor.processRecording(
                         audioBlob, 
                         activeFile,
@@ -497,12 +417,7 @@ export default class NeuroVoxPlugin extends Plugin {
                     );
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                    console.error('❌ Failed to process recording:', {
-                        error,
-                        message: errorMessage,
-                        stack: error instanceof Error ? error.stack : undefined
-                    });
-                    new Notice(`Failed to process recording: ${errorMessage}`);
+                    new Notice(`❌ Failed to process recording: ${errorMessage}`);
                 }
             };
             
@@ -528,6 +443,16 @@ export default class NeuroVoxPlugin extends Plugin {
         this.buttonMap.forEach(button => {
             button.updateButtonColor();
         });
+    }
+
+    /**
+     * 🔄 Refreshes model dropdowns after API key changes
+     * This ensures model selection dropdowns reflect current API key validity
+     */
+    public refreshModelDropdowns(): void {
+        if (this.settingTab) {
+            this.settingTab.display();
+        }
     }
 
     onunload() {

@@ -173,17 +173,11 @@ export class TimerModal extends Modal {
      */
     private async stopRecording(): Promise<void> {
         try {
-            console.log('🎙️ Stopping recording...');
             const blob = await this.recordingManager.stop();
             
             if (!blob) {
                 throw new Error('No audio data received from recorder');
             }
-
-            console.log('✅ Recording stopped:', {
-                size: `${(blob.size / (1024 * 1024)).toFixed(2)}MB`,
-                type: blob.type
-            });
             
             this.currentState = 'stopped';
             this.ui.updateState(this.currentState);
@@ -191,17 +185,13 @@ export class TimerModal extends Modal {
             if (this.onStop) {
                 try {
                     await this.onStop(blob);
-                    console.log('✅ Recording processed successfully');
                 } catch (error) {
-                    console.error('❌ Error in onStop callback:', error);
                     throw error;
                 }
-            } else {
-                console.warn('⚠️ No onStop callback provided');
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            console.error('❌ Failed to stop recording:', {
+            error('❌ Failed to stop recording:', {
                 error,
                 message: errorMessage,
                 stack: error instanceof Error ? error.stack : undefined

@@ -15,7 +15,7 @@ export class GroqAdapter extends AIAdapter {
     }
 
     protected getApiBaseUrl(): string {
-        return 'https://api.groq.com/openai/v1';  // Updated base URL
+        return 'https://api.groq.com/openai/v1';
     }
 
     protected getTranscriptionEndpoint(): string {
@@ -23,7 +23,7 @@ export class GroqAdapter extends AIAdapter {
     }
 
     protected getTextGenerationEndpoint(): string {
-        return '/chat/completions';  // Updated to correct endpoint
+        return '/chat/completions';
     }
 
     protected parseTextGenerationResponse(response: any): string {
@@ -45,7 +45,6 @@ export class GroqAdapter extends AIAdapter {
             const endpoint = `${this.getApiBaseUrl()}${this.getTextGenerationEndpoint()}`;
             const modelInfo = getModelInfo(model);
             
-            // Updated request body format for Groq chat completions
             const body = {
                 model: model,
                 messages: [
@@ -69,8 +68,7 @@ export class GroqAdapter extends AIAdapter {
 
             return this.parseTextGenerationResponse(response);
         } catch (error) {
-            console.error('Groq API Error:', error);
-            throw new Error(`Groq API request failed: ${(error as Error).message}`);
+            throw new Error(`Groq response generation failed: ${this.getErrorMessage(error)}`);
         }
     }
 
@@ -84,9 +82,10 @@ export class GroqAdapter extends AIAdapter {
                 },
                 null
             );
-            return Array.isArray(response.data);
+            // Groq API returns { data: [...] } format
+            return Boolean(response?.data);
         } catch (error) {
-            console.error('Groq API Key Validation Error:', error);
+            console.error('Groq API validation error:', error);
             return false;
         }
     }
@@ -101,24 +100,34 @@ export class GroqAdapter extends AIAdapter {
             const response = await super.makeAPIRequest(endpoint, method, headers, body);
             
             if (response.error) {
-                throw new Error(response.error.message || 'Unknown Groq API error');
+                const errorMsg = response.error.message || 'Unknown Groq API error';
+                console.error('Groq API error:', errorMsg);
+                throw new Error(errorMsg);
             }
             
             return response;
         } catch (error) {
             const status = (error as any).status;
+            const errorMsg = (error as any).message || 'Unknown error';
+            
+            console.error(`Groq API error (${status}):`, errorMsg);
+            
             switch (status) {
                 case 401:
-                    throw new Error('Invalid Groq API key. Please check your credentials.');
+                    throw new Error('Invalid Groq API key. Please check your settings.');
                 case 404:
                     throw new Error('Groq API endpoint not found. Please check your model selection.');
                 case 429:
-                    throw new Error('Groq API rate limit exceeded. Please try again later.');
+                    throw new Error('Groq API rate limit exceeded. Please try again in a few minutes.');
+                case 500:
+                    throw new Error('Groq API server error. Please try again later.');
+                case 503:
+                    throw new Error('Groq API service is temporarily unavailable. Please try again later.');
                 default:
                     if (error instanceof Error) {
                         throw error;
                     }
-                    throw new Error('Unknown error occurred');
+                    throw new Error(`Groq API error: ${errorMsg}`);
             }
         }
     }

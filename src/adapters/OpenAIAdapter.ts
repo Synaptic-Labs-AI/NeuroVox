@@ -1,9 +1,16 @@
 import { AIAdapter, AIProvider, AIModels, getModelInfo } from './AIAdapter';
 import { NeuroVoxSettings } from '../settings/Settings';
+import OpenAI from 'openai';
 
 export class OpenAIAdapter extends AIAdapter {
+    private client: OpenAI;
+
     constructor(settings: NeuroVoxSettings) {
         super(settings, AIProvider.OpenAI);
+        this.client = new OpenAI({
+            apiKey: this.getApiKey(),
+            dangerouslyAllowBrowser: true // Required for client-side usage
+        });
     }
 
     public getApiKey(): string {
@@ -42,107 +49,59 @@ export class OpenAIAdapter extends AIAdapter {
 
     public async generateResponse(prompt: string, model: string, options?: { maxTokens?: number, temperature?: number }): Promise<string> {
         try {
-            const endpoint = `${this.getApiBaseUrl()}${this.getTextGenerationEndpoint()}`;
+            // 🤖 Using OpenAI client to create chat completion
             const modelInfo = getModelInfo(model);
-            
-            const body = {
+            const completion = await this.client.chat.completions.create({
                 model: model,
                 messages: [{ role: "user", content: prompt }],
                 max_tokens: options?.maxTokens || modelInfo?.maxTokens || 1000,
                 temperature: options?.temperature ?? 0.7,
-            };
+            });
 
-            const response = await this.makeAPIRequest(
-                endpoint,
-                'POST',
-                {
-                    'Content-Type': 'application/json',
-                },
-                JSON.stringify(body)
-            );
-
-            return this.parseTextGenerationResponse(response);
+            // 🎯 Extract and validate response content
+            if (!completion?.choices?.[0]?.message?.content) {
+                throw new Error('Invalid response format from OpenAI API');
+            }
+            
+            return completion.choices[0].message.content.trim();
         } catch (error) {
-            const errorMessage = this.getErrorMessage(error);
-            console.error('OpenAI API Error:', error);
-            throw new Error(`OpenAI API request failed: ${errorMessage}`);
+            console.error('🚨 OpenAI API Error:', error);
+            throw new Error(`OpenAI response generation failed: ${this.getErrorMessage(error)}`);
         }
     }
 
     public async transcribeAudio(audioArrayBuffer: ArrayBuffer, model: string): Promise<string> {
         try {
-            const { headers, body } = await this.prepareTranscriptionRequest(audioArrayBuffer, model);
-            const endpoint = `${this.getApiBaseUrl()}${this.getTranscriptionEndpoint()}`;
-            
-            const response = await this.makeAPIRequest(
-                endpoint,
-                'POST',
-                headers,
-                body
-            );
+            // 🎙️ Convert ArrayBuffer to Blob for OpenAI client
+            const audioBlob = new Blob([audioArrayBuffer], { type: 'audio/wav' });
+            const file = new File([audioBlob], 'recording.wav', { type: 'audio/wav' });
 
-            return this.parseTranscriptionResponse(response);
+            // 🔊 Use OpenAI client to transcribe audio
+            const transcription = await this.client.audio.transcriptions.create({
+                file: file,
+                model: model,
+            });
+
+            if (!transcription?.text) {
+                throw new Error('Invalid transcription response format from OpenAI API');
+            }
+
+            return transcription.text.trim();
         } catch (error) {
-            const errorMessage = this.getErrorMessage(error);
-            console.error('OpenAI Transcription Error:', error);
-            throw new Error(`OpenAI transcription failed: ${errorMessage}`);
+            console.error('🎤 Transcription Error:', error);
+            throw new Error(`OpenAI transcription failed: ${this.getErrorMessage(error)}`);
         }
     }
 
     protected async validateApiKeyImpl(): Promise<boolean> {
         try {
-            const response = await this.makeAPIRequest(
-                `${this.getApiBaseUrl()}/models`,
-                'GET',
-                {
-                    'Content-Type': 'application/json',
-                },
-                null
-            );
-            return Array.isArray(response.data);
+            // 🔑 Validate API key by listing models
+            const models = await this.client.models.list();
+            return Array.isArray(models.data);
         } catch (error) {
-            console.error('OpenAI API Key Validation Error:', error);
+            console.error('🚫 API Key validation failed:', error);
             return false;
         }
     }
 
-    protected async makeAPIRequest(
-        endpoint: string,
-        method: string,
-        headers: Record<string, string>,
-        body: string | ArrayBuffer | null
-    ): Promise<any> {
-        try {
-            const response = await super.makeAPIRequest(endpoint, method, headers, body);
-            
-            if (response.error) {
-                throw new Error(response.error.message || 'Unknown OpenAI API error');
-            }
-            
-            return response;
-        } catch (error) {
-            const status = (error as any).status;
-            switch (status) {
-                case 401:
-                    throw new Error('Invalid OpenAI API key. Please check your credentials.');
-                case 429:
-                    throw new Error('OpenAI API rate limit exceeded. Please try again later.');
-                case 500:
-                    throw new Error('OpenAI API server error. Please try again later.');
-                case 503:
-                    throw new Error('OpenAI API service is temporarily unavailable. Please try again later.');
-                default:
-                    if (error instanceof Error) {
-                        throw error;
-                    }
-                    throw new Error('Unknown error occurred');
-            }
-        }
-    }
-
-    protected getErrorMessage(error: unknown): string {
-        if (error instanceof Error) return error.message;
-        if (typeof error === 'string') return error;
-        return 'Unknown error occurred';
-    }
 }

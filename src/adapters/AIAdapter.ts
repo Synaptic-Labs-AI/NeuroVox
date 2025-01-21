@@ -23,8 +23,6 @@ export const AIModels: Record<AIProvider, AIModel[]> = {
     ],
     [AIProvider.Groq]: [
         { id: 'distil-whisper-large-v3-en', name: 'Groq', category: 'transcription' },
-        // { id: 'whisper-large-v3-turbo', name: 'Whisper Large V3 Turbo', category: 'transcription' },
-        // { id: 'whisper-large-v3', name: 'Whisper large-v3', category: 'transcription' },
         { id: 'gemma2-9b-it', name: 'Gemma 2 9B IT', category: 'language', maxTokens: 4096 },
         { id: 'gemma-7b-it', name: 'Gemma 7B IT', category: 'language', maxTokens: 2048 },
         { id: 'llama3-groq-70b-8192-tool-use-preview', name: 'Llama 3 Groq 70B Versatile', category: 'language', maxTokens: 8192 },
@@ -86,10 +84,12 @@ export abstract class AIAdapter {
             );
             return this.parseTextGenerationResponse(response);
         } catch (error) {
-            console.error(`${this.provider} generateResponse Error:`, error);
-            throw new Error(`${this.provider} generateResponse Failed: ${(error as Error).message}`);
+            const message = this.getErrorMessage(error);
+            throw new Error(`Failed to generate response: ${message}`);
         }
-    }public async transcribeAudio(audioArrayBuffer: ArrayBuffer, model: string): Promise<string> {
+    }
+
+    public async transcribeAudio(audioArrayBuffer: ArrayBuffer, model: string): Promise<string> {
         try {
             const { headers, body } = await this.prepareTranscriptionRequest(audioArrayBuffer, model);
             const endpoint = `${this.getApiBaseUrl()}${this.getTranscriptionEndpoint()}`;
@@ -101,18 +101,22 @@ export abstract class AIAdapter {
             );
             return this.parseTranscriptionResponse(response);
         } catch (error) {
-            console.error(`${this.provider} Transcribe Audio Error:`, error);
-            throw new Error(`${this.provider} Transcription Failed: ${(error as Error).message}`);
+            const message = this.getErrorMessage(error);
+            throw new Error(`Failed to transcribe audio: ${message}`);
         }
     }
 
     public async validateApiKey(): Promise<boolean> {
         try {
             if (!this.getApiKey()) throw new Error('API key not set.');
-            return await this.validateApiKeyImpl();
+            // Simple test request instead of fetching models
+            const testPrompt = "Test.";
+            await this.generateResponse(testPrompt, 'gpt-4o-mini', { maxTokens: 5 });
+            return true;
         } catch (error) {
-            console.error(`${this.provider} API Key Validation Error:`, error);
-            new Notice(`Invalid ${this.provider} API Key.`);
+            console.error('API validation error:', error);
+            const message = this.getErrorMessage(error);
+            new Notice(`❌ Invalid ${this.provider} API Key: ${message}`);
             return false;
         }
     }
@@ -122,20 +126,7 @@ export abstract class AIAdapter {
     }
 
     public isReady(category: 'transcription' | 'language' = 'transcription'): boolean {
-        const hasApiKey = Boolean(this.getApiKey());
-        const hasModels = this.getAvailableModels(category).length > 0;
-        
-        if (!hasApiKey) {
-            console.debug(`${this.provider} API key not set`);
-            return false;
-        }
-        
-        if (!hasModels) {
-            console.debug(`${this.provider} has no ${category} models available`);
-            return false;
-        }
-        
-        return true;
+        return Boolean(this.getApiKey());
     }
 
     protected async makeAPIRequest(
@@ -144,19 +135,29 @@ export abstract class AIAdapter {
         headers: Record<string, string>,
         body: string | ArrayBuffer | null
     ): Promise<any> {
-        const requestHeaders: Record<string, string> = {
-            'Authorization': `Bearer ${this.getApiKey()}`,
-            ...headers
-        };
+        try {
+            const requestHeaders: Record<string, string> = {
+                'Authorization': `Bearer ${this.getApiKey()}`,
+                ...headers
+            };
 
-        const response = await requestUrl({
-            url: endpoint,
-            method,
-            headers: requestHeaders,
-            body: body || undefined
-        });
+            const response = await requestUrl({
+                url: endpoint,
+                method,
+                headers: requestHeaders,
+                body: body || undefined,
+                throw: true // Change to true to properly catch errors
+            });
 
-        return response.json;
+            if (!response.json) {
+                throw new Error('Invalid response format');
+            }
+
+            return response.json;
+        } catch (error) {
+            console.error('API Request error:', error);
+            throw error;
+        }
     }
 
     protected async prepareTranscriptionRequest(audioArrayBuffer: ArrayBuffer, model: string): Promise<{
@@ -166,33 +167,25 @@ export abstract class AIAdapter {
         const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
         const encoder = new TextEncoder();
         
-        // Create form data parts
         const parts: Uint8Array[] = [];
         
-        // Add file part
         parts.push(encoder.encode(`--${boundary}\r\n`));
         parts.push(encoder.encode('Content-Disposition: form-data; name="file"; filename="recording.wav"\r\n'));
         parts.push(encoder.encode('Content-Type: audio/wav\r\n\r\n'));
         parts.push(new Uint8Array(audioArrayBuffer));
         parts.push(encoder.encode('\r\n'));
         
-        // Add model part
         parts.push(encoder.encode(`--${boundary}\r\n`));
         parts.push(encoder.encode('Content-Disposition: form-data; name="model"\r\n\r\n'));
         parts.push(encoder.encode(model));
         parts.push(encoder.encode('\r\n'));
         
-        // Add final boundary
         parts.push(encoder.encode(`--${boundary}--\r\n`));
         
-        // Calculate total length
         const totalLength = parts.reduce((acc, part) => acc + part.length, 0);
-        
-        // Create final buffer
         const finalBuffer = new Uint8Array(totalLength);
         let offset = 0;
         
-        // Combine all parts
         for (const part of parts) {
             finalBuffer.set(part, offset);
             offset += part.length;
@@ -204,13 +197,6 @@ export abstract class AIAdapter {
             },
             body: finalBuffer.buffer
         };
-    }
-
-
-    private handleError(operation: string, error: unknown): void {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        console.error(`${this.provider} ${operation} Error:`, error);
-        new Notice(`${this.provider} ${operation} failed: ${errorMessage}`);
     }
 
     protected getErrorMessage(error: unknown): string {

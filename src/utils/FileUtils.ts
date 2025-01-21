@@ -18,16 +18,12 @@ async function ensureDirectoryExists(app: App, folderPath: string): Promise<stri
 
     for (const part of parts) {
         currentPath = currentPath ? `${currentPath}/${part}` : part;
-        try {
-            const folder = app.vault.getAbstractFileByPath(currentPath);
-            if (!folder) {
-                await app.vault.createFolder(currentPath);
-            } else if (!(folder instanceof TFolder)) {
-                throw new Error(`${currentPath} exists but is not a folder`);
-            }
-        } catch (error) {
-            console.error(`Error ensuring directory exists: ${error.message}`);
-            throw error;
+        const folder = app.vault.getAbstractFileByPath(currentPath);
+        
+        if (!folder) {
+            await app.vault.createFolder(currentPath);
+        } else if (!(folder instanceof TFolder)) {
+            throw new Error(`Path "${currentPath}" exists but is not a folder`);
         }
     }
 
@@ -43,31 +39,26 @@ export async function saveAudioFile(
     fileName: string, 
     settings: NeuroVoxSettings
 ): Promise<TFile | null> {
-    try {
-        // Ensure we have a folder path
-        const folderPath = settings.recordingFolderPath || '';
-        
-        // Ensure the directory exists and get normalized path
-        const normalizedFolder = await ensureDirectoryExists(app, folderPath);
-        
-        // Create the full file path
-        const filePath = normalizedFolder 
-            ? `${normalizedFolder}/${fileName}`
-            : fileName;
+    // Ensure we have a folder path
+    const folderPath = settings.recordingFolderPath || '';
+    
+    // Ensure the directory exists and get normalized path
+    const normalizedFolder = await ensureDirectoryExists(app, folderPath);
+    
+    // Create the full file path
+    const filePath = normalizedFolder 
+        ? `${normalizedFolder}/${fileName}`
+        : fileName;
 
-        // Convert blob to array buffer
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
+    // Convert blob to array buffer
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
 
-        // Create the file
-        const file = await app.vault.createBinary(filePath, uint8Array);
-        if (!file) {
-            throw new Error('File creation failed');
-        }
-
-        return file;
-
-    } catch (error) {
-        throw error;
+    // Create the file
+    const file = await app.vault.createBinary(filePath, uint8Array);
+    if (!file) {
+        throw new Error(`Failed to create audio file: ${filePath}`);
     }
+
+    return file;
 }
