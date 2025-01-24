@@ -72,7 +72,7 @@ export abstract class AIAdapter {
             const endpoint = `${this.getApiBaseUrl()}${this.getTextGenerationEndpoint()}`;
             const body = {
                 model,
-                prompt,
+                messages: [{ role: "user", content: prompt }],
                 max_tokens: options?.maxTokens || 1000,
                 temperature: options?.temperature || 0.7,
             };
@@ -93,13 +93,36 @@ export abstract class AIAdapter {
         try {
             const { headers, body } = await this.prepareTranscriptionRequest(audioArrayBuffer, model);
             const endpoint = `${this.getApiBaseUrl()}${this.getTranscriptionEndpoint()}`;
-            const response = await this.makeAPIRequest(
-                endpoint,
-                'POST',
-                headers,
-                body
-            );
-            return this.parseTranscriptionResponse(response);
+            
+            try {
+                const response = await this.makeAPIRequest(
+                    endpoint,
+                    'POST',
+                    headers,
+                    body
+                );
+                return this.parseTranscriptionResponse(response);
+            } catch (error: any) {
+                // Log detailed error information
+                console.error('🎙️ Transcription Error:', {
+                    endpoint,
+                    model,
+                    error: error?.message,
+                    response: error?.response?.data,
+                    status: error?.response?.status
+                });
+                
+                // Provide more specific error messages based on status codes
+                if (error?.response?.status === 400) {
+                    throw new Error(`Invalid request format: ${error?.response?.data?.error?.message || 'Check audio format and model name'}`);
+                } else if (error?.response?.status === 401) {
+                    throw new Error('Invalid API key or unauthorized access');
+                } else if (error?.response?.status === 413) {
+                    throw new Error('Audio file too large. Maximum size is 25MB');
+                }
+                
+                throw error;
+            }
         } catch (error) {
             const message = this.getErrorMessage(error);
             throw new Error(`Failed to transcribe audio: ${message}`);
@@ -108,15 +131,13 @@ export abstract class AIAdapter {
 
     public async validateApiKey(): Promise<boolean> {
         try {
-            if (!this.getApiKey()) throw new Error('API key not set.');
-            // Simple test request instead of fetching models
-            const testPrompt = "Test.";
-            await this.generateResponse(testPrompt, 'gpt-4o-mini', { maxTokens: 5 });
-            return true;
+            if (!this.getApiKey()) {
+                return false;
+            }
+
+            const isValid = await this.validateApiKeyImpl();
+            return isValid;
         } catch (error) {
-            console.error('API validation error:', error);
-            const message = this.getErrorMessage(error);
-            new Notice(`❌ Invalid ${this.provider} API Key: ${message}`);
             return false;
         }
     }
@@ -141,21 +162,47 @@ export abstract class AIAdapter {
                 ...headers
             };
 
+            // Debug log the request (excluding sensitive data)
+            console.log('🚀 Making API request:', {
+                endpoint,
+                method,
+                headers: Object.keys(requestHeaders),
+                bodyType: body instanceof ArrayBuffer ? 'ArrayBuffer' : typeof body,
+                bodySize: body instanceof ArrayBuffer ? body.byteLength : 
+                         typeof body === 'string' ? body.length : 0
+            });
+
             const response = await requestUrl({
                 url: endpoint,
                 method,
                 headers: requestHeaders,
                 body: body || undefined,
-                throw: true // Change to true to properly catch errors
+                throw: true
             });
 
             if (!response.json) {
+                console.error('❌ Invalid response format:', response);
                 throw new Error('Invalid response format');
             }
 
+            // Debug log the response (excluding sensitive data)
+            console.log('✅ API response received:', {
+                status: response.status,
+                statusText: response.status.toString(),
+                headers: response.headers
+            });
+
             return response.json;
-        } catch (error) {
-            console.error('API Request error:', error);
+        } catch (error: any) {
+            // Enhanced error logging
+            console.error('❌ API request failed:', {
+                endpoint,
+                method,
+                error: error?.message,
+                status: error?.response?.status,
+                response: error?.response?.data,
+                headers: error?.response?.headers
+            });
             throw error;
         }
     }
@@ -164,24 +211,35 @@ export abstract class AIAdapter {
         headers: Record<string, string>;
         body: ArrayBuffer;
     }> {
-        const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+        // Simple boundary without special characters
+        const boundary = 'boundary';
         const encoder = new TextEncoder();
+        
+        // Debug log the request details
+        console.log('🎙️ Preparing transcription request:', {
+            model,
+            audioSize: audioArrayBuffer.byteLength,
+            boundary
+        });
         
         const parts: Uint8Array[] = [];
         
+        // File part (keep it simple, just file and filename)
         parts.push(encoder.encode(`--${boundary}\r\n`));
-        parts.push(encoder.encode('Content-Disposition: form-data; name="file"; filename="recording.wav"\r\n'));
-        parts.push(encoder.encode('Content-Type: audio/wav\r\n\r\n'));
+        parts.push(encoder.encode('Content-Disposition: form-data; name="file"; filename="audio.wav"\r\n\r\n'));
         parts.push(new Uint8Array(audioArrayBuffer));
         parts.push(encoder.encode('\r\n'));
         
+        // Model part (just the model name)
         parts.push(encoder.encode(`--${boundary}\r\n`));
         parts.push(encoder.encode('Content-Disposition: form-data; name="model"\r\n\r\n'));
         parts.push(encoder.encode(model));
         parts.push(encoder.encode('\r\n'));
         
+        // Final boundary
         parts.push(encoder.encode(`--${boundary}--\r\n`));
         
+        // Combine all parts
         const totalLength = parts.reduce((acc, part) => acc + part.length, 0);
         const finalBuffer = new Uint8Array(totalLength);
         let offset = 0;

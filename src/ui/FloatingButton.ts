@@ -261,19 +261,33 @@ export class FloatingButton {
             return;
         }
 
-        // Remove any existing floating buttons in the view
-        viewContent.querySelectorAll('.neurovox-button-container').forEach(el => {
-            if (el !== this.containerEl) {
+        // Only remove other floating buttons, not our own
+        const existingButtons = viewContent.querySelectorAll('.neurovox-button-container');
+        existingButtons.forEach(el => {
+            if (el !== this.containerEl && el.parentNode === viewContent) {
                 el.remove();
             }
         });
 
-        if (this.containerEl?.parentNode) {
-            this.containerEl.remove();
+        // Only move our container if it's not already in the right place
+        if (this.containerEl && this.containerEl.parentNode !== viewContent) {
+            // Remove from old parent if needed
+            if (this.containerEl.parentNode) {
+                this.containerEl.remove();
+            }
+            // Update container and reattach
+            this.updateActiveContainer(viewContent);
+        } else if (!this.containerEl) {
+            // If we don't have a container, create and attach it
+            this.createContainer();
+            this.createButton();
+            this.updateActiveContainer(viewContent);
         }
 
-        // Update container and reattach
-        this.updateActiveContainer(viewContent);
+        // Show the button if it should be visible
+        if (this.pluginData.showFloatingButton) {
+            this.show();
+        }
     }
 
     /**
@@ -356,10 +370,7 @@ export class FloatingButton {
         
         // Remove event listeners and element
         if (this.buttonEl) {
-            const newButton = this.buttonEl.cloneNode(true);
-            if (this.buttonEl.parentNode) {
-                this.buttonEl.parentNode.replaceChild(newButton, this.buttonEl);
-            }
+            this.buttonEl.remove();
             this.buttonEl = null;
         }
         
@@ -369,10 +380,10 @@ export class FloatingButton {
             this.containerEl = null;
         }
 
-        // Ensure all floating buttons are removed from the document
-        document.querySelectorAll('.neurovox-button-container').forEach(el => el.remove());
-
-        FloatingButton.instance = null;
+        // Only clear the instance if this is the current instance
+        if (FloatingButton.instance === this) {
+            FloatingButton.instance = null;
+        }
     }
 
     /**

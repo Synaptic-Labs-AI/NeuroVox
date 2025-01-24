@@ -53,6 +53,12 @@ export class AudioRecordingManager {
      */
     async initialize(): Promise<void> {
         try {
+            // Check if browser supports getUserMedia
+            if (!navigator.mediaDevices?.getUserMedia) {
+                throw new Error('Browser does not support audio recording');
+            }
+
+            // Request microphone access with detailed constraints
             this.stream = await navigator.mediaDevices.getUserMedia({ 
                 audio: {
                     echoCancellation: true,      
@@ -63,9 +69,16 @@ export class AudioRecordingManager {
                     sampleRate: 44100
                 }
             });
+
+            // Verify we got an audio track
+            const audioTracks = this.stream.getAudioTracks();
+            if (audioTracks.length === 0) {
+                throw new Error('No audio track available');
+            }
+
+            // Initialize recorder with backup handling
             this.recorder = new RecordRTC(this.stream, {
                 ...this.AUDIO_CONFIG,
-                // Add periodic data handlers
                 timeSlice: 1000,
                 ondataavailable: (blob: Blob) => {
                     this.recordingBackup = blob;
@@ -73,7 +86,22 @@ export class AudioRecordingManager {
             });
 
         } catch (error) {
-            throw new Error('Failed to access microphone');
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            // Provide more specific error messages
+            if (error instanceof Error) {
+                switch (error.name) {
+                    case 'NotAllowedError':
+                        throw new Error('Microphone access denied by user');
+                    case 'NotFoundError':
+                        throw new Error('No microphone found');
+                    case 'NotReadableError':
+                        throw new Error('Microphone is already in use');
+                    default:
+                        throw new Error(`Failed to access microphone: ${errorMessage}`);
+                }
+            }
+            
+            throw new Error('Failed to initialize recording system');
         }
     }
 

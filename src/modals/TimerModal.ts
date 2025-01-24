@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { AudioRecordingManager } from '../utils/RecordingManager';
 import { RecordingUI, RecordingState } from '../ui/RecordingUI';
-import { ConfirmationModal } from './ConfirmationModal';
+import { ConfirmationModal, ConfirmationResult } from './ConfirmationModal';
 
 interface TimerConfig {
     maxDuration: number;
@@ -27,7 +27,7 @@ export class TimerModal extends Modal {
         updateInterval: 1000
     };
 
-    public onStop: (audioBlob: Blob) => void;
+    public onStop: (audioBlob: Blob, shouldSave: boolean) => void;
 
     constructor(app: App) {
         super(app);
@@ -72,10 +72,10 @@ export class TimerModal extends Modal {
         this.isClosing = true;
 
         if (this.currentState === 'recording' || this.currentState === 'paused') {
-            await this.stopRecording();
+            await this.handleStop();
+        } else {
+            await this.finalizeClose();
         }
-        
-        await this.finalizeClose();
     }
 
     /**
@@ -164,38 +164,45 @@ export class TimerModal extends Modal {
      * Handles stop button click
      */
     private async handleStop(): Promise<void> {
-        await this.stopRecording();
-        await this.requestClose();
-    }
-
-    /**
-     * Stops recording and processes the result
-     */
-    private async stopRecording(): Promise<void> {
         try {
             const blob = await this.recordingManager.stop();
-            
             if (!blob) {
                 throw new Error('No audio data received from recorder');
             }
-            
-            this.currentState = 'stopped';
-            this.ui.updateState(this.currentState);
 
-            if (this.onStop) {
-                try {
-                    await this.onStop(blob);
-                } catch (error) {
-                    throw error;
-                }
+            // Close recording modal first
+            this.cleanup();
+            super.close();
+
+            // Show confirmation modal
+            const confirmModal = new ConfirmationModal(this.app, {
+                title: 'Save Recording',
+                message: 'Would you like to save the audio file?',
+                confirmText: 'Save & Process',
+                processOnlyText: 'Process Only',
+                cancelText: 'Cancel'
+            });
+
+            confirmModal.open();
+            const result = await confirmModal.getResult();
+
+            switch (result) {
+                case ConfirmationResult.SaveAndProcess:
+                    if (this.onStop) {
+                        await this.onStop(blob, true);
+                    }
+                    break;
+                case ConfirmationResult.ProcessOnly:
+                    if (this.onStop) {
+                        await this.onStop(blob, false);
+                    }
+                    break;
+                case ConfirmationResult.Cancel:
+                    // Do nothing, just close
+                    break;
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            error('❌ Failed to stop recording:', {
-                error,
-                message: errorMessage,
-                stack: error instanceof Error ? error.stack : undefined
-            });
             this.handleError('Failed to stop recording', error);
         }
     }
@@ -255,9 +262,17 @@ export class TimerModal extends Modal {
      * Cleans up all resources
      */
     private cleanup(): void {
-        this.pauseTimer();
-        this.recordingManager.cleanup();
-        this.ui?.cleanup();
+        try {
+            this.pauseTimer();
+            this.recordingManager.cleanup();
+            this.ui?.cleanup();
+        } catch (error) {
+        } finally {
+            // Reset states
+            this.currentState = 'inactive';
+            this.seconds = 0;
+            this.isClosing = false;
+        }
     }
 
     /**
@@ -265,12 +280,6 @@ export class TimerModal extends Modal {
      */
     private handleError(message: string, error: unknown): void {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error('❌ Error:', {
-            context: message,
-            error,
-            message: errorMessage,
-            stack: error instanceof Error ? error.stack : undefined
-        });
         new Notice(`${message}: ${errorMessage}`);
         this.cleanup();
         void this.requestClose();

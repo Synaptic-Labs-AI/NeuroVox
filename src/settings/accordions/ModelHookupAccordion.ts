@@ -3,103 +3,105 @@
 import { BaseAccordion } from "./BaseAccordion";
 import { NeuroVoxSettings } from "../Settings";
 import { Setting } from "obsidian";
-import NeuroVoxPlugin from '../../main';
-import { AIProvider } from '../../adapters/AIAdapter';
+import { AIProvider } from "../../adapters/AIAdapter";
+import NeuroVoxPlugin from "../../main";
+import { RecordingAccordion } from "./RecordingAccordion";
+import { SummaryAccordion } from "./SummaryAccordion";
 
 export class ModelHookupAccordion extends BaseAccordion {
+    private recordingAccordion!: RecordingAccordion;
+    private summaryAccordion!: SummaryAccordion;
+
     constructor(
-        containerEl: HTMLElement, 
+        containerEl: HTMLElement,
         public settings: NeuroVoxSettings,
+        public getAdapter: (provider: AIProvider) => any,
         public plugin: NeuroVoxPlugin
     ) {
-        super(containerEl, "🔌 AI provider hookup", "Configure your API keys for OpenAI and Groq services.");
+        super(
+            containerEl,
+            "🔑 API Keys",
+            "Configure API keys for AI providers."
+        );
+    }
+
+    setAccordions(recording: RecordingAccordion, summary: SummaryAccordion): void {
+        this.recordingAccordion = recording;
+        this.summaryAccordion = summary;
+    }
+
+    private async refreshAccordions(): Promise<void> {
+        await Promise.all([
+            this.recordingAccordion.refresh(),
+            this.summaryAccordion.refresh()
+        ]);
     }
 
     render(): void {
-        // OpenAI API Key Input
         const openaiSetting = new Setting(this.contentEl)
-            .setName("OpenAI API key")
-            .setDesc("Enter your OpenAI API key for transcription and summarization")
+            .setName("OpenAI API Key")
+            .setDesc("Enter your OpenAI API key")
             .addText(text => {
-                text.setPlaceholder("sk-...")
+                text
+                    .setPlaceholder("sk-...")
                     .setValue(this.settings.openaiApiKey)
-                    .onChange(async (value: string) => {
+                    .onChange(async (value) => {
                         const trimmedValue = value.trim();
                         this.settings.openaiApiKey = trimmedValue;
-                        
-                        // Update adapter and validate
-                        const adapter = this.plugin.aiAdapters.get(AIProvider.OpenAI);
-                        if (adapter) {
-                            adapter.setApiKey(trimmedValue);
-                            const isValid = await adapter.validateApiKey();
-                            openaiSetting.setDesc(
-                                isValid 
-                                    ? "✅ API key validated successfully"
-                                    : "❌ Invalid API key. Please check your credentials."
-                            );
-                        }
-                        
                         await this.plugin.saveSettings();
-                        this.plugin.refreshModelDropdowns();
+
+                        const adapter = this.getAdapter(AIProvider.OpenAI);
+                        if (!adapter) {
+                            return;
+                        }
+
+                        adapter.setApiKey(trimmedValue);
+                        const isValid = await adapter.validateApiKey();
+
+                        if (isValid) {
+                            openaiSetting.setDesc("✅ API key validated successfully");
+                            try {
+                                await this.refreshAccordions();
+                            } catch (error) {
+                                openaiSetting.setDesc("✅ API key valid, but failed to update model lists");
+                            }
+                        } else {
+                            openaiSetting.setDesc("❌ Invalid API key. Please check your credentials.");
+                        }
                     });
             });
 
-        // Groq API Key Input
         const groqSetting = new Setting(this.contentEl)
-            .setName("Groq API key")
-            .setDesc("Enter your Groq API key for faster processing")
+            .setName("Groq API Key")
+            .setDesc("Enter your Groq API key")
             .addText(text => {
-                text.setPlaceholder("gsk_...")
+                text
+                    .setPlaceholder("gsk_...")
                     .setValue(this.settings.groqApiKey)
-                    .onChange(async (value: string) => {
+                    .onChange(async (value) => {
                         const trimmedValue = value.trim();
                         this.settings.groqApiKey = trimmedValue;
-                        
-                        // Update adapter and validate
-                        const adapter = this.plugin.aiAdapters.get(AIProvider.Groq);
-                        if (adapter) {
-                            adapter.setApiKey(trimmedValue);
-                            const isValid = await adapter.validateApiKey();
-                            groqSetting.setDesc(
-                                isValid 
-                                    ? "✅ API key validated successfully"
-                                    : "❌ Invalid API key. Please check your credentials."
-                            );
-                        }
-                        
                         await this.plugin.saveSettings();
-                        this.plugin.refreshModelDropdowns();
+
+                        const adapter = this.getAdapter(AIProvider.Groq);
+                        if (!adapter) {
+                            return;
+                        }
+
+                        adapter.setApiKey(trimmedValue);
+                        const isValid = await adapter.validateApiKey();
+
+                        if (isValid) {
+                            groqSetting.setDesc("✅ API key validated successfully");
+                            try {
+                                await this.refreshAccordions();
+                            } catch (error) {
+                                groqSetting.setDesc("✅ API key valid, but failed to update model lists");
+                            }
+                        } else {
+                            groqSetting.setDesc("❌ Invalid API key. Please check your credentials.");
+                        }
                     });
             });
-
-        // Add validation status indicators
-        this.validateInitialKeys(openaiSetting, groqSetting);
-    }
-
-    /**
-     * Validates initial API keys and updates status indicators
-     */
-    private async validateInitialKeys(openaiSetting: Setting, groqSetting: Setting): Promise<void> {
-        // Validate OpenAI key
-        const openaiAdapter = this.plugin.aiAdapters.get(AIProvider.OpenAI);
-        if (openaiAdapter && this.settings.openaiApiKey) {
-            const isValidOpenAI = await openaiAdapter.validateApiKey();
-            openaiSetting.setDesc(
-                isValidOpenAI 
-                    ? "✅ API key validated successfully"
-                    : "❌ Invalid API key. Please check your credentials."
-            );
-        }
-
-        // Validate Groq key
-        const groqAdapter = this.plugin.aiAdapters.get(AIProvider.Groq);
-        if (groqAdapter && this.settings.groqApiKey) {
-            const isValidGroq = await groqAdapter.validateApiKey();
-            groqSetting.setDesc(
-                isValidGroq 
-                    ? "✅ API key validated successfully"
-                    : "❌ Invalid API key. Please check your credentials."
-            );
-        }
     }
 }

@@ -102,7 +102,8 @@ export class RecordingProcessor {
         audioBlob: Blob,
         activeFile: TFile,
         cursorPosition: EditorPosition,
-        audioFilePath?: string
+        audioFilePath?: string,
+        shouldSaveAudio: boolean = false
     ): Promise<void> {
         this.processingState.audioBlob = audioBlob;
         this.processingState.startTime = Date.now();
@@ -119,14 +120,18 @@ export class RecordingProcessor {
             this.steps = [];
             
             await this.validateRequirements();
-            const shouldSaveAudio = audioFilePath ? true : await this.confirmSave();
+
+            // Use provided audioFilePath or save if requested
+            let finalPath = audioFilePath || '';
+            if (!audioFilePath && shouldSaveAudio) {
+                finalPath = await this.saveAudioFile(audioBlob);
+            }
 
             if (audioBlob.size <= this.MAX_AUDIO_SIZE_BYTES) {
-                const finalPath = audioFilePath || (shouldSaveAudio ? await this.saveAudioFile(audioBlob) : '');
                 const result = await this.executeProcessingPipelineWithRecovery(audioBlob, finalPath);
                 await this.insertResults(result, activeFile, cursorPosition);
             } else {
-                await this.processLargeAudioFile(audioBlob, shouldSaveAudio, audioFilePath, activeFile, cursorPosition);
+                await this.processLargeAudioFile(audioBlob, shouldSaveAudio, finalPath, activeFile, cursorPosition);
             }
 
         } catch (error) {
@@ -136,29 +141,6 @@ export class RecordingProcessor {
             throw error;
         } finally {
             this.cleanup();
-        }
-    }
-
-    private async confirmSave(): Promise<boolean> {
-        const confirmModal = new ConfirmationModal(this.plugin.app, {
-            title: 'Recording Options',
-            message: 'How would you like to handle this recording?',
-            confirmText: 'Save and Process',
-            processOnlyText: 'Process Only',
-            cancelText: 'Cancel'
-        });
-        confirmModal.open();
-        const result = await confirmModal.getResult();
-
-        switch (result) {
-            case ConfirmationResult.SaveAndProcess:
-                return true;
-            case ConfirmationResult.ProcessOnly:
-                return false;
-            case ConfirmationResult.Cancel:
-                throw new Error('Recording cancelled');
-            default:
-                return false;
         }
     }
 

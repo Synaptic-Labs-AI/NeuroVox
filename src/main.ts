@@ -399,7 +399,7 @@ export default class NeuroVoxPlugin extends Plugin {
             if (this.modalInstance) return;
             
             this.modalInstance = new TimerModal(this.app);
-            this.modalInstance.onStop = async (audioBlob: Blob) => {
+            this.modalInstance.onStop = async (audioBlob: Blob, shouldSave: boolean) => {
                 try {
                     const adapter = this.aiAdapters.get(this.pluginData.transcriptionProvider);
                     if (!adapter) {
@@ -413,7 +413,9 @@ export default class NeuroVoxPlugin extends Plugin {
                     await this.recordingProcessor.processRecording(
                         audioBlob, 
                         activeFile,
-                        activeView.editor.getCursor()
+                        activeView.editor.getCursor(),
+                        undefined,
+                        shouldSave
                     );
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -445,15 +447,6 @@ export default class NeuroVoxPlugin extends Plugin {
         });
     }
 
-    /**
-     * 🔄 Refreshes model dropdowns after API key changes
-     * This ensures model selection dropdowns reflect current API key validity
-     */
-    public refreshModelDropdowns(): void {
-        if (this.settingTab) {
-            this.settingTab.display();
-        }
-    }
 
     onunload() {
         this.cleanupUI();

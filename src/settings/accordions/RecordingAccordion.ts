@@ -7,7 +7,7 @@ import { AIAdapter, AIProvider, AIModels } from "../../adapters/AIAdapter";
 import NeuroVoxPlugin from "../../main";
 
 export class RecordingAccordion extends BaseAccordion {
-    public modelDropdown: DropdownComponent;
+    public modelDropdown!: DropdownComponent;
 
     constructor(
         containerEl: HTMLElement,

@@ -17,6 +17,9 @@ export type NeuroVoxSettings = {
     transcriptionModel: string;
     transcriptionProvider: AIProvider;
     transcriptionCalloutFormat: string;
+    showTimer: boolean;
+    autoStopEnabled: boolean;
+    autoStopDuration: number;
 
     // Summary
     generateSummary: boolean;
@@ -46,6 +49,9 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     transcriptionModel: 'whisper-1',
     transcriptionProvider: AIProvider.OpenAI,
     transcriptionCalloutFormat: '>[!info]- Transcription\n>![[{audioPath}]]\n>{transcription}',
+    showTimer: true,
+    autoStopEnabled: false,
+    autoStopDuration: 5,
 
     // Summary
     generateSummary: true,
