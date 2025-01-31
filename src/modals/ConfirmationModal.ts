@@ -14,14 +14,21 @@ export enum ConfirmationResult {
     Cancel
 }
 
+/**
+ * Modal for confirming user actions with enhanced mobile support
+ * 📱 Added mobile-specific handling and UI adjustments
+ */
 export class ConfirmationModal extends Modal {
     private result: Promise<ConfirmationResult>;
     private resolvePromise: (value: ConfirmationResult) => void;
     private options: Required<ConfirmationOptions>;
+    private isMobile: boolean;
 
     constructor(app: App, options: ConfirmationOptions) {
         super(app);
-
+        
+        this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        
         this.options = {
             title: 'Recording Options',
             confirmText: 'Save and Process',
@@ -34,31 +41,66 @@ export class ConfirmationModal extends Modal {
             this.resolvePromise = resolve;
         });
 
-        // Handle escape key and clicking outside modal
-        this.modalEl.addEventListener('click', (event: MouseEvent) => {
-            if (event.target === this.modalEl) {
+        this.setupModalInteractions();
+    }
+
+    /**
+     * Sets up modal interaction handlers with mobile support
+     * 📱 Enhanced touch event handling
+     */
+    private setupModalInteractions(): void {
+        // Prevent touch events from bubbling on modal content
+        this.contentEl.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        }, { passive: true });
+
+        // Handle clicks/touches outside modal
+        const handleOutsideInteraction = (event: MouseEvent | TouchEvent) => {
+            const target = event.target as HTMLElement;
+            if (target === this.modalEl) {
+                event.preventDefault();
+                event.stopPropagation();
                 this.resolvePromise(ConfirmationResult.Cancel);
                 this.close();
             }
-        });
+        };
+
+        // Desktop mouse events
+        this.modalEl.addEventListener('click', handleOutsideInteraction);
+        
+        // Mobile touch events
+        this.modalEl.addEventListener('touchstart', handleOutsideInteraction, { passive: false });
+        this.modalEl.addEventListener('touchend', (e) => e.preventDefault(), { passive: false });
     }
 
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
+        
+        // Add mobile-specific class
         contentEl.addClass('neurovox-confirmation-modal');
+        if (this.isMobile) {
+            contentEl.addClass('is-mobile');
+        }
         
-        // Create modal content
-        contentEl.createEl('h2', { text: this.options.title });
-        contentEl.createEl('p', { text: this.options.message });
+        // Create modal content with larger touch targets for mobile
+        const titleEl = contentEl.createEl('h2', { 
+            text: this.options.title,
+            cls: this.isMobile ? 'mobile-title' : ''
+        });
+
+        const messageEl = contentEl.createEl('p', { 
+            text: this.options.message,
+            cls: this.isMobile ? 'mobile-message' : ''
+        });
         
-        // Create button container
+        // Create button container with mobile-optimized spacing
         const buttonContainer = contentEl.createDiv({
-            cls: 'neurovox-confirmation-buttons'
+            cls: `neurovox-confirmation-buttons ${this.isMobile ? 'is-mobile' : ''}`
         });
 
         // Cancel button
-        new ButtonComponent(buttonContainer)
+        const cancelBtn = new ButtonComponent(buttonContainer)
             .setButtonText(this.options.cancelText)
             .setClass('neurovox-button-secondary')
             .onClick(() => {
@@ -67,7 +109,7 @@ export class ConfirmationModal extends Modal {
             });
 
         // Process only button
-        new ButtonComponent(buttonContainer)
+        const processBtn = new ButtonComponent(buttonContainer)
             .setButtonText(this.options.processOnlyText)
             .setClass('neurovox-button-warning')
             .onClick(() => {
@@ -76,7 +118,7 @@ export class ConfirmationModal extends Modal {
             });
 
         // Save and process button
-        new ButtonComponent(buttonContainer)
+        const saveBtn = new ButtonComponent(buttonContainer)
             .setButtonText(this.options.confirmText)
             .setClass('neurovox-button-primary')
             .setCta()
@@ -84,6 +126,14 @@ export class ConfirmationModal extends Modal {
                 this.resolvePromise(ConfirmationResult.SaveAndProcess);
                 this.close();
             });
+
+        // Add mobile-specific button classes and event handling
+        if (this.isMobile) {
+            [cancelBtn, processBtn, saveBtn].forEach(btn => {
+                btn.buttonEl.addClass('mobile-button');
+                btn.buttonEl.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+            });
+        }
     }
 
     /**

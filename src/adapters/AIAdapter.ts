@@ -49,6 +49,8 @@ interface RequestOptions {
 
 export abstract class AIAdapter {
     public models: AIModel[];
+    private keyValidated: boolean = false;
+    private lastValidatedKey: string = '';
 
     protected constructor(
         protected settings: NeuroVoxSettings,
@@ -59,13 +61,22 @@ export abstract class AIAdapter {
 
     // Abstract methods
     public abstract getApiKey(): string;
-    public abstract setApiKey(apiKey: string): void;
+    protected abstract setApiKeyInternal(key: string): void;
     protected abstract getApiBaseUrl(): string;
     protected abstract getTextGenerationEndpoint(): string;
     protected abstract getTranscriptionEndpoint(): string;
     protected abstract validateApiKeyImpl(): Promise<boolean>;
     protected abstract parseTextGenerationResponse(response: any): string;
     protected abstract parseTranscriptionResponse(response: any): string;
+
+    public setApiKey(key: string): void {
+        const currentKey = this.getApiKey();
+        if (key !== currentKey) {
+            this.keyValidated = false;
+            this.lastValidatedKey = '';
+        }
+        this.setApiKeyInternal(key);
+    }
 
     public async generateResponse(prompt: string, model: string, options?: { maxTokens?: number, temperature?: number }): Promise<string> {
         try {
@@ -131,13 +142,33 @@ export abstract class AIAdapter {
 
     public async validateApiKey(): Promise<boolean> {
         try {
-            if (!this.getApiKey()) {
+            const currentKey = this.getApiKey();
+            
+            if (!currentKey) {
+                this.keyValidated = false;
+                this.lastValidatedKey = '';
                 return false;
             }
 
+            // Return cached validation if key hasn't changed
+            if (this.keyValidated && this.lastValidatedKey === currentKey) {
+                return true;
+            }
+
+            // Otherwise validate the key
             const isValid = await this.validateApiKeyImpl();
+            if (isValid) {
+                this.keyValidated = true;
+                this.lastValidatedKey = currentKey;
+            } else {
+                this.keyValidated = false;
+                this.lastValidatedKey = '';
+            }
+
             return isValid;
         } catch (error) {
+            this.keyValidated = false;
+            this.lastValidatedKey = '';
             return false;
         }
     }
@@ -147,7 +178,9 @@ export abstract class AIAdapter {
     }
 
     public isReady(category: 'transcription' | 'language' = 'transcription'): boolean {
-        return Boolean(this.getApiKey());
+        const currentKey = this.getApiKey();
+        if (!currentKey) return false;
+        return this.keyValidated && this.lastValidatedKey === currentKey;
     }
 
     protected async makeAPIRequest(

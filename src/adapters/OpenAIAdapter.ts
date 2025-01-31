@@ -1,5 +1,3 @@
-// src/adapters/OpenAIAdapter.ts
-
 import { AIAdapter, AIProvider } from './AIAdapter';
 import { NeuroVoxSettings } from '../settings/Settings';
 
@@ -10,12 +8,12 @@ export class OpenAIAdapter extends AIAdapter {
         super(settings, AIProvider.OpenAI);
     }
 
-    setApiKey(key: string): void {
-        this.apiKey = key;
-    }
-
     getApiKey(): string {
         return this.apiKey;
+    }
+
+    protected setApiKeyInternal(key: string): void {
+        this.apiKey = key;
     }
 
     protected getApiBaseUrl(): string {

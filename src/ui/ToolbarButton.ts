@@ -23,7 +23,7 @@ export class ToolbarButton {
      */
     public createButton(): void {
         this.ribbonIconEl = this.plugin.addRibbonIcon(
-            'microphone', 
+            'mic-vocal', 
             'Start recording',
             (evt: MouseEvent) => {
                 this.openRecordingModal();

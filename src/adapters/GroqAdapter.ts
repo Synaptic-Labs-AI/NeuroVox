@@ -1,5 +1,3 @@
-// src/adapters/GroqAdapter.ts
-
 import { AIAdapter, AIProvider } from './AIAdapter';
 import { NeuroVoxSettings } from '../settings/Settings';
 
@@ -10,16 +8,16 @@ export class GroqAdapter extends AIAdapter {
         super(settings, AIProvider.Groq);
     }
 
-    setApiKey(key: string): void {
-        this.apiKey = key;
-    }
-
     getApiKey(): string {
         return this.apiKey;
     }
 
+    protected setApiKeyInternal(key: string): void {
+        this.apiKey = key;
+    }
+
     protected getApiBaseUrl(): string {
-        return 'https://api.groq.com/openai/v1';
+        return 'https://api.groq.com/v1';
     }
 
     protected getTextGenerationEndpoint(): string {
@@ -44,7 +42,7 @@ export class GroqAdapter extends AIAdapter {
                     'Content-Type': 'application/json'
                 },
                 JSON.stringify({
-                    model: 'gemma2-9b-it',
+                    model: 'mixtral-8x7b-32768',
                     messages: [{ role: 'user', content: 'test' }],
                     max_tokens: 1
                 })

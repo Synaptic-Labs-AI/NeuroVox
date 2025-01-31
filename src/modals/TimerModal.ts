@@ -38,20 +38,42 @@ export class TimerModal extends Modal {
     /**
      * Sets up handlers for modal closing via escape key and clicking outside
      */
+    /**
+     * Sets up handlers for modal closing via escape key, clicks, and touch events
+     * 📱 Enhanced with proper mobile touch handling
+     */
     private setupCloseHandlers(): void {
-        // Handle clicking outside the modal
-        this.modalEl.addEventListener('click', (event: MouseEvent) => {
-            if (event.target === this.modalEl) {
+        // Prevent touch events from bubbling on modal content
+        this.contentEl.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        }, { passive: true });
+
+        // Handle clicks/touches outside modal
+        const handleOutsideInteraction = (event: MouseEvent | TouchEvent) => {
+            const target = event.target as HTMLElement;
+            if (target === this.modalEl) {
                 event.preventDefault();
                 event.stopPropagation();
-                this.requestClose();
+                void this.requestClose();
             }
-        });
+        };
+
+        // Desktop mouse events
+        this.modalEl.addEventListener('click', handleOutsideInteraction);
+        
+        // Mobile touch events
+        this.modalEl.addEventListener('touchstart', handleOutsideInteraction, { passive: false });
+        this.modalEl.addEventListener('touchend', (e) => e.preventDefault(), { passive: false });
 
         // Handle escape key
         this.scope.register([], 'Escape', () => {
-            this.requestClose();
+            void this.requestClose();
             return false;
+        });
+
+        // Handle mobile back button
+        window.addEventListener('popstate', () => {
+            void this.requestClose();
         });
     }
 
@@ -90,11 +112,29 @@ export class TimerModal extends Modal {
     /**
      * Initializes the modal and starts recording
      */
+    /**
+     * Initializes the modal with enhanced mobile support
+     * 📱 Added mobile-specific meta tags and initialization
+     */
     async onOpen(): Promise<void> {
         try {
+            // Set viewport meta for mobile
+            const viewport = document.querySelector('meta[name="viewport"]');
+            if (!viewport) {
+                const meta = document.createElement('meta');
+                meta.name = 'viewport';
+                meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+                document.head.appendChild(meta);
+            }
+
             const { contentEl } = this;
             contentEl.empty();
             contentEl.addClass('neurovox-timer-modal');
+
+            // Add mobile-specific class
+            if (this.isMobileDevice()) {
+                contentEl.addClass('is-mobile');
+            }
 
             const container = contentEl.createDiv({ 
                 cls: 'neurovox-timer-content' 
@@ -105,11 +145,45 @@ export class TimerModal extends Modal {
                 onStop: () => this.handleStop()
             });
 
-            await this.recordingManager.initialize();
-            await this.startRecording();
+            // Initialize recording with mobile-specific settings
+            await this.initializeRecording();
         } catch (error) {
             this.handleError('Failed to initialize recording', error);
         }
+    }
+
+    /**
+     * Initializes recording with mobile-specific handling
+     * 📱 Added device-specific audio configuration
+     */
+    private async initializeRecording(): Promise<void> {
+        try {
+            await this.recordingManager.initialize({
+                isMobile: this.isMobileDevice(),
+                isIOS: this.isIOSDevice()
+            });
+            await this.startRecording();
+        } catch (error) {
+            if (this.isIOSDevice() && error instanceof Error && error.name === 'NotAllowedError') {
+                this.handleError('iOS requires microphone permission. Please enable it in Settings.', error);
+            } else {
+                this.handleError('Failed to initialize recording', error);
+            }
+        }
+    }
+
+    /**
+     * Detects if current device is mobile
+     */
+    private isMobileDevice(): boolean {
+        return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    }
+
+    /**
+     * Detects if current device is iOS
+     */
+    private isIOSDevice(): boolean {
+        return /iPhone|iPad|iPod/i.test(navigator.userAgent);
     }
 
     /**

@@ -44,8 +44,9 @@ export class ModelHookupAccordion extends BaseAccordion {
             .addText(text => {
                 text
                     .setPlaceholder("sk-...")
-                    .setValue(this.settings.openaiApiKey)
-                    .onChange(async (value) => {
+                    .setValue(this.settings.openaiApiKey);
+                text.inputEl.type = "password";
+                text.onChange(async (value: string) => {
                         const trimmedValue = value.trim();
                         this.settings.openaiApiKey = trimmedValue;
                         await this.plugin.saveSettings();
@@ -77,8 +78,9 @@ export class ModelHookupAccordion extends BaseAccordion {
             .addText(text => {
                 text
                     .setPlaceholder("gsk_...")
-                    .setValue(this.settings.groqApiKey)
-                    .onChange(async (value) => {
+                    .setValue(this.settings.groqApiKey);
+                text.inputEl.type = "password";
+                text.onChange(async (value: string) => {
                         const trimmedValue = value.trim();
                         this.settings.groqApiKey = trimmedValue;
                         await this.plugin.saveSettings();

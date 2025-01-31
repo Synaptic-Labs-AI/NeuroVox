@@ -32,9 +32,39 @@ export class RecordingUI {
     }
 
     private initializeComponents(): void {
+        // Add touch event handlers to container
+        this.setupTouchHandlers();
+        
         this.createTimerDisplay();
         this.createControls();
         this.createWaveform();
+    }
+
+    /**
+     * Sets up touch event handlers for mobile interactions
+     * 📱 Prevents unwanted gestures and ensures smooth interaction
+     */
+    private setupTouchHandlers(): void {
+        // Prevent pinch zoom
+        this.container.addEventListener('gesturestart', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+
+        // Prevent scrolling while interacting with controls
+        this.container.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+
+        // Prevent double-tap zoom
+        let lastTap = 0;
+        this.container.addEventListener('touchend', (e) => {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            if (tapLength < 300 && tapLength > 0) {
+                e.preventDefault();
+            }
+            lastTap = currentTime;
+        }, { passive: false });
     }
 
     private createTimerDisplay(): void {
@@ -82,6 +112,10 @@ export class RecordingUI {
      * Creates a button with debouncing and error handling
      * 🛡️ Mobile-optimized with protection against rapid clicks
      */
+    /**
+     * Creates a button with enhanced mobile interaction handling
+     * 📱 Optimized touch events and feedback for mobile devices
+     */
     private createButton(
         container: HTMLElement,
         classNames: string[],
@@ -90,63 +124,121 @@ export class RecordingUI {
         onClick: () => void
     ): HTMLButtonElement {
         const button = container.createEl('button', {
-            cls: classNames,
+            cls: [...classNames, 'touch-button'],
             attr: { 
                 'aria-label': ariaLabel,
-                'data-state': 'ready'
+                'data-state': 'ready',
+                'role': 'button',
+                'tabindex': '0'
             }
         });
 
         setIcon(button, iconName);
         
-        button.addEventListener('click', async (e) => {
-            e.preventDefault(); // Prevent double tap zoom on mobile
+        // Track touch interactions
+        let touchStartTime = 0;
+        let isLongPress = false;
+        
+        // Handle touch start
+        const handleTouchStart = (e: TouchEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
             
-            if (this.isProcessingAction) {
-                return;
-            }
-
-            // Visual feedback
-            button.setAttribute('data-state', 'processing');
-            button.addClass('is-processing');
-            this.isProcessingAction = true;
-
-            try {
-                // Clear any existing timeout
-                if (this.actionTimeout) {
-                    clearTimeout(this.actionTimeout);
+            if (this.isProcessingAction) return;
+            
+            touchStartTime = Date.now();
+            isLongPress = false;
+            
+            button.addClass('is-touching');
+            
+            // Detect long press
+            setTimeout(() => {
+                if (button.matches(':active')) {
+                    isLongPress = true;
+                    button.addClass('is-long-press');
                 }
-
-                // Execute the action
-                await onClick();
-
-                // Set debounce timeout
-                this.actionTimeout = setTimeout(() => {
-                    this.isProcessingAction = false;
-                    button.setAttribute('data-state', 'ready');
-                    button.removeClass('is-processing');
-                }, this.DEBOUNCE_TIME);
-
-            } catch (error) {
-                // Reset state on error
-                this.isProcessingAction = false;
-                button.setAttribute('data-state', 'error');
-                button.addClass('has-error');
-                
-                // Clear error state after delay
-                setTimeout(() => {
-                    button.setAttribute('data-state', 'ready');
-                    button.removeClass('has-error');
-                }, 2000);
+            }, 500);
+        };
+        
+        // Handle touch end
+        const handleTouchEnd = async (e: TouchEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            button.removeClass('is-touching');
+            button.removeClass('is-long-press');
+            
+            if (this.isProcessingAction || isLongPress) return;
+            
+            const touchDuration = Date.now() - touchStartTime;
+            if (touchDuration > 1000) return; // Ignore long touches
+            
+            // Process the action
+            await this.processButtonAction(button, onClick);
+        };
+        
+        // Add touch event listeners
+        button.addEventListener('touchstart', handleTouchStart, { passive: false });
+        button.addEventListener('touchend', handleTouchEnd, { passive: false });
+        button.addEventListener('touchcancel', () => {
+            button.removeClass('is-touching');
+            button.removeClass('is-long-press');
+        });
+        
+        // Add click handler for non-touch devices
+        button.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (!this.isProcessingAction) {
+                await this.processButtonAction(button, onClick);
             }
         });
 
-        // Prevent touch event issues on mobile
-        button.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-        }, { passive: false });
-
         return button;
+    }
+
+    /**
+     * Processes button actions with proper state management and feedback
+     * 🎯 Handles action processing with proper cleanup
+     */
+    private async processButtonAction(
+        button: HTMLButtonElement,
+        onClick: () => void
+    ): Promise<void> {
+        if (this.isProcessingAction) return;
+
+        // Visual feedback
+        button.setAttribute('data-state', 'processing');
+        button.addClass('is-processing');
+        this.isProcessingAction = true;
+
+        try {
+            // Clear any existing timeout
+            if (this.actionTimeout) {
+                clearTimeout(this.actionTimeout);
+            }
+
+            // Execute the action
+            await onClick();
+
+            // Set debounce timeout
+            this.actionTimeout = setTimeout(() => {
+                this.isProcessingAction = false;
+                button.setAttribute('data-state', 'ready');
+                button.removeClass('is-processing');
+            }, this.DEBOUNCE_TIME);
+
+        } catch (error) {
+            // Reset state on error
+            this.isProcessingAction = false;
+            button.setAttribute('data-state', 'error');
+            button.addClass('has-error');
+            
+            // Clear error state after delay
+            setTimeout(() => {
+                button.setAttribute('data-state', 'ready');
+                button.removeClass('has-error');
+            }, 2000);
+        }
     }
 
     public updateTimer(seconds: number, maxDuration: number, warningThreshold: number): void {
