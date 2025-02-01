@@ -66,7 +66,7 @@ export class RecordingProcessor {
     private readonly MAX_AUDIO_SIZE_MB = 25;
     private readonly MAX_AUDIO_SIZE_BYTES = this.MAX_AUDIO_SIZE_MB * 1024 * 1024;
     private readonly CHUNK_OVERLAP_SECONDS = 2;
-    private readonly SAMPLE_RATE = 44100;
+    private readonly SAMPLE_RATE = 44100; // CD quality audio for better fidelity
 
     private constructor(
         private plugin: NeuroVoxPlugin,
@@ -150,46 +150,74 @@ export class RecordingProcessor {
         }
 
         try {
+            // Create an audio context to properly decode the WebM audio
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
             const arrayBuffer = await audioBlob.arrayBuffer();
-            const audioData = await this.convertToFloat32Array(arrayBuffer);
-
-            const bytesPerSample = 4;
-            const samplesPerChunk = Math.floor(this.MAX_AUDIO_SIZE_BYTES / bytesPerSample);
-            const overlapSamples = this.CHUNK_OVERLAP_SECONDS * this.SAMPLE_RATE;
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
             
+            // Calculate chunk duration in seconds
+            const totalDuration = audioBuffer.duration;
+            const chunkDuration = Math.floor(totalDuration * (this.MAX_AUDIO_SIZE_BYTES / audioBlob.size));
             const chunks: Blob[] = [];
-            let start = 0;
-
-            while (start < audioData.length) {
-                const idealEnd = Math.min(start + samplesPerChunk, audioData.length);
-                let end = idealEnd;
+            
+            // Process audio in chunks
+            for (let startTime = 0; startTime < totalDuration; startTime += chunkDuration) {
+                const endTime = Math.min(startTime + chunkDuration + this.CHUNK_OVERLAP_SECONDS, totalDuration);
                 
-                const searchStart = Math.max(idealEnd - 1000, start);
-                const searchEnd = Math.min(idealEnd + 1000, audioData.length);
-                
-                for (let i = searchStart; i < searchEnd; i++) {
-                    if (Math.abs(audioData[i]) < 0.01 && 
-                        Math.abs(audioData[i + 1]) < 0.01) {
-                        end = i;
-                        break;
-                    }
-                }
-
-                const chunkStart = start > 0 ? start - overlapSamples : start;
-                const chunkData = audioData.slice(chunkStart, end);
-                
-                const chunkBuffer = chunkData.buffer.slice(
-                    chunkData.byteOffset,
-                    chunkData.byteOffset + chunkData.byteLength
+                // Create a new buffer for this chunk
+                const chunkBuffer = audioContext.createBuffer(
+                    audioBuffer.numberOfChannels,
+                    Math.ceil((endTime - startTime) * audioBuffer.sampleRate),
+                    audioBuffer.sampleRate
                 );
                 
-                chunks.push(new Blob([chunkBuffer], { type: audioBlob.type }));
-                start = end;
+                // Copy data for each channel
+                for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+                    const channelData = audioBuffer.getChannelData(channel);
+                    const chunkData = chunkBuffer.getChannelData(channel);
+                    const startSample = Math.floor(startTime * audioBuffer.sampleRate);
+                    const endSample = Math.ceil(endTime * audioBuffer.sampleRate);
+                    chunkData.set(channelData.subarray(startSample, endSample));
+                }
+                
+                // Convert chunk to blob
+                const chunk = await new Promise<Blob>((resolve) => {
+                    const source = audioContext.createBufferSource();
+                    source.buffer = chunkBuffer;
+                    const destination = audioContext.createMediaStreamDestination();
+                    source.connect(destination);
+                    
+                    const recorder = new MediaRecorder(destination.stream, {
+                        mimeType: audioBlob.type
+                    });
+                    
+                    const chunks: Blob[] = [];
+                    recorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) chunks.push(e.data);
+                    };
+                    
+                    recorder.onstop = () => {
+                        resolve(new Blob(chunks, { type: audioBlob.type }));
+                    };
+                    
+                    recorder.start();
+                    source.start(0);
+                    setTimeout(() => {
+                        source.stop();
+                        recorder.stop();
+                    }, chunkBuffer.duration * 1000);
+                });
+                
+                chunks.push(chunk);
             }
-
+            
+            await audioContext.close();
             return chunks;
+            
         } catch (error) {
-            throw error;
+            console.error('Error splitting audio:', error);
+            // If splitting fails, return the original blob as a single chunk
+            return [audioBlob];
         }
     }
 
@@ -259,14 +287,14 @@ export class RecordingProcessor {
 
     private async saveAudioFile(audioBlob: Blob): Promise<string> {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const baseFileName = `recording-${timestamp}.wav`;
+        const baseFileName = `recording-${timestamp}.webm`;
         const folderPath = this.pluginData.recordingFolderPath || '';
         let fileName = baseFileName;
         let filePath = folderPath ? `${folderPath}/${fileName}` : fileName;
         let count = 1;
 
         while (await this.plugin.app.vault.adapter.exists(filePath)) {
-            fileName = `recording-${timestamp}-${count}.wav`;
+            fileName = `recording-${timestamp}-${count}.webm`;
             filePath = folderPath ? `${folderPath}/${fileName}` : fileName;
             count++;
         }
@@ -340,6 +368,71 @@ export class RecordingProcessor {
         }
     }
 
+    private async concatenateAudioChunks(chunks: Blob[]): Promise<Blob> {
+        try {
+            // Create a MediaStream from the first chunk to get the correct format
+            const firstChunk = chunks[0];
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            
+            // Process all chunks sequentially
+            const processedChunks: Blob[] = [];
+            for (const chunk of chunks) {
+                try {
+                    // Convert chunk to audio buffer
+                    const arrayBuffer = await chunk.arrayBuffer();
+                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                    
+                    // Create a new MediaStream
+                    const source = audioContext.createBufferSource();
+                    source.buffer = audioBuffer;
+                    const destination = audioContext.createMediaStreamDestination();
+                    source.connect(destination);
+                    
+                    // Record the stream
+                    const recorder = new MediaRecorder(destination.stream, {
+                        mimeType: firstChunk.type
+                    });
+                    
+                    const processedData = await new Promise<Blob>((resolve) => {
+                        const chunks: Blob[] = [];
+                        recorder.ondataavailable = (e) => {
+                            if (e.data.size > 0) chunks.push(e.data);
+                        };
+                        recorder.onstop = () => {
+                            resolve(new Blob(chunks, { type: firstChunk.type }));
+                        };
+                        
+                        recorder.start();
+                        source.start(0);
+                        
+                        // Record for the exact duration of the buffer
+                        setTimeout(() => {
+                            source.stop();
+                            recorder.stop();
+                        }, audioBuffer.duration * 1000);
+                    });
+                    
+                    processedChunks.push(processedData);
+                } catch (error) {
+                    console.error('Error processing chunk:', error);
+                    // If we can't process, use the original chunk
+                    processedChunks.push(chunk);
+                }
+            }
+            
+            // Clean up
+            await audioContext.close();
+            
+            // Combine all chunks into a single blob
+            return new Blob(processedChunks, { type: firstChunk.type });
+            
+        } catch (error) {
+            console.error('Error in concatenateAudioChunks:', error);
+            // Fallback: return the first chunk if concatenation fails
+            return chunks[0];
+        }
+    }
+
     private async processLargeAudioFile(
         audioBlob: Blob,
         shouldSaveAudio: boolean,
@@ -349,11 +442,20 @@ export class RecordingProcessor {
     ): Promise<void> {
         const chunks = await this.splitAudioBlob(audioBlob);
         const allResults: ProcessingResult[] = [];
+        const chunkPaths: string[] = [];
         
+        // Process each chunk for transcription
         for (let i = 0; i < chunks.length; i++) {
             try {
                 const chunk = chunks[i];
-                const chunkPath = audioFilePath || (shouldSaveAudio ? await this.saveAudioFile(chunk) : '');
+                const chunkPath = audioFilePath ? 
+                    `${audioFilePath}.part${i}` : 
+                    (shouldSaveAudio ? await this.saveAudioFile(chunk) : '');
+                
+                if (chunkPath) {
+                    chunkPaths.push(chunkPath);
+                }
+                
                 const result = await this.executeProcessingPipelineWithRecovery(chunk, chunkPath);
                 allResults.push(result);
                 
@@ -363,11 +465,47 @@ export class RecordingProcessor {
                 
                 new Notice(`Processing chunk ${i + 1} of ${chunks.length}`);
             } catch (error) {
+                console.error('Error processing chunk:', error);
             }
         }
 
         if (allResults.length > 0) {
-            await this.insertAggregatedResults(allResults, activeFile, cursorPosition);
+            try {
+                // Concatenate all audio chunks into a single file
+                const concatenatedAudio = await this.concatenateAudioChunks(chunks);
+                
+                // Save the concatenated audio file
+                const finalPath = audioFilePath || (shouldSaveAudio ? await this.saveAudioFile(concatenatedAudio) : '');
+                
+                // Clean up temporary chunk files
+                if (shouldSaveAudio) {
+                    for (const chunkPath of chunkPaths) {
+                        try {
+                            await this.plugin.app.vault.adapter.remove(chunkPath);
+                        } catch (error) {
+                            console.error('Error removing chunk file:', error);
+                        }
+                    }
+                }
+                
+                // Create final result with concatenated audio
+                const finalResult: ProcessingResult = {
+                    transcription: allResults.map(r => r.transcription).join('\n'),
+                    summary: allResults.some(r => r.summary) ? 
+                        allResults.map(r => r.summary).filter(Boolean).join('\n') : 
+                        undefined,
+                    timings: this.calculateTimings(),
+                    audioFilePath: finalPath,
+                    audioBlob: concatenatedAudio
+                };
+                
+                await this.insertResults(finalResult, activeFile, cursorPosition);
+                
+            } catch (error) {
+                console.error('Error concatenating audio:', error);
+                // Fallback: use the original insertAggregatedResults if concatenation fails
+                await this.insertAggregatedResults(allResults, activeFile, cursorPosition);
+            }
         } else {
             throw new Error('No chunks were successfully processed');
         }

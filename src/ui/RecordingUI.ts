@@ -1,4 +1,5 @@
 import { setIcon } from 'obsidian';
+import { TouchableButton } from './TouchableButton';
 
 export type RecordingState = 'recording' | 'paused' | 'stopped' | 'inactive';
 
@@ -13,13 +14,10 @@ export interface RecordingUIHandlers {
  */
 export class RecordingUI {
     private timerText: HTMLElement;
-    private pauseButton: HTMLButtonElement;
-    private stopButton: HTMLButtonElement;
+    private pauseButton: TouchableButton;
+    private stopButton: TouchableButton;
     private waveContainer: HTMLElement;
     private currentState: RecordingState = 'inactive';
-    private isProcessingAction = false;
-    private readonly DEBOUNCE_TIME = 1000; // 1 second debounce
-    private actionTimeout: NodeJS.Timeout | null = null;
 
     constructor(
         private container: HTMLElement,
@@ -79,21 +77,25 @@ export class RecordingUI {
             cls: 'neurovox-timer-controls'
         });
 
-        this.pauseButton = this.createButton(
-            controls,
-            ['neurovox-timer-button', 'neurovox-pause-button'],
-            'pause',
-            'Pause recording',
-            () => this.handlers.onPause()
-        );
+        // Create pause button
+        this.pauseButton = new TouchableButton({
+            container: controls,
+            text: '',
+            icon: 'pause',
+            classes: ['neurovox-timer-button', 'neurovox-pause-button'],
+            ariaLabel: 'Pause recording',
+            onClick: () => this.handlers.onPause()
+        });
 
-        this.stopButton = this.createButton(
-            controls,
-            ['neurovox-timer-button', 'neurovox-stop-button'],
-            'square',
-            'Stop Recording',
-            () => this.handlers.onStop()
-        );
+        // Create stop button
+        this.stopButton = new TouchableButton({
+            container: controls,
+            text: '',
+            icon: 'square',
+            classes: ['neurovox-timer-button', 'neurovox-stop-button'],
+            ariaLabel: 'Stop Recording',
+            onClick: () => this.handlers.onStop()
+        });
     }
 
     private createWaveform(): void {
@@ -105,139 +107,6 @@ export class RecordingUI {
             this.waveContainer.createDiv({
                 cls: 'neurovox-wave-bar'
             });
-        }
-    }
-
-    /**
-     * Creates a button with debouncing and error handling
-     * 🛡️ Mobile-optimized with protection against rapid clicks
-     */
-    /**
-     * Creates a button with enhanced mobile interaction handling
-     * 📱 Optimized touch events and feedback for mobile devices
-     */
-    private createButton(
-        container: HTMLElement,
-        classNames: string[],
-        iconName: string,
-        ariaLabel: string,
-        onClick: () => void
-    ): HTMLButtonElement {
-        const button = container.createEl('button', {
-            cls: [...classNames, 'touch-button'],
-            attr: { 
-                'aria-label': ariaLabel,
-                'data-state': 'ready',
-                'role': 'button',
-                'tabindex': '0'
-            }
-        });
-
-        setIcon(button, iconName);
-        
-        // Track touch interactions
-        let touchStartTime = 0;
-        let isLongPress = false;
-        
-        // Handle touch start
-        const handleTouchStart = (e: TouchEvent) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            if (this.isProcessingAction) return;
-            
-            touchStartTime = Date.now();
-            isLongPress = false;
-            
-            button.addClass('is-touching');
-            
-            // Detect long press
-            setTimeout(() => {
-                if (button.matches(':active')) {
-                    isLongPress = true;
-                    button.addClass('is-long-press');
-                }
-            }, 500);
-        };
-        
-        // Handle touch end
-        const handleTouchEnd = async (e: TouchEvent) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            button.removeClass('is-touching');
-            button.removeClass('is-long-press');
-            
-            if (this.isProcessingAction || isLongPress) return;
-            
-            const touchDuration = Date.now() - touchStartTime;
-            if (touchDuration > 1000) return; // Ignore long touches
-            
-            // Process the action
-            await this.processButtonAction(button, onClick);
-        };
-        
-        // Add touch event listeners
-        button.addEventListener('touchstart', handleTouchStart, { passive: false });
-        button.addEventListener('touchend', handleTouchEnd, { passive: false });
-        button.addEventListener('touchcancel', () => {
-            button.removeClass('is-touching');
-            button.removeClass('is-long-press');
-        });
-        
-        // Add click handler for non-touch devices
-        button.addEventListener('click', async (e) => {
-            e.preventDefault();
-            if (!this.isProcessingAction) {
-                await this.processButtonAction(button, onClick);
-            }
-        });
-
-        return button;
-    }
-
-    /**
-     * Processes button actions with proper state management and feedback
-     * 🎯 Handles action processing with proper cleanup
-     */
-    private async processButtonAction(
-        button: HTMLButtonElement,
-        onClick: () => void
-    ): Promise<void> {
-        if (this.isProcessingAction) return;
-
-        // Visual feedback
-        button.setAttribute('data-state', 'processing');
-        button.addClass('is-processing');
-        this.isProcessingAction = true;
-
-        try {
-            // Clear any existing timeout
-            if (this.actionTimeout) {
-                clearTimeout(this.actionTimeout);
-            }
-
-            // Execute the action
-            await onClick();
-
-            // Set debounce timeout
-            this.actionTimeout = setTimeout(() => {
-                this.isProcessingAction = false;
-                button.setAttribute('data-state', 'ready');
-                button.removeClass('is-processing');
-            }, this.DEBOUNCE_TIME);
-
-        } catch (error) {
-            // Reset state on error
-            this.isProcessingAction = false;
-            button.setAttribute('data-state', 'error');
-            button.addClass('has-error');
-            
-            // Clear error state after delay
-            setTimeout(() => {
-                button.setAttribute('data-state', 'ready');
-                button.removeClass('has-error');
-            }, 2000);
         }
     }
 
@@ -262,10 +131,11 @@ export class RecordingUI {
         const iconName = isPaused ? 'play' : 'pause';
         const label = isPaused ? 'Resume recording' : 'Pause Recording';
         
-        this.pauseButton.empty();
-        setIcon(this.pauseButton, iconName);
-        this.pauseButton.setAttribute('aria-label', label);
-        this.pauseButton.toggleClass('is-paused', isPaused);
+        // Update pause button
+        this.pauseButton.buttonEl.empty();
+        setIcon(this.pauseButton.buttonEl, iconName);
+        this.pauseButton.buttonEl.setAttribute('aria-label', label);
+        this.pauseButton.buttonEl.toggleClass('is-paused', isPaused);
     }
 
     /**
@@ -273,22 +143,9 @@ export class RecordingUI {
      * 🧹 Ensures all resources are properly released
      */
     public cleanup(): void {
-        // Clear any pending timeouts
-        if (this.actionTimeout) {
-            clearTimeout(this.actionTimeout);
-            this.actionTimeout = null;
-        }
-
-        // Reset state
-        this.isProcessingAction = false;
-        
-        // Remove event listeners
-        if (this.pauseButton) {
-            this.pauseButton.remove();
-        }
-        if (this.stopButton) {
-            this.stopButton.remove();
-        }
+        // Clean up buttons
+        this.pauseButton?.cleanup();
+        this.stopButton?.cleanup();
 
         // Clear container
         this.container.empty();

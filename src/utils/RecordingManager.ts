@@ -1,4 +1,5 @@
 import RecordRTC from 'recordrtc';
+import { Platform } from 'obsidian';
 
 /**
  * Audio-specific MIME types supported by RecordRTC
@@ -17,6 +18,8 @@ type AudioChannels = 1 | 2;
 /**
  * Configuration options for audio recording that match RecordRTC requirements
  */
+type BufferSize = 256 | 512 | 1024 | 2048 | 4096 | 8192 | 16384;
+
 interface AudioRecorderOptions {
     type: 'audio';
     mimeType: AudioMimeType;
@@ -24,6 +27,7 @@ interface AudioRecorderOptions {
     numberOfAudioChannels: AudioChannels;
     desiredSampRate: number;
     timeSlice?: number;
+    bufferSize?: BufferSize;
 }
 
 /**
@@ -44,22 +48,18 @@ export class AudioRecordingManager {
 
     private readonly AUDIO_CONFIG: AudioRecorderOptions = {
         type: 'audio',
-        mimeType: "audio/wav",  // Reverted to WAV format
+        mimeType: "audio/webm;codecs=pcm",  // Use PCM encoding for better compatibility
         recorderType: RecordRTC.StereoAudioRecorder,
-        numberOfAudioChannels: 1 as AudioChannels, // Set to single audio channel
-        desiredSampRate: 44100,   // Set sample rate to 44100 Hz
-        // Note: RecordRTC does not provide a direct option for bits per sample.
-        timeSlice: 1000           // ...existing code...
+        numberOfAudioChannels: 1 as AudioChannels,
+        desiredSampRate: 44100,  // CD quality audio for better fidelity
+        bufferSize: 16384 as BufferSize  // Larger buffer for better stability
     };
 
-    /**
-     * Initializes the recording manager with microphone access
-     */
     /**
      * Initializes the recording manager with device-specific settings
      * 📱 Added mobile-specific audio configurations
      */
-    async initialize(options: { isMobile: boolean; isIOS: boolean } = { isMobile: false, isIOS: false }): Promise<void> {
+    async initialize(options: { customSampleRate?: number } = {}): Promise<void> {
         try {
             // Check if browser supports getUserMedia
             if (!navigator.mediaDevices?.getUserMedia) {
@@ -72,9 +72,9 @@ export class AudioRecordingManager {
                 noiseSuppression: true,
                 autoGainControl: true,
                 channelCount: 1,
-                sampleRate: options.isIOS ? 44100 : 48000,
+                sampleRate: Platform.isIosApp ? 44100 : 48000,
                 // iOS-specific optimizations
-                ...(options.isIOS && {
+                ...(Platform.isIosApp && {
                     sampleSize: 16,
                     googEchoCancellation: true,
                     googAutoGainControl: true,
@@ -93,7 +93,7 @@ export class AudioRecordingManager {
             }
 
             // Set up audio context first (especially important for iOS)
-            if (options.isIOS) {
+            if (Platform.isIosApp) {
                 try {
                     console.debug('Initializing iOS audio context...');
                     // Need to create context before initializing recorder
@@ -106,11 +106,10 @@ export class AudioRecordingManager {
                     // Resume context (required for iOS)
                     await this.audioContext.resume();
 
-                    // Create and connect audio nodes
+                    // Create and connect audio nodes for recording only (no speaker output)
                     const source = this.audioContext.createMediaStreamSource(this.stream);
                     const destination = this.audioContext.createMediaStreamDestination();
-                    source.connect(destination);
-                    source.connect(this.audioContext.destination);
+                    source.connect(destination); // Only connect to destination for recording
 
                     console.debug('iOS audio context initialized successfully');
                 } catch (error) {
@@ -119,45 +118,82 @@ export class AudioRecordingManager {
                 }
             }
 
-            // Initialize recorder with device-specific settings
-            const recorderConfig: AudioRecorderOptions = {
-                ...this.AUDIO_CONFIG,
-                desiredSampRate: options.isMobile ? 22050 : 44100,
-                mimeType: options.isIOS ? "audio/webm" as AudioMimeType : "audio/wav" as AudioMimeType,
-                timeSlice: options.isMobile ? 500 : 1000,
-                type: 'audio',
-                recorderType: RecordRTC.StereoAudioRecorder,
-                numberOfAudioChannels: 1
-            };
-
-            // Create recorder instance with enhanced configuration
-            this.recorder = new RecordRTC(this.stream, {
-                ...recorderConfig,
-                // Mobile optimizations
-                ...(options.isMobile && {
-                    bufferSize: 4096,
-                    disableLogs: false // Enable logs for debugging
-                }),
-                // Backup handling
-                ondataavailable: (blob: Blob) => {
-                    console.debug('RecordRTC data available:', blob.size, 'bytes');
-                    if (blob.size > 0) {
-                        this.recordingBackup = blob;
-                        this.lastBackupTime = Date.now();
-                    }
-                }
+            // Log audio context state
+            console.debug('🔊 Audio context state:', {
+                state: this.audioContext?.state,
+                sampleRate: this.audioContext?.sampleRate,
+                baseLatency: this.audioContext?.baseLatency
             });
 
-            // Setup periodic backup
-            this.backupInterval = window.setInterval(() => {
-                if (this.recorder && this.recorder.state === 'recording') {
-                    const currentTime = Date.now();
-                    // If no backup received in twice the expected interval, log warning
-                    if (currentTime - this.lastBackupTime > this.BACKUP_INTERVAL * 2) {
-                        console.warn('No recent backup received from recorder');
-                    }
+            // Log media stream info
+            console.debug('📡 Media stream tracks:', this.stream?.getTracks().map(t => ({
+                kind: t.kind,
+                label: t.label,
+                enabled: t.enabled,
+                muted: t.muted,
+                constraints: t.getConstraints()
+            })));
+
+            // Initialize recorder with optimized settings
+            const recorderConfig: AudioRecorderOptions & {
+                disableLogs: boolean;
+                onStateChanged: (state: string) => void;
+            } = {
+                type: 'audio',
+                mimeType: "audio/webm;codecs=pcm",
+                recorderType: RecordRTC.StereoAudioRecorder,
+                numberOfAudioChannels: 1,
+                desiredSampRate: 44100,
+                bufferSize: 16384 as BufferSize,
+                disableLogs: false,
+                onStateChanged: (state: string) => {
+                    console.debug('🎙️ Recorder state changed:', {
+                        newState: state,
+                        previousState: this.recordingState,
+                        audioContextState: this.audioContext?.state
+                    });
+                    this.recordingState = state as 'recording' | 'paused' | 'inactive';
                 }
-            }, this.BACKUP_INTERVAL);
+            };
+
+            // Log recorder configuration
+            console.debug('🎙️ Initializing recorder with config:', {
+                type: recorderConfig.type,
+                mimeType: recorderConfig.mimeType,
+                sampleRate: recorderConfig.desiredSampRate,
+                bufferSize: recorderConfig.bufferSize,
+                channels: recorderConfig.numberOfAudioChannels
+            });
+
+            // Create recorder instance
+            this.recorder = new RecordRTC(this.stream, recorderConfig);
+            console.debug('🎙️ Recorder instance created:', {
+                version: RecordRTC.version,
+                state: this.recorder.state
+            });
+
+            // Initialize audio context after recorder creation
+            if (!this.audioContext) {
+                this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+                    sampleRate: 44100,
+                    latencyHint: 'interactive'
+                });
+                await this.audioContext.resume();
+            }
+
+            // Verify the recorder was created successfully
+            if (!this.recorder) {
+                throw new Error('Failed to create recorder instance');
+            }
+
+            // Initialize recorder with detailed logging
+            console.debug('🎙️ Starting recorder initialization...');
+            await this.recorder.initRecorder();
+            console.debug('🎙️ Recorder initialized successfully:', {
+                state: this.recorder.state,
+                audioContextState: this.audioContext?.state,
+                streamActive: this.stream?.active
+            });
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -180,9 +216,6 @@ export class AudioRecordingManager {
     }
 
     /**
-     * Starts audio recording without enforcing a maximum duration
-     */
-    /**
      * Starts audio recording with enhanced state tracking
      * 🎯 Added better error handling and state management
      */
@@ -199,32 +232,48 @@ export class AudioRecordingManager {
 
         try {
             console.debug('Starting recording...');
+            
+            // Ensure audio context is active
+            if (this.audioContext?.state === 'suspended') {
+                await this.audioContext.resume();
+            }
+            
+            // Start recording
             this.recorder.startRecording();
             this.recordingState = 'recording';
-            this.lastBackupTime = Date.now();
-
-            // Wait for first data to confirm recording started
-            const startTimeout = setTimeout(() => {
-                if (!this.recordingBackup) {
-                    console.warn('No initial recording data received');
-                }
-            }, 1000);
-
-            // Track recorder state
-            const stateInterval = setInterval(() => {
-                if (this.recorder) {
-                    console.debug('Recorder state:', this.recorder.state);
-                    if (this.recorder.state === 'inactive' && this.recordingState === 'recording') {
-                        console.warn('Recorder unexpectedly stopped');
-                        clearInterval(stateInterval);
+            
+            // Wait for recorder to actually start
+            await new Promise<void>((resolve, reject) => {
+                const maxWait = setTimeout(() => {
+                    reject(new Error('Recorder failed to start'));
+                }, 3000);
+                
+                const checkState = setInterval(() => {
+                    if (this.recorder?.state === 'recording') {
+                        clearInterval(checkState);
+                        clearTimeout(maxWait);
+                        resolve();
                     }
-                } else {
-                    clearInterval(stateInterval);
-                }
-            }, 1000);
+                }, 100);
+            });
+            
+            console.debug('Recording started successfully');
 
         } catch (error) {
-            console.error('Error starting recording:', error);
+            const errorContext = {
+                error: error instanceof Error ? error.message : error,
+                state: this.recordingState,
+                recorderState: this.recorder?.state,
+                audioContextState: this.audioContext?.state,
+                streamActive: this.stream?.active,
+                streamTracks: this.stream?.getTracks().map(t => ({
+                    kind: t.kind,
+                    enabled: t.enabled,
+                    muted: t.muted,
+                    readyState: t.readyState
+                }))
+            };
+            console.error('🚨 Error starting recording:', errorContext);
             this.recordingState = 'inactive';
             await this.cleanup();
             throw error;
@@ -268,10 +317,6 @@ export class AudioRecordingManager {
     }
 
     /**
-     * Stops recording with enhanced error handling and resource cleanup
-     * 🎯 Mobile-optimized with proper error handling and resource management
-     */
-    /**
      * Stops recording and retrieves the audio blob
      * 🎯 Enhanced with better error handling and iOS compatibility
      */
@@ -286,74 +331,101 @@ export class AudioRecordingManager {
             return this.recordingBackup;
         }
 
-        return new Promise<Blob | null>((resolve) => {
-            console.debug('Initiating recording stop...');
+        return new Promise<Blob | null>((resolve, reject) => {
+            console.debug('🎙️ Initiating recording stop:', {
+                currentState: this.recordingState,
+                recorderState: this.recorder?.state,
+                audioContextState: this.audioContext?.state,
+                streamActive: this.stream?.active
+            });
             
             // Set a timeout to prevent hanging
             const timeoutId = setTimeout(async () => {
-                console.warn('Recording stop timeout reached, using backup');
-                await this.cleanup();
-                resolve(this.recordingBackup);
+                console.warn('⚠️ Recording stop timeout reached:', {
+                    state: this.recordingState,
+                    recorderState: this.recorder?.state,
+                    audioContextState: this.audioContext?.state
+                });
+                reject(new Error('Recording stop timeout'));
             }, 5000);
 
             try {
-                // Save reference to current backup before stopping
-                const currentBackup = this.recordingBackup;
-
-                this.recorder!.stopRecording(async () => {
-                    try {
+                // Wait for recorder to finish any pending operations
+                const waitForInactive = setInterval(() => {
+                    console.debug('🔄 Waiting for recorder to become inactive:', {
+                        state: this.recorder?.state,
+                        recordingState: this.recordingState
+                    });
+                    if (this.recorder?.state === 'inactive') {
+                        console.debug('✅ Recorder is now inactive');
+                        clearInterval(waitForInactive);
                         clearTimeout(timeoutId);
-                        console.debug('Recording stopped, retrieving blob...');
-
-                        let blob: Blob | null = null;
-                        
-                        try {
-                            // Get the blob from recorder
-                            blob = this.recorder?.getBlob() || null;
-                            console.debug('Got blob:', blob?.size ?? 'null', 'bytes');
-
-                            if (!blob || blob.size === 0) {
-                                console.warn('Invalid blob, falling back to backup');
-                                blob = currentBackup; // Use the backup we saved before stopping
-                            } else {
-                                // Set metadata for valid blob
-                                Object.defineProperty(blob, 'name', {
-                                    value: `recording-${new Date().getTime()}.wav`,
-                                    writable: true
-                                });
-                            }
-                        } catch (error) {
-                            console.error('Error getting blob:', error);
-                            blob = currentBackup;
-                        }
-
-                        // Always cleanup after getting the blob
-                        await this.cleanup();
-                        
-                        if (!blob) {
-                            console.warn('No valid recording data available');
-                        }
-                        resolve(blob);
-                        
-                    } catch (error) {
-                        console.error('Error in stop callback:', error);
-                        await this.cleanup();
-                        resolve(currentBackup);
+                        this.getRecordingBlob().then(resolve).catch(reject);
                     }
+                }, 100);
+
+                // Stop the recording
+                console.debug('🛑 Calling stopRecording...');
+                this.recorder!.stopRecording(() => {
+                    console.debug('🎙️ StopRecording callback triggered');
+                    clearInterval(waitForInactive);
+                    clearTimeout(timeoutId);
+                    this.getRecordingBlob().then(resolve).catch(reject);
                 });
             } catch (error) {
-                console.error('Error stopping recording:', error);
                 clearTimeout(timeoutId);
-                this.cleanup();
-                resolve(this.recordingBackup);
+                reject(error);
             }
+        }).finally(async () => {
+            // Always cleanup after getting the blob
+            await this.cleanup();
         });
     }
 
     /**
-     * Cleans up recording resources with enhanced error handling
-     * 🧹 Aggressively cleans up resources to prevent memory leaks
+     * Gets the recording blob with proper error handling
      */
+    private async getRecordingBlob(): Promise<Blob> {
+        console.debug('🎙️ Getting recording blob...');
+        
+        if (!this.recorder) {
+            throw new Error('Recorder not available');
+        }
+
+        const blob = this.recorder.getBlob();
+        if (!blob) {
+            console.error('❌ No blob returned from recorder');
+            throw new Error('No recording data available');
+        }
+
+        console.debug('🎙️ Raw blob details:', {
+            size: blob.size,
+            type: blob.type,
+            state: this.recorder.state
+        });
+
+        if (blob.size === 0) {
+            console.error('❌ Empty recording blob:', {
+                recorderState: this.recorder.state,
+                audioContextState: this.audioContext?.state
+            });
+            throw new Error('Empty recording data');
+        }
+
+        // Create a File object instead of setting blob metadata
+        const file = new File([blob], `recording-${new Date().getTime()}.webm`, {
+            type: blob.type
+        });
+
+        console.debug('✅ Got valid recording file:', {
+            size: file.size,
+            type: file.type,
+            name: file.name
+        });
+
+        return file;
+    }
+
     /**
      * Cleans up recording resources with enhanced error handling
      * 🧹 Aggressively cleans up resources to prevent memory leaks
@@ -362,7 +434,12 @@ export class AudioRecordingManager {
         try {
             // Clean up recorder
             if (this.recorder) {
-                console.debug('Cleaning up recorder in state:', this.recorder.state);
+            console.debug('🧹 Starting cleanup. Current state:', {
+                recorderState: this.recorder?.state,
+                recordingState: this.recordingState,
+                audioContextState: this.audioContext?.state,
+                streamActive: this.stream?.active
+            });
                 try {
                     if (this.recorder.state !== 'inactive') {
                         this.recorder.stopRecording();

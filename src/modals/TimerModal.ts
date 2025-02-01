@@ -1,4 +1,4 @@
-import { App, Modal, Notice } from 'obsidian';
+import { App, Modal, Notice, Platform } from 'obsidian';
 import { AudioRecordingManager } from '../utils/RecordingManager';
 import { RecordingUI, RecordingState } from '../ui/RecordingUI';
 import { ConfirmationModal, ConfirmationResult } from './ConfirmationModal';
@@ -35,9 +35,6 @@ export class TimerModal extends Modal {
         this.setupCloseHandlers();
     }
 
-    /**
-     * Sets up handlers for modal closing via escape key and clicking outside
-     */
     /**
      * Sets up handlers for modal closing via escape key, clicks, and touch events
      * 📱 Enhanced with proper mobile touch handling
@@ -110,9 +107,6 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Initializes the modal and starts recording
-     */
-    /**
      * Initializes the modal with enhanced mobile support
      * 📱 Added mobile-specific meta tags and initialization
      */
@@ -158,10 +152,7 @@ export class TimerModal extends Modal {
      */
     private async initializeRecording(): Promise<void> {
         try {
-            await this.recordingManager.initialize({
-                isMobile: this.isMobileDevice(),
-                isIOS: this.isIOSDevice()
-            });
+            await this.recordingManager.initialize();
             await this.startRecording();
         } catch (error) {
             if (this.isIOSDevice() && error instanceof Error && error.name === 'NotAllowedError') {
@@ -173,17 +164,17 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Detects if current device is mobile
+     * Detects if current device is mobile using Obsidian's Platform API
      */
     private isMobileDevice(): boolean {
-        return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        return Platform.isMobile;
     }
 
     /**
-     * Detects if current device is iOS
+     * Detects if current device is iOS using Obsidian's Platform API
      */
     private isIOSDevice(): boolean {
-        return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        return Platform.isIosApp || (Platform.isMobile && /iPhone|iPad|iPod/i.test(navigator.userAgent));
     }
 
     /**

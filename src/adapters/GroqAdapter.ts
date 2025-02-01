@@ -17,7 +17,7 @@ export class GroqAdapter extends AIAdapter {
     }
 
     protected getApiBaseUrl(): string {
-        return 'https://api.groq.com/v1';
+        return 'https://api.groq.com/openai/v1';
     }
 
     protected getTextGenerationEndpoint(): string {

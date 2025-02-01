@@ -177,23 +177,96 @@ export class RecordingAccordion extends BaseAccordion {
     }
 
     public createTranscriptionModelSetting(): void {
-        new Setting(this.contentEl)
+        const setting = new Setting(this.contentEl)
             .setName("Transcription model")
-            .setDesc("Select the AI model for transcription")
-            .addDropdown(dropdown => {
-                this.modelDropdown = dropdown;
-                this.populateModelDropdown(dropdown);
-                
-                dropdown.setValue(this.settings.transcriptionModel)
-                    .onChange(async (value: string) => {
-                        this.settings.transcriptionModel = value;
-                        const provider = this.getProviderFromModel(value);
-                        if (provider) {
-                            this.settings.transcriptionProvider = provider;
-                            await this.plugin.saveSettings();
-                        }
-                    });
-            });
+            .setDesc("Select the AI model for transcription");
+
+        // Create a custom container for the dropdown
+        const dropdownContainer = setting.controlEl.createDiv('neurovox-dropdown-container');
+        
+        // Create a custom select element
+        const select = dropdownContainer.createEl('select', {
+            cls: 'neurovox-model-select',
+            attr: {
+                'aria-label': 'Select transcription model',
+                'touch-action': 'manipulation' // Improve touch handling
+            }
+        });
+
+        // Add mobile-specific styles
+        select.style.cssText = `
+            width: 100%;
+            padding: 8px;
+            font-size: 16px; /* Prevent iOS zoom on focus */
+            border: 1px solid var(--background-modifier-border);
+            border-radius: 4px;
+            background-color: var(--background-primary);
+            color: var(--text-normal);
+            cursor: pointer;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        `;
+
+        // Create and style the dropdown arrow
+        const arrow = dropdownContainer.createDiv('neurovox-select-arrow');
+        arrow.style.cssText = `
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 5px solid var(--text-normal);
+        `;
+
+        // Create a custom DropdownComponent implementation
+        this.modelDropdown = {
+            selectEl: select,
+            addOption: (value: string, display: string) => {
+                const option = select.createEl('option');
+                option.value = value;
+                option.text = display;
+                return this.modelDropdown;
+            },
+            addOptions: (options: Record<string, string>) => {
+                Object.entries(options).forEach(([value, display]) => {
+                    const option = select.createEl('option');
+                    option.value = value;
+                    option.text = display;
+                });
+                return this.modelDropdown;
+            },
+            getValue: () => select.value,
+            setValue: (value: string) => {
+                select.value = value;
+                return this.modelDropdown;
+            },
+            setDisabled: (disabled: boolean) => {
+                select.disabled = disabled;
+                return this.modelDropdown;
+            },
+            onChange: (callback: (value: string) => any) => {
+                select.addEventListener('change', () => callback(select.value));
+                return this.modelDropdown;
+            }
+        } as DropdownComponent;
+
+        // Populate and set initial value
+        this.populateModelDropdown(this.modelDropdown);
+        select.value = this.settings.transcriptionModel;
+
+        // Add change event listener
+        select.addEventListener('change', async () => {
+            const value = select.value;
+            this.settings.transcriptionModel = value;
+            const provider = this.getProviderFromModel(value);
+            if (provider) {
+                this.settings.transcriptionProvider = provider;
+                await this.plugin.saveSettings();
+            }
+        });
     }
 
     public populateModelDropdown(dropdown: DropdownComponent): void {
