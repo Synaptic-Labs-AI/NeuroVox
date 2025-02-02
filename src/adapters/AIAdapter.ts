@@ -16,15 +16,16 @@ export interface AIModel {
 export const AIModels: Record<AIProvider, AIModel[]> = {
     [AIProvider.OpenAI]: [
         { id: 'whisper-1', name: 'OpenAI', category: 'transcription' },
-        { id: 'gpt-4o', name: 'GPT 4o', category: 'language', maxTokens: 8192 },
-        { id: 'gpt-4o-mini', name: 'GPT 4o Mini', category: 'language', maxTokens: 4096 },
-        { id: 'o1-preview', name: 'o1 Preview', category: 'language', maxTokens: 2048 },
-        { id: 'o1-mini', name: 'o1 Mini', category: 'language', maxTokens: 1024 },
+        { id: 'gpt-4o', name: 'GPT 4o', category: 'language', maxTokens: 16000 },
+        { id: 'gpt-4o-mini', name: 'GPT 4o Mini', category: 'language', maxTokens: 16000 },
+        { id: 'o1-2024-12-17', name: 'o1', category: 'language', maxTokens: 100000 },
+        { id: 'o1-mini-2024-09-12', name: 'o1 Mini', category: 'language', maxTokens: 66000 },
+        { id: 'o3-mini-2025-31', name: 'o3 Mini', category: 'language', maxTokens: 100000 }
     ],
     [AIProvider.Groq]: [
         { id: 'distil-whisper-large-v3-en', name: 'Groq', category: 'transcription' },
         { id: 'gemma2-9b-it', name: 'Gemma 2 9B IT', category: 'language', maxTokens: 4096 },
-        { id: 'gemma-7b-it', name: 'Gemma 7B IT', category: 'language', maxTokens: 2048 },
+        { id: 'deepseek-r1-distill-llama-70b', name: 'r1', category: 'language', maxTokens: 8192 },
         { id: 'llama3-groq-70b-8192-tool-use-preview', name: 'Llama 3 Groq 70B Versatile', category: 'language', maxTokens: 8192 },
         { id: 'llama3-groq-8b-8192-tool-use-preview', name: 'Llama 3 Groq 8B Instant', category: 'language', maxTokens: 4096 },
         { id: 'llama-3.1-70b-versatile', name: 'Llama 3.1 70b', category: 'language', maxTokens: 8192 },

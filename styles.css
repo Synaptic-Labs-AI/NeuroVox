@@ -387,7 +387,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--neurovox-spacing-md);
+    padding: var(--neurovox-spacing-sm);
     background-color: var(--background-secondary-alt);
     cursor: pointer;
     border-bottom: 1px solid var(--background-modifier-border);
@@ -446,34 +446,6 @@
 
 .neurovox-setting-item:last-child {
     border-bottom: none;
-}
-
-/* Model Selection */
-.neurovox-model-select {
-    width: 100%;
-    background-color: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: var(--radius-s);
-    padding: var(--neurovox-spacing-xs) var(--neurovox-spacing-sm);
-    color: var(--text-normal);
-    transition: border-color var(--neurovox-transition-quick) ease;
-}
-
-.neurovox-model-select:hover,
-.neurovox-model-select:focus {
-    border-color: var(--interactive-accent);
-}
-
-.neurovox-model-group {
-    color: var(--text-muted);
-    font-size: var(--font-ui-smaller);
-    padding: var(--neurovox-spacing-xs) var(--neurovox-spacing-sm);
-}
-
-.neurovox-model-option {
-    color: var(--text-normal);
-    background-color: var(--background-primary);
-    padding: var(--neurovox-spacing-xs) var(--neurovox-spacing-sm);
 }
 
 /* Toggle Switch */

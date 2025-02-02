@@ -1,7 +1,6 @@
 import { App, Modal, Notice, Platform } from 'obsidian';
 import { AudioRecordingManager } from '../utils/RecordingManager';
 import { RecordingUI, RecordingState } from '../ui/RecordingUI';
-import { ConfirmationModal, ConfirmationResult } from './ConfirmationModal';
 
 interface TimerConfig {
     maxDuration: number;
@@ -239,32 +238,10 @@ export class TimerModal extends Modal {
             this.cleanup();
             super.close();
 
-            // Show confirmation modal
-            const confirmModal = new ConfirmationModal(this.app, {
-                title: 'Save Recording',
-                message: 'Would you like to save the audio file?',
-                confirmText: 'Save & Process',
-                processOnlyText: 'Process Only',
-                cancelText: 'Cancel'
-            });
-
-            confirmModal.open();
-            const result = await confirmModal.getResult();
-
-            switch (result) {
-                case ConfirmationResult.SaveAndProcess:
-                    if (this.onStop) {
-                        await this.onStop(blob, true);
-                    }
-                    break;
-                case ConfirmationResult.ProcessOnly:
-                    if (this.onStop) {
-                        await this.onStop(blob, false);
-                    }
-                    break;
-                case ConfirmationResult.Cancel:
-                    // Do nothing, just close
-                    break;
+            // Use the settings to determine whether to save
+            if (this.onStop) {
+                const settings = (this.app as any).plugins.plugins['neurovox'].settings;
+                await this.onStop(blob, settings.saveRecording);
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';

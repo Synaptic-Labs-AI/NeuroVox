@@ -2,8 +2,6 @@ import { Notice, TFile, EditorPosition, TFolder } from 'obsidian';
 import { AIProvider, AIAdapter } from '../adapters/AIAdapter';
 import { PluginData } from '../types';
 import NeuroVoxPlugin from '../main';
-import { ConfirmationModal, ConfirmationResult } from 'src/modals';
-
 /**
  * Represents a single step in the processing pipeline
  */

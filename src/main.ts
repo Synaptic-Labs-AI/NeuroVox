@@ -117,12 +117,41 @@ export default class NeuroVoxPlugin extends Plugin {
     public async initializePlugin(): Promise<void> {
         await this.loadPluginData();
         this.initializeAIAdapters();
+        await this.validateApiKeys();
         this.registerSettingsTab();
         this.registerCommands();
         this.registerEvents();
         
         this.recordingProcessor = RecordingProcessor.getInstance(this, this.pluginData);
         this.initializeUI();
+    }
+
+    private async validateApiKeys(): Promise<void> {
+        try {
+            // Set API keys from settings
+            const openaiAdapter = this.aiAdapters.get(AIProvider.OpenAI);
+            const groqAdapter = this.aiAdapters.get(AIProvider.Groq);
+
+            if (openaiAdapter) {
+                openaiAdapter.setApiKey(this.settings.openaiApiKey);
+                await openaiAdapter.validateApiKey();
+            }
+
+            if (groqAdapter) {
+                groqAdapter.setApiKey(this.settings.groqApiKey);
+                await groqAdapter.validateApiKey();
+            }
+
+            // Only show notice if validation fails
+            if (openaiAdapter && !openaiAdapter.isReady() && this.settings.openaiApiKey) {
+                new Notice('❌ OpenAI API key validation failed');
+            }
+            if (groqAdapter && !groqAdapter.isReady() && this.settings.groqApiKey) {
+                new Notice('❌ Groq API key validation failed');
+            }
+        } catch (error) {
+            console.error('API key validation error:', error);
+        }
     }
 
     public async loadPluginData(): Promise<void> {
