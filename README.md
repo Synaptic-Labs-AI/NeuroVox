@@ -37,17 +37,11 @@ If you need to obtain an OpenAI API key, follow the steps below:
     - On the API Keys page, click "Create new secret key."
 
 4. **Secure Your API Key**:
-    - Copy the newly generated API key into the "🔌 AI Provider Keys" accordion in the Neurovox Settings. Treat this key like a password and do not share it with anyone.
+    - Copy the newly generated API key into the `🔑 Api Keys` accordion in the Neurovox Settings. Treat this key like a password and do not share it with anyone.
 
 5. **Billing Information**:
     - You need to add billing information to your OpenAI account to make API calls.
     - Groq is currently free.
-
-## Roadmap
-- [ ] Allow users to customize the callouts (titles and collapsed/uncollapsed default)
-- [ ] Allow users to decide whether or not to keep the recording
-- [ ] Improve ability to transcribe videos
-- [ ] Add chunking of audio to do unlimited length and size files
 
 ## Contribution
 
