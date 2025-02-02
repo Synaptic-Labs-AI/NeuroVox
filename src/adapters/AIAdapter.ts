@@ -115,15 +115,6 @@ export abstract class AIAdapter {
                 );
                 return this.parseTranscriptionResponse(response);
             } catch (error: any) {
-                // Log detailed error information
-                console.error('🎙️ Transcription Error:', {
-                    endpoint,
-                    model,
-                    error: error?.message,
-                    response: error?.response?.data,
-                    status: error?.response?.status
-                });
-                
                 // Provide more specific error messages based on status codes
                 if (error?.response?.status === 400) {
                     throw new Error(`Invalid request format: ${error?.response?.data?.error?.message || 'Check audio format and model name'}`);
@@ -196,16 +187,6 @@ export abstract class AIAdapter {
                 ...headers
             };
 
-            // Debug log the request (excluding sensitive data)
-            console.log('🚀 Making API request:', {
-                endpoint,
-                method,
-                headers: Object.keys(requestHeaders),
-                bodyType: body instanceof ArrayBuffer ? 'ArrayBuffer' : typeof body,
-                bodySize: body instanceof ArrayBuffer ? body.byteLength : 
-                         typeof body === 'string' ? body.length : 0
-            });
-
             const response = await requestUrl({
                 url: endpoint,
                 method,
@@ -215,28 +196,11 @@ export abstract class AIAdapter {
             });
 
             if (!response.json) {
-                console.error('❌ Invalid response format:', response);
                 throw new Error('Invalid response format');
             }
 
-            // Debug log the response (excluding sensitive data)
-            console.log('✅ API response received:', {
-                status: response.status,
-                statusText: response.status.toString(),
-                headers: response.headers
-            });
-
             return response.json;
         } catch (error: any) {
-            // Enhanced error logging
-            console.error('❌ API request failed:', {
-                endpoint,
-                method,
-                error: error?.message,
-                status: error?.response?.status,
-                response: error?.response?.data,
-                headers: error?.response?.headers
-            });
             throw error;
         }
     }
@@ -248,13 +212,6 @@ export abstract class AIAdapter {
         // Simple boundary without special characters
         const boundary = 'boundary';
         const encoder = new TextEncoder();
-        
-        // Debug log the request details
-        console.log('🎙️ Preparing transcription request:', {
-            model,
-            audioSize: audioArrayBuffer.byteLength,
-            boundary
-        });
         
         const parts: Uint8Array[] = [];
         

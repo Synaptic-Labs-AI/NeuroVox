@@ -150,7 +150,6 @@ export default class NeuroVoxPlugin extends Plugin {
                 new Notice('❌ Groq API key validation failed');
             }
         } catch (error) {
-            console.error('API key validation error:', error);
         }
     }
 

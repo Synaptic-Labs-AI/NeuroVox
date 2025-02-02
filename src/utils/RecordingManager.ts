@@ -57,7 +57,6 @@ export class AudioRecordingManager {
             });
             this.recorder = new RecordRTC(this.stream, this.AUDIO_CONFIG);
         } catch (error) {
-            console.error('Failed to initialize audio recorder:', error);
             throw new Error('Failed to access microphone');
         }
     }
@@ -107,7 +106,6 @@ export class AudioRecordingManager {
             try {
                 this.recorder.destroy();
             } catch (error) {
-                console.warn('Error destroying audio recorder:', error);
             }
             this.recorder = null;
         }
@@ -116,7 +114,6 @@ export class AudioRecordingManager {
             try {
                 this.stream.getTracks().forEach(track => track.stop());
             } catch (error) {
-                console.warn('Error stopping audio tracks:', error);
             }
             this.stream = null;
         }

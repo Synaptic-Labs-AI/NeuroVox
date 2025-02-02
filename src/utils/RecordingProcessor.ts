@@ -213,7 +213,6 @@ export class RecordingProcessor {
             return chunks;
             
         } catch (error) {
-            console.error('Error splitting audio:', error);
             // If splitting fails, return the original blob as a single chunk
             return [audioBlob];
         }
@@ -412,7 +411,6 @@ export class RecordingProcessor {
                     
                     processedChunks.push(processedData);
                 } catch (error) {
-                    console.error('Error processing chunk:', error);
                     // If we can't process, use the original chunk
                     processedChunks.push(chunk);
                 }
@@ -425,7 +423,6 @@ export class RecordingProcessor {
             return new Blob(processedChunks, { type: firstChunk.type });
             
         } catch (error) {
-            console.error('Error in concatenateAudioChunks:', error);
             // Fallback: return the first chunk if concatenation fails
             return chunks[0];
         }
@@ -463,7 +460,6 @@ export class RecordingProcessor {
                 
                 new Notice(`Processing chunk ${i + 1} of ${chunks.length}`);
             } catch (error) {
-                console.error('Error processing chunk:', error);
             }
         }
 
@@ -481,7 +477,6 @@ export class RecordingProcessor {
                         try {
                             await this.plugin.app.vault.adapter.remove(chunkPath);
                         } catch (error) {
-                            console.error('Error removing chunk file:', error);
                         }
                     }
                 }
@@ -500,7 +495,6 @@ export class RecordingProcessor {
                 await this.insertResults(finalResult, activeFile, cursorPosition);
                 
             } catch (error) {
-                console.error('Error concatenating audio:', error);
                 // Fallback: use the original insertAggregatedResults if concatenation fails
                 await this.insertAggregatedResults(allResults, activeFile, cursorPosition);
             }
