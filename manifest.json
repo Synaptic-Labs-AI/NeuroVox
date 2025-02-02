@@ -1,7 +1,7 @@
 {
 	"id": "neurovox",
 	"name": "NeuroVox",
-	"version": "0.1.6",
+	"version": "0.2.0",
 	"minAppVersion": "0.15.0",
 	"description": "Enhances your note-taking with voice transcription and AI capabilities",
 	"author": "Synaptic Labs",
