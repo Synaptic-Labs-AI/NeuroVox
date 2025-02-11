@@ -23,7 +23,8 @@ export const AIModels: Record<AIProvider, AIModel[]> = {
         { id: 'o3-mini-2025-31', name: 'o3 Mini', category: 'language', maxTokens: 100000 }
     ],
     [AIProvider.Groq]: [
-        { id: 'distil-whisper-large-v3-en', name: 'Groq', category: 'transcription' },
+        { id: 'distil-whisper-large-v3-en', name: 'Groq English', category: 'transcription' },
+		{ id: 'whisper-large-v3-turbo', name: 'Groq Multilanguage', category: 'transcription' },
         { id: 'gemma2-9b-it', name: 'Gemma 2 9B IT', category: 'language', maxTokens: 4096 },
         { id: 'deepseek-r1-distill-llama-70b', name: 'r1', category: 'language', maxTokens: 8192 },
         { id: 'llama3-groq-70b-8192-tool-use-preview', name: 'Llama 3 Groq 70B Versatile', category: 'language', maxTokens: 8192 },
