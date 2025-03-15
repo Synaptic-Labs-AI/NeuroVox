@@ -74,8 +74,8 @@ export class RecordingProcessor {
     public static getInstance(plugin: NeuroVoxPlugin, pluginData: PluginData): RecordingProcessor {
         return this.instance ??= new RecordingProcessor(plugin, pluginData);
     }
-
-    private async saveState(): Promise<void> {
+// taking this function out and replacing it rewritten further below
+/*    private async saveState(): Promise<void> {
         try {
             const state = {
                 ...this.processingState,
@@ -85,7 +85,18 @@ export class RecordingProcessor {
         } catch (error) {
         }
     }
-
+*/
+// replaced by this on 15Mar25
+// just has finer targeting of what is saved and where; so it doesn't overwrite settings
+// I'm not sure if the audioBlob can be 'undefined' or 'void.0'; but this seems to work 
+private async saveState(): Promise<void>  {
+    try {
+        this.pluginData.processingState = { ...this.processingState, audioBlob: void.0 };
+        await this.plugin.saveData(this.pluginData);
+    } catch (error) {
+    }
+  }
+// end of change
     private async loadState(): Promise<void> {
         try {
             const state = await this.plugin.loadData();
