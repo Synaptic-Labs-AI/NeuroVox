@@ -47,12 +47,15 @@ export class DocumentInserter {
 
     /**
      * Formats lines based on whether callout syntax is being used
+     * Ensures we don't double up on '>' characters
      */
     private formatLines(content: string, useCallout: boolean): string {
         return content.split('\n')
             .map(line => {
                 if (!useCallout) return line;
-                return line.trim() ? `>${line}` : '>'; // Only add '>' if using callout format
+                if (!line.trim()) return '>'; // Empty lines just get a single '>'
+                // If line already starts with '>', return as is, otherwise add '>'
+                return line.startsWith('>') ? line : `>${line}`;
             })
             .join('\n');
     }
