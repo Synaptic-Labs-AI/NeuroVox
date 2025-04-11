@@ -101,6 +101,9 @@ export class RecordingAccordion extends BaseAccordion {
                         this.settings.showFloatingButton = value;
                         await this.plugin.saveSettings();
                         
+                        // Emit an event for the floating button setting change
+                        this.plugin.events.trigger('floating-button-setting-changed', value);
+                        
                         // Refresh the settings display to show/hide modal toggle
                         this.refresh();
                     });

@@ -1,9 +1,8 @@
 // src/ui/FloatingButton.ts
 
 import { MarkdownView, Notice, setIcon } from 'obsidian';
-import NeuroVoxPlugin from '../main';
 import { ButtonPositionManager } from '../utils/ButtonPositionManager';
-import { PluginData, Position } from '../types'; // Import PluginData and Position
+import { NeuroVoxPlugin, PluginData, Position } from '../types'; // Import NeuroVoxPlugin interface
 import { AudioRecordingManager } from '../utils/RecordingManager';
 import { RecordingProcessor } from '../utils/RecordingProcessor';
 
@@ -155,7 +154,7 @@ export class FloatingButton {
 
     public async handleDragEnd(position: Position): Promise<void> {
         this.pluginData.buttonPosition = position; // Directly update pluginData
-        await this.plugin.savePluginData(); // Save all data
+        await this.plugin.saveSettings(); // Save all data
     }
 
     public async setInitialPosition(): Promise<void> {
@@ -198,7 +197,7 @@ export class FloatingButton {
                 this.positionManager.setPosition(x, y, true);
                 // Save default position to pluginData
                 this.pluginData.buttonPosition = { x, y };
-                this.plugin.savePluginData();
+                this.plugin.saveSettings();
             }
         });
     }
@@ -261,32 +260,38 @@ export class FloatingButton {
             return;
         }
 
-        // Only remove other floating buttons, not our own
+        // Remove all existing floating buttons from this view
         const existingButtons = viewContent.querySelectorAll('.neurovox-button-container');
         existingButtons.forEach(el => {
-            if (el !== this.containerEl && el.parentNode === viewContent) {
+            if (el !== this.containerEl) {
                 el.remove();
             }
         });
 
-        // Only move our container if it's not already in the right place
+        // Create and attach our container if needed
+        if (!this.containerEl) {
+            this.createContainer();
+            this.createButton();
+        }
+
+        // Always attach to the current view content
         if (this.containerEl && this.containerEl.parentNode !== viewContent) {
             // Remove from old parent if needed
             if (this.containerEl.parentNode) {
                 this.containerEl.remove();
             }
-            // Update container and reattach
-            this.updateActiveContainer(viewContent);
-        } else if (!this.containerEl) {
-            // If we don't have a container, create and attach it
-            this.createContainer();
-            this.createButton();
-            this.updateActiveContainer(viewContent);
+            viewContent.appendChild(this.containerEl);
         }
 
-        // Show the button if it should be visible
-        if (this.pluginData.showFloatingButton) {
+        // Initialize position manager
+        this.activeLeafContainer = viewContent;
+        this.initializePositionManager();
+
+        // Only show the button if the setting is enabled
+        if (this.plugin.settings.showFloatingButton) {
             this.show();
+        } else {
+            this.hide();
         }
     }
 
@@ -305,9 +310,12 @@ export class FloatingButton {
         }
         this.resizeObserver?.observe(newContainer);
 
-        if (this.pluginData.showFloatingButton) {
+        // Always initialize position manager
+        this.initializePositionManager();
+        
+        // Only show the button if the setting is enabled
+        if (this.plugin.settings.showFloatingButton) {
             this.show();
-            this.initializePositionManager();
         } else {
             this.hide();
         }
@@ -327,7 +335,7 @@ export class FloatingButton {
     }
 
     public show(): void {
-        if (!this.containerEl || !this.pluginData.showFloatingButton) return;
+        if (!this.containerEl) return;
         
         this.containerEl.style.display = 'block';
         requestAnimationFrame(() => {

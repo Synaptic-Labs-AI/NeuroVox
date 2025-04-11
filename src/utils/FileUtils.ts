@@ -5,7 +5,7 @@ import { NeuroVoxSettings } from '../settings/Settings';
  * Ensures that the directory exists, creating it if necessary
  * @returns The normalized folder path
  */
-async function ensureDirectoryExists(app: App, folderPath: string): Promise<string> {
+export async function ensureDirectoryExists(app: App, folderPath: string): Promise<string> {
     // Normalize the path and remove any leading/trailing slashes
     const normalizedPath = folderPath.replace(/^\/+|\/+$/g, '');
     

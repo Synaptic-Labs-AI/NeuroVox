@@ -1,14 +1,15 @@
-import { 
-    Plugin, 
-    Notice, 
-    TFile,  
-    MarkdownView, 
-    TAbstractFile, 
+import {
+    Plugin,
+    Notice,
+    TFile,
+    MarkdownView,
+    TAbstractFile,
     WorkspaceLeaf,
     normalizePath,
     FuzzySuggestModal,
     App,
-    FuzzyMatch
+    FuzzyMatch,
+    Events
 } from 'obsidian';
 import { VideoProcessor } from './utils/VideoProcessor';
 import { DEFAULT_SETTINGS, NeuroVoxSettings } from './settings/Settings';
@@ -98,32 +99,112 @@ class AudioFileSuggestModal extends FuzzySuggestModal<TFile> {
 export default class NeuroVoxPlugin extends Plugin {
     settings: NeuroVoxSettings;
     public aiAdapters: Map<AIProvider, AIAdapter>;
-    public pluginData: PluginData;
     
     private buttonMap: Map<string, FloatingButton> = new Map();
     toolbarButton: ToolbarButton | null = null;
     public activeLeaf: WorkspaceLeaf | null = null;
     settingTab: NeuroVoxSettingTab | null = null;
 
+    // Custom events emitter
+    public events = new Events();
+
     public recordingProcessor: RecordingProcessor;
 
     async onload(): Promise<void> {
         try {
-            await this.initializePlugin();
+            // First load settings
+            await this.loadSettings();
+            
+            // Then initialize everything that depends on settings
+            this.initializeAIAdapters();
+            await this.validateApiKeys();
+            this.registerSettingsTab();
+            this.registerCommands();
+            this.registerEvents();
+            
+            this.recordingProcessor = RecordingProcessor.getInstance(this);
+            this.initializeUI();
+            
+            // Register event listener for floating button setting changes and trigger initial state
+            this.registerFloatingButtonEvents();
+            
+            // Trigger initial state
+            this.events.trigger('floating-button-setting-changed', this.settings.showFloatingButton);
         } catch (error) {
+            console.error("Failed to load plugin:", error);
+            new Notice("Failed to initialize NeuroVox plugin");
+        }
+    }
+    
+    /**
+     * Register event listeners for floating button setting changes
+     */
+    private registerFloatingButtonEvents(): void {
+        // Listen for floating button setting changes
+        this.events.on('floating-button-setting-changed', (isEnabled: boolean) => {
+            console.log(`Floating button setting changed to: ${isEnabled}`);
+            
+            // Always clean up existing buttons first
+            this.cleanupUI();
+            
+            if (isEnabled) {
+                // If setting is turned ON, create a button for the active file
+                const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (activeView?.file) {
+                    this.createButtonForFile(activeView.file);
+                }
+            }
+            // If setting is OFF, we've already cleaned up all buttons
+        });
+    }
+
+    /**
+     * Load plugin settings with proper fallback to defaults and validation
+     */
+    public async loadSettings(): Promise<void> {
+        try {
+            console.log("Loading NeuroVox settings...");
+            const data = await this.loadData();
+            
+            // Start with a deep copy of defaults
+            this.settings = { ...DEFAULT_SETTINGS };
+            
+            // Only override with saved settings if data exists and isn't null
+            if (data && typeof data === 'object') {
+                // Safely merge saved settings with defaults
+                Object.keys(DEFAULT_SETTINGS).forEach(key => {
+                    if (key in data) {
+                        (this.settings as any)[key] = (data as any)[key];
+                    }
+                });
+                console.log("Settings loaded successfully");
+            } else {
+                console.log("No saved settings found, using defaults");
+            }
+        } catch (error) {
+            console.error("Failed to load settings:", error);
+            this.settings = { ...DEFAULT_SETTINGS };
+            new Notice("Failed to load NeuroVox settings. Using defaults.");
         }
     }
 
-    public async initializePlugin(): Promise<void> {
-        await this.loadPluginData();
-        this.initializeAIAdapters();
-        await this.validateApiKeys();
-        this.registerSettingsTab();
-        this.registerCommands();
-        this.registerEvents();
-        
-        this.recordingProcessor = RecordingProcessor.getInstance(this);
-        this.initializeUI();
+    /**
+     * Save settings to plugin data storage
+     */
+    public async saveSettings(): Promise<void> {
+        try {
+            console.log("Saving NeuroVox settings...", this.settings);
+            await this.saveData(this.settings);
+            this.initializeUI();
+            
+            // Trigger the floating button setting changed event to ensure UI is in sync
+            this.events.trigger('floating-button-setting-changed', this.settings.showFloatingButton);
+            
+            console.log("Settings saved successfully");
+        } catch (error) {
+            console.error("Failed to save settings:", error);
+            new Notice("Failed to save NeuroVox settings");
+        }
     }
 
     private async validateApiKeys(): Promise<void> {
@@ -150,40 +231,22 @@ export default class NeuroVoxPlugin extends Plugin {
                 new Notice('❌ Groq API key validation failed');
             }
         } catch (error) {
+            console.error("API key validation failed:", error);
         }
-    }
-
-    public async loadPluginData(): Promise<void> {
-        const data = await this.loadData();
-        if (data) {
-            // Create a new object with all default settings
-            const mergedData = { ...DEFAULT_SETTINGS };
-            
-            // Override with any saved settings
-            for (const key in data) {
-                if (data.hasOwnProperty(key)) {
-                    (mergedData as any)[key] = (data as any)[key];
-                }
-            }
-            
-            this.pluginData = mergedData;
-        } else {
-            this.pluginData = { ...DEFAULT_SETTINGS };
-        }
-        this.settings = this.pluginData;
-    }
-
-    public async savePluginData(): Promise<void> {
-        await this.saveData(this.pluginData);
     }
 
     public initializeAIAdapters(): void {
-        const adapters: Array<[AIProvider, AIAdapter]> = [
-            [AIProvider.OpenAI, new OpenAIAdapter(this.pluginData)],
-            [AIProvider.Groq, new GroqAdapter(this.pluginData)]
-        ];
-        
-        this.aiAdapters = new Map<AIProvider, AIAdapter>(adapters);
+        try {
+            const adapters: Array<[AIProvider, AIAdapter]> = [
+                [AIProvider.OpenAI, new OpenAIAdapter(this.settings)],
+                [AIProvider.Groq, new GroqAdapter(this.settings)]
+            ];
+            
+            this.aiAdapters = new Map<AIProvider, AIAdapter>(adapters);
+        } catch (error) {
+            console.error("Failed to initialize AI adapters:", error);
+            throw new Error("Failed to initialize AI adapters");
+        }
     }
 
     public registerSettingsTab(): void {
@@ -266,18 +329,18 @@ export default class NeuroVoxPlugin extends Plugin {
 
     public async processExistingAudioFile(file: TFile): Promise<void> {
         try {
-            const adapter = this.aiAdapters.get(this.pluginData.transcriptionProvider);
+            const adapter = this.aiAdapters.get(this.settings.transcriptionProvider);
             if (!adapter) {
-                throw new Error(`Transcription provider ${this.pluginData.transcriptionProvider} not found`);
+                throw new Error(`Transcription provider ${this.settings.transcriptionProvider} not found`);
             }
 
             if (!adapter.getApiKey()) {
-                throw new Error(`API key not set for ${this.pluginData.transcriptionProvider}`);
+                throw new Error(`API key not set for ${this.settings.transcriptionProvider}`);
             }
 
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
             const sanitizedName = file.basename.replace(/[\\/:*?"<>|]/g, '');
-            const transcriptsFolder = 'Transcripts';
+            const transcriptsFolder = this.settings.transcriptFolderPath || 'Transcripts';
             const baseFileName = `${transcriptsFolder}/${timestamp}-${sanitizedName}.md`;
             let newFileName = baseFileName;
             let count = 1;
@@ -288,7 +351,7 @@ export default class NeuroVoxPlugin extends Plugin {
             }
 
             while (await this.app.vault.adapter.exists(newFileName)) {
-                newFileName = `Transcripts/${timestamp}-${sanitizedName}-${count}.md`;
+                newFileName = `${transcriptsFolder}/${timestamp}-${sanitizedName}-${count}.md`;
                 count++;
             }
 
@@ -358,21 +421,31 @@ export default class NeuroVoxPlugin extends Plugin {
     public handleActiveLeafChange(leaf: WorkspaceLeaf | null): void {
         this.activeLeaf = leaf;
         
+        // Always clean up existing buttons
         this.buttonMap.forEach((button, path) => {
             button.remove();
         });
         this.buttonMap.clear();
         
-        if (leaf?.view instanceof MarkdownView && leaf.view.file) {
+        // Only create a new button if the setting is enabled
+        if (this.settings.showFloatingButton && leaf?.view instanceof MarkdownView && leaf.view.file) {
             this.createButtonForFile(leaf.view.file);
         }
     }
 
     public handleLayoutChange(): void {
-        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (activeView?.file) {
-            const button = this.buttonMap.get(activeView.file.path);
-            button?.show();
+        // Only show buttons if the setting is enabled
+        if (this.settings.showFloatingButton) {
+            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (activeView?.file) {
+                const button = this.buttonMap.get(activeView.file.path);
+                if (button) {
+                    button.show();
+                } else {
+                    // Create a button if it doesn't exist
+                    this.createButtonForFile(activeView.file);
+                }
+            }
         }
     }
 
@@ -389,13 +462,13 @@ export default class NeuroVoxPlugin extends Plugin {
     public initializeUI(): void {
         this.cleanupUI();
     
-        if (this.pluginData.showToolbarButton) {
-            this.toolbarButton = new ToolbarButton(this, this.pluginData);
+        if (this.settings.showToolbarButton) {
+            this.toolbarButton = new ToolbarButton(this, this.settings);
         }
     }
     
     private createButtonForFile(file: TFile): void {
-        if (!this.pluginData.showFloatingButton) return;
+        // The decision to create a button should be made by the caller
         
         const existingButton = this.buttonMap.get(file.path);
         if (existingButton) {
@@ -405,7 +478,7 @@ export default class NeuroVoxPlugin extends Plugin {
         
         const button = new FloatingButton(
             this,
-            this.pluginData,
+            this.settings,
             () => this.handleRecordingStart()
         );
         
@@ -437,19 +510,19 @@ export default class NeuroVoxPlugin extends Plugin {
             return;
         }
     
-        if (this.pluginData.useRecordingModal) {
+        if (this.settings.useRecordingModal) {
             if (this.modalInstance) return;
             
             this.modalInstance = new TimerModal(this.app);
             this.modalInstance.onStop = async (audioBlob: Blob) => {
                 try {
-                    const adapter = this.aiAdapters.get(this.pluginData.transcriptionProvider);
+                    const adapter = this.aiAdapters.get(this.settings.transcriptionProvider);
                     if (!adapter) {
-                        throw new Error(`Transcription provider ${this.pluginData.transcriptionProvider} not found`);
+                        throw new Error(`Transcription provider ${this.settings.transcriptionProvider} not found`);
                     }
 
                     if (!adapter.getApiKey()) {
-                        throw new Error(`API key not set for ${this.pluginData.transcriptionProvider}`);
+                        throw new Error(`API key not set for ${this.settings.transcriptionProvider}`);
                     }
 
                     await this.recordingProcessor.processRecording(
@@ -476,20 +549,27 @@ export default class NeuroVoxPlugin extends Plugin {
         }
     }
 
-    public async saveSettings(): Promise<void> {
-        await this.savePluginData();
-        this.initializeUI();
-    }
-
     public updateAllButtonColors(): void {
         this.buttonMap.forEach(button => {
             button.updateButtonColor();
         });
     }
-
+    
+    /**
+     * Refreshes all floating buttons based on current settings
+     * This ensures UI is in sync with settings when they change
+     */
+    public refreshFloatingButtons(): void {
+        // Trigger the floating button setting changed event
+        // This will use the same event handler as the toggle button
+        this.events.trigger('floating-button-setting-changed', this.settings.showFloatingButton);
+    }
 
     onunload() {
-        this.savePluginData();
+        // Make sure to save settings on plugin unload
+        this.saveSettings().catch(error => {
+            console.error("Failed to save settings on unload:", error);
+        });
         this.cleanupUI();
     }
 }
