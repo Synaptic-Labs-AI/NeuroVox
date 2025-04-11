@@ -52,16 +52,12 @@ export class RecordingProcessor {
         cursorPosition: EditorPosition,
         audioFilePath?: string
     ): Promise<void> {
-        await this.loadState();
-
         if (this.processingState.getIsProcessing()) {
             throw new Error('Recording is already in progress.');
         }
 
         try {
             this.processingState.setIsProcessing(true);
-            await this.saveState();
-
             this.processingState.reset();
             
             // Process the audio file
@@ -101,11 +97,9 @@ export class RecordingProcessor {
         } catch (error) {
             this.handleError('Processing failed', error);
             this.processingState.setError(error as Error);
-            await this.saveState();
             throw error;
         } finally {
             this.processingState.setIsProcessing(false);
-            await this.saveState();
         }
     }
 
@@ -124,31 +118,6 @@ export class RecordingProcessor {
                 return this.executeWithRetry(operation, retryCount + 1);
             }
             throw error;
-        }
-    }
-
-    /**
-     * Saves the current processing state
-     */
-    private async saveState(): Promise<void> {
-        try {
-            await this.plugin.saveData(this.processingState.toJSON());
-        } catch (error) {
-            console.error("Failed to save processing state:", error);
-        }
-    }
-
-    /**
-     * Loads the processing state
-     */
-    private async loadState(): Promise<void> {
-        try {
-            const state = await this.plugin.loadData();
-            if (state) {
-                this.processingState.fromJSON(state);
-            }
-        } catch (error) {
-            console.error("Failed to load processing state:", error);
         }
     }
 
