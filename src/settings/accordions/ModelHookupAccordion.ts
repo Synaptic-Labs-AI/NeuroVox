@@ -6,11 +6,11 @@ import { Setting } from "obsidian";
 import { AIProvider } from "../../adapters/AIAdapter";
 import NeuroVoxPlugin from "../../main";
 import { RecordingAccordion } from "./RecordingAccordion";
-import { SummaryAccordion } from "./SummaryAccordion";
+import { PostProcessingAccordion } from "./PostProcessingAccordion";
 
 export class ModelHookupAccordion extends BaseAccordion {
     private recordingAccordion!: RecordingAccordion;
-    private summaryAccordion!: SummaryAccordion;
+    private postProcessingAccordion!: PostProcessingAccordion;
 
     constructor(
         containerEl: HTMLElement,
@@ -25,15 +25,15 @@ export class ModelHookupAccordion extends BaseAccordion {
         );
     }
 
-    setAccordions(recording: RecordingAccordion, summary: SummaryAccordion): void {
+    setAccordions(recording: RecordingAccordion, postProcessing: PostProcessingAccordion): void {
         this.recordingAccordion = recording;
-        this.summaryAccordion = summary;
+        this.postProcessingAccordion = postProcessing;
     }
 
     private async refreshAccordions(): Promise<void> {
         await Promise.all([
             this.recordingAccordion.refresh(),
-            this.summaryAccordion.refresh()
+            this.postProcessingAccordion.refresh()
         ]);
     }
 

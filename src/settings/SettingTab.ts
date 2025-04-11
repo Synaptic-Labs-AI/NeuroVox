@@ -3,14 +3,14 @@
 import { App, PluginSettingTab } from 'obsidian';
 import { ModelHookupAccordion } from './accordions/ModelHookupAccordion';
 import { RecordingAccordion } from './accordions/RecordingAccordion';
-import { SummaryAccordion } from './accordions/SummaryAccordion';
+import { PostProcessingAccordion } from './accordions/PostProcessingAccordion';
 import { AIProvider } from '../adapters/AIAdapter';
 import NeuroVoxPlugin from '../main';
 
 export class NeuroVoxSettingTab extends PluginSettingTab {
     plugin: NeuroVoxPlugin;
     private recordingAccordion: RecordingAccordion | null = null;
-    private summaryAccordion: SummaryAccordion | null = null;
+    private postProcessingAccordion: PostProcessingAccordion | null = null;
 
     constructor(app: App, plugin: NeuroVoxPlugin) {
         super(app, plugin);
@@ -24,9 +24,9 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
         // Create all containers first, in the desired display order
         const modelHookupContainer = containerEl.createDiv();
         const recordingContainer = containerEl.createDiv();
-        const summaryContainer = containerEl.createDiv();
+        const postProcessingContainer = containerEl.createDiv();
 
-        // Create Recording and Summary accordions first
+        // Create Recording and Post-Processing accordions first
         this.recordingAccordion = new RecordingAccordion(
             recordingContainer,
             this.plugin.settings,
@@ -34,8 +34,8 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
             this.plugin
         );
         
-        this.summaryAccordion = new SummaryAccordion(
-            summaryContainer,
+        this.postProcessingAccordion = new PostProcessingAccordion(
+            postProcessingContainer,
             this.plugin.settings,
             (provider: AIProvider) => this.plugin.aiAdapters.get(provider)!,
             this.plugin
@@ -50,19 +50,19 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
         );
 
         // Set the accordions now that they're properly initialized
-        modelHookupAccordion.setAccordions(this.recordingAccordion, this.summaryAccordion);
+        modelHookupAccordion.setAccordions(this.recordingAccordion, this.postProcessingAccordion);
 
         // Render all accordions in order
         modelHookupAccordion.render();
         this.recordingAccordion.render();
-        this.summaryAccordion.render();
+        this.postProcessingAccordion.render();
     }
 
     getRecordingAccordion(): RecordingAccordion | null {
         return this.recordingAccordion;
     }
 
-    getSummaryAccordion(): SummaryAccordion | null {
-        return this.summaryAccordion;
+    getPostProcessingAccordion(): PostProcessingAccordion | null {
+        return this.postProcessingAccordion;
     }
 }

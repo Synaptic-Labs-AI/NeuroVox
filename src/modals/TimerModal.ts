@@ -26,7 +26,7 @@ export class TimerModal extends Modal {
         updateInterval: 1000
     };
 
-    public onStop: (audioBlob: Blob, shouldSave: boolean) => void;
+    public onStop: (audioBlob: Blob) => void;
 
     constructor(app: App) {
         super(app);
@@ -238,10 +238,9 @@ export class TimerModal extends Modal {
             this.cleanup();
             super.close();
 
-            // Use the settings to determine whether to save
+            // Always save the recording
             if (this.onStop) {
-                const settings = (this.app as any).plugins.plugins['neurovox'].settings;
-                await this.onStop(blob, settings.saveRecording);
+                await this.onStop(blob);
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';

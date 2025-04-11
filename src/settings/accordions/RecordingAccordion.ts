@@ -1,13 +1,14 @@
 // src/settings/accordions/RecordingAccordion.ts
 
 import { BaseAccordion } from "./BaseAccordion";
-import { NeuroVoxSettings } from "../Settings";
+import { NeuroVoxSettings, AudioQuality } from "../Settings";
 import { Setting, DropdownComponent } from "obsidian";
 import { AIAdapter, AIProvider, AIModels } from "../../adapters/AIAdapter";
 import NeuroVoxPlugin from "../../main";
 
 export class RecordingAccordion extends BaseAccordion {
-    public modelDropdown!: DropdownComponent;
+    private modelDropdown: DropdownComponent | null = null;
+    private modelSetting: Setting | null = null;
 
     constructor(
         containerEl: HTMLElement,
@@ -22,15 +23,14 @@ export class RecordingAccordion extends BaseAccordion {
         // Recording Path
         this.createRecordingPathSetting();
         
-        // Save Recording Toggle
-        this.createSaveRecordingSetting();
+        // Transcript Path
+        this.createTranscriptPathSetting();
+
+        // Audio Quality Setting
+        this.createAudioQualitySetting();
         
         // Floating Button Toggle
         this.createFloatingButtonSetting();
-
-        if (this.settings.showFloatingButton) {
-            this.createModalToggleSetting();
-        }
         
         // Toolbar Button Toggle
         this.createToolbarButtonSetting();
@@ -43,6 +43,20 @@ export class RecordingAccordion extends BaseAccordion {
 
         // Transcription Model Selection
         this.createTranscriptionModelSetting();
+    }
+
+    public createTranscriptPathSetting(): void {
+        new Setting(this.contentEl)
+            .setName("Transcript path")
+            .setDesc('Specify the folder path to save transcripts relative to the vault root')
+            .addText(text => {
+                text.setPlaceholder("Transcripts")
+                    .setValue(this.settings.transcriptFolderPath)
+                    .onChange(async (value: string) => {
+                        this.settings.transcriptFolderPath = value.trim() || "Transcripts";
+                        await this.plugin.saveSettings();
+                    });
+            });
     }
 
     public createRecordingPathSetting(): void {
@@ -59,15 +73,18 @@ export class RecordingAccordion extends BaseAccordion {
             });
     }
 
-    public createSaveRecordingSetting(): void {
+    public createAudioQualitySetting(): void {
         new Setting(this.contentEl)
-            .setName("Save recording")
-            .setDesc("Save the audio file after recording")
-            .addToggle(toggle => {
-                toggle
-                    .setValue(this.settings.saveRecording)
-                    .onChange(async (value: boolean) => {
-                        this.settings.saveRecording = value;
+            .setName("Audio quality")
+            .setDesc("Set the recording quality (affects file size and clarity)")
+            .addDropdown(dropdown => {
+                dropdown
+                    .addOption(AudioQuality.Low, "Voice optimized (smaller files)")
+                    .addOption(AudioQuality.Medium, "CD quality (balanced)")
+                    .addOption(AudioQuality.High, "Enhanced quality (larger files)")
+                    .setValue(this.settings.audioQuality)
+                    .onChange(async (value: string) => {
+                        this.settings.audioQuality = value as AudioQuality;
                         await this.plugin.saveSettings();
                     });
             });
@@ -90,32 +107,16 @@ export class RecordingAccordion extends BaseAccordion {
             });
     }
 
-    public createModalToggleSetting(): void {
-        const modalToggleSetting = new Setting(this.contentEl)
-            .setName("Use recording modal")
-            .setDesc("When enabled, shows a modal with controls. When disabled, use direct recording through the mic button.")
-            .setClass('neurovox-modal-toggle-setting')
-            .addToggle(toggle => {
-                toggle
-                    .setValue(this.settings.useRecordingModal)
-                    .onChange(async (value) => {
-                        this.settings.useRecordingModal = value;
-                        await this.plugin.saveSettings();
-                    });
-            });
-
-        // Add some indentation to show it's related to the floating button
-        modalToggleSetting.settingEl.style.paddingLeft = '2em';
-        modalToggleSetting.settingEl.style.borderLeft = '2px solid var(--background-modifier-border)';
-    }
-
-    /**
-     * Refreshes the accordion content
-     */
-    public refresh(): void {
-        const { contentEl } = this;
-        contentEl.empty();
-        this.render();
+    public async refresh(): Promise<void> {
+        try {
+            if (!this.modelDropdown) {
+                return;
+            }
+            
+            await this.setupModelDropdown(this.modelDropdown);
+        } catch (error) {
+            throw error;
+        }
     }
 
     public createToolbarButtonSetting(): void {
@@ -176,14 +177,18 @@ export class RecordingAccordion extends BaseAccordion {
             });
     }
 
-    public createTranscriptionModelSetting(): void {
-        const setting = new Setting(this.contentEl)
+    private createTranscriptionModelSetting(): void {
+        if (this.modelSetting) {
+            this.modelSetting.settingEl.remove();
+        }
+
+        this.modelSetting = new Setting(this.contentEl)
             .setName("Transcription model")
             .setDesc("Select the AI model for transcription")
             .addDropdown(dropdown => {
                 this.modelDropdown = dropdown;
-                this.populateModelDropdown(dropdown);
-                dropdown.setValue(this.settings.transcriptionModel);
+                this.setupModelDropdown(dropdown);
+                
                 dropdown.onChange(async (value) => {
                     this.settings.transcriptionModel = value;
                     const provider = this.getProviderFromModel(value);
@@ -195,39 +200,59 @@ export class RecordingAccordion extends BaseAccordion {
             });
     }
 
-    public populateModelDropdown(dropdown: DropdownComponent): void {
-        let hasModels = false;
-        const options: Record<string, string> = {};
+    private async setupModelDropdown(dropdown: DropdownComponent): Promise<void> {
+        dropdown.selectEl.empty();
+        let hasValidProvider = false;
 
-        // Add OpenAI and Groq models
-        [AIProvider.OpenAI, AIProvider.Groq].forEach(provider => {
+        for (const provider of [AIProvider.OpenAI, AIProvider.Groq]) {
             const apiKey = this.settings[`${provider}ApiKey` as keyof NeuroVoxSettings];
             if (apiKey) {
                 const adapter = this.getAdapter(provider);
                 if (adapter) {
                     const models = adapter.getAvailableModels('transcription');
                     if (models.length > 0) {
-                        hasModels = true;
-                        // Add a header option for the provider
-                        options[`${provider.toUpperCase()}_HEADER`] = `--- ${provider.toUpperCase()} Models ---`;
-                        // Add all models for this provider
+                        hasValidProvider = true;
+                        const group = document.createElement("optgroup");
+                        group.label = `${provider.toUpperCase()} Models`;
+                        
                         models.forEach(model => {
-                            options[model.id] = model.name;
+                            const option = document.createElement("option");
+                            option.value = model.id;
+                            option.text = `${model.name}`;
+                            group.appendChild(option);
                         });
+                        
+                        dropdown.selectEl.appendChild(group);
                     }
                 }
             }
-        });
-
-        // If no models are available, add a placeholder option
-        if (!hasModels) {
-            options["none"] = "No API keys configured";
-            dropdown.setDisabled(true);
-        } else {
-            dropdown.setDisabled(false);
         }
 
-        dropdown.addOptions(options);
+        if (!hasValidProvider) {
+            dropdown.addOption("none", "No API keys configured");
+            dropdown.setDisabled(true);
+            this.settings.transcriptionModel = '';
+        } else {
+            dropdown.setDisabled(false);
+            
+            if (!this.settings.transcriptionModel || !this.getProviderFromModel(this.settings.transcriptionModel)) {
+                const firstOption = dropdown.selectEl.querySelector('option:not([value="none"])') as HTMLOptionElement;
+                if (firstOption) {
+                    const modelId = firstOption.value;
+                    const provider = this.getProviderFromModel(modelId);
+                    if (provider) {
+                        this.settings.transcriptionProvider = provider;
+                        this.settings.transcriptionModel = modelId;
+                        dropdown.setValue(modelId);
+                        await this.plugin.saveSettings();
+                    }
+                }
+            } else {
+                dropdown.setValue(this.settings.transcriptionModel);
+            }
+        }
+
+        await this.plugin.saveSettings();
     }
 
     public getProviderFromModel(modelId: string): AIProvider | null {

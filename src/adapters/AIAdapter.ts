@@ -15,23 +15,22 @@ export interface AIModel {
 
 export const AIModels: Record<AIProvider, AIModel[]> = {
     [AIProvider.OpenAI]: [
-        { id: 'whisper-1', name: 'OpenAI', category: 'transcription' },
+        { id: 'whisper-1', name: 'Whisper', category: 'transcription' },
+        { id: 'gpt-4o-mini-transcribe', name: 'GPT-4o Mini Transcribe', category: 'transcription' },
+        { id: 'gpt-4o-transcribe', name: 'GPT-4o Transcribe', category: 'transcription' },
         { id: 'gpt-4o', name: 'GPT 4o', category: 'language', maxTokens: 16000 },
         { id: 'gpt-4o-mini', name: 'GPT 4o Mini', category: 'language', maxTokens: 16000 },
-        { id: 'o1-2024-12-17', name: 'o1', category: 'language', maxTokens: 100000 },
-        { id: 'o1-mini-2024-09-12', name: 'o1 Mini', category: 'language', maxTokens: 66000 },
-        { id: 'o3-mini-2025-31', name: 'o3 Mini', category: 'language', maxTokens: 100000 }
     ],
     [AIProvider.Groq]: [
-        { id: 'distil-whisper-large-v3-en', name: 'Groq', category: 'transcription' },
+        { id: 'distil-whisper-large-v3-en', name: 'Distilled Whisper Large v3', category: 'transcription' },
+        { id: 'whisper-large-v3', name: 'Whisper Large v3', category: 'transcription' },
         { id: 'gemma2-9b-it', name: 'Gemma 2 9B IT', category: 'language', maxTokens: 4096 },
         { id: 'deepseek-r1-distill-llama-70b', name: 'r1', category: 'language', maxTokens: 8192 },
-        { id: 'llama3-groq-70b-8192-tool-use-preview', name: 'Llama 3 Groq 70B Versatile', category: 'language', maxTokens: 8192 },
-        { id: 'llama3-groq-8b-8192-tool-use-preview', name: 'Llama 3 Groq 8B Instant', category: 'language', maxTokens: 4096 },
-        { id: 'llama-3.1-70b-versatile', name: 'Llama 3.1 70b', category: 'language', maxTokens: 8192 },
-        { id: 'llama-3.2-3b-preview', name: 'Llama 3.2 3b', category: 'language', maxTokens: 8192 },
-        { id: 'llama-3.2-90b-vision-preview', name: 'Llama 3.2 90b', category: 'language', maxTokens: 8192 },
-        { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7b', category: 'language', maxTokens: 32768 },
+        { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', category: 'language', maxTokens: 8192 },
+        { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B', category: 'language', maxTokens: 4096 },
+        { id: 'meta-llama/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout', category: 'language', maxTokens: 8192 },
+        { id: 'meta-llama/llama-4-maverick-17b-128e-instruct', name: 'Llama 4 Maverick', category: 'language', maxTokens: 8192 },
+        { id: 'mistral-saba-24b', name: 'Mistral Saba 24B', category: 'language', maxTokens: 8192 },
     ],
 };
 

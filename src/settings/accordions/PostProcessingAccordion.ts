@@ -1,4 +1,4 @@
-// src/settings/accordions/SummaryAccordion.ts
+// src/settings/accordions/PostProcessingAccordion.ts
 
 import { BaseAccordion } from "./BaseAccordion";
 import { NeuroVoxSettings } from "../Settings";
@@ -6,7 +6,7 @@ import { Setting, DropdownComponent, TextAreaComponent, SliderComponent } from "
 import { AIAdapter, AIProvider, AIModels, getModelInfo } from "../../adapters/AIAdapter";
 import NeuroVoxPlugin from "../../main";
 
-export class SummaryAccordion extends BaseAccordion {
+export class PostProcessingAccordion extends BaseAccordion {
     private modelDropdown: DropdownComponent | null = null;
     private modelSetting: Setting | null = null;
     private promptArea: TextAreaComponent | null = null;
@@ -21,8 +21,8 @@ export class SummaryAccordion extends BaseAccordion {
             
             await this.setupModelDropdown(this.modelDropdown);
             
-            if (this.settings.summaryModel) {
-                await this.updateMaxTokensLimit(this.settings.summaryModel);
+            if (this.settings.postProcessingModel) {
+                await this.updateMaxTokensLimit(this.settings.postProcessingModel)
             }
         } catch (error) {
             throw error;
@@ -36,9 +36,9 @@ export class SummaryAccordion extends BaseAccordion {
         public plugin: NeuroVoxPlugin
     ) {
         super(
-            containerEl, 
-            "📝 Summarize", 
-            "Configure AI summary generation preferences and customize the prompt template."
+            containerEl,
+            "📝 Post-Processing",
+            "Configure AI post-processing preferences and customize the prompt template."
         );
     }
 
@@ -53,13 +53,13 @@ export class SummaryAccordion extends BaseAccordion {
 
     private addEnableToggle(): void {
         new Setting(this.contentEl)
-            .setName("Enable AI summary")
-            .setDesc("Automatically generate an AI summary after transcription")
+            .setName("Enable AI Post-Processing")
+            .setDesc("Automatically generate AI post-processing after transcription")
             .addToggle(toggle => {
                 toggle
-                    .setValue(this.settings.generateSummary)
+                    .setValue(this.settings.generatePostProcessing)
                     .onChange(async (value) => {
-                        this.settings.generateSummary = value;
+                        this.settings.generatePostProcessing = value;
                         await this.plugin.saveSettings();
                     });
             });
@@ -71,18 +71,18 @@ export class SummaryAccordion extends BaseAccordion {
         }
 
         this.modelSetting = new Setting(this.contentEl)
-            .setName("Summary model")
-            .setDesc("Select the AI model for generating summaries")
+            .setName("Post-processing model")
+            .setDesc("Select the AI model for post-processing")
             .addDropdown(dropdown => {
                 this.modelDropdown = dropdown;
                 
                 this.setupModelDropdown(dropdown);
                 
                 dropdown.onChange(async (value: string) => {
-                    this.settings.summaryModel = value;
+                    this.settings.postProcessingModel = value;
                     const provider = this.getProviderFromModel(value);
                     if (provider) {
-                        this.settings.summaryProvider = provider;
+                        this.settings.postProcessingProvider = provider;
                         await this.plugin.saveSettings();
                     }
 
@@ -119,23 +119,23 @@ export class SummaryAccordion extends BaseAccordion {
         if (!hasValidProvider) {
             dropdown.addOption("none", "No API keys configured");
             dropdown.setDisabled(true);
-            this.settings.summaryModel = '';
+            this.settings.postProcessingModel = '';
         } else {
             dropdown.setDisabled(false);
             
-            if (!this.settings.summaryModel) {
+            if (!this.settings.postProcessingModel) {
                 const firstOption = dropdown.selectEl.querySelector('option:not([value="none"])') as HTMLOptionElement;
                 if (firstOption) {
                     const modelId = firstOption.value;
                     const provider = this.getProviderFromModel(modelId);
                     if (provider) {
-                        this.settings.summaryProvider = provider;
-                        this.settings.summaryModel = modelId;
+                        this.settings.postProcessingProvider = provider;
+                        this.settings.postProcessingModel = modelId;
                         dropdown.setValue(modelId);
                     }
                 }
             } else {
-                dropdown.setValue(this.settings.summaryModel);
+                dropdown.setValue(this.settings.postProcessingModel)
             }
         }
 
@@ -144,15 +144,15 @@ export class SummaryAccordion extends BaseAccordion {
 
     private addPromptTemplate(): void {
         new Setting(this.contentEl)
-            .setName("Summary prompt template")
+            .setName("Post-processing template")
             .setDesc("Customize the prompt used for generating summaries. Use {transcript} as a placeholder for the transcribed text.")
             .addTextArea(text => {
                 this.promptArea = text;
                 text
-                    .setPlaceholder("Please provide a concise summary of the following transcript: {transcript}")
-                    .setValue(this.settings.summaryPrompt)
+                    .setPlaceholder("Please process the following transcript: {transcript}")
+                    .setValue(this.settings.postProcessingPrompt)
                     .onChange(async (value) => {
-                        this.settings.summaryPrompt = value;
+                        this.settings.postProcessingPrompt = value;
                         await this.plugin.saveSettings();
                     });
                 
@@ -163,13 +163,13 @@ export class SummaryAccordion extends BaseAccordion {
 
     private addSummaryFormat(): void {
         new Setting(this.contentEl)
-            .setName("Summary format")
-            .setDesc("Customize the summary callout format. Use {summary} for the generated summary")
+            .setName("Post-processing format")
+            .setDesc("Customize the post-processing callout format. Use {postProcessing} for the generated content")
             .addTextArea(text => {
-                text.setPlaceholder(">[!summary]- Summary\n>{summary}")
-                    .setValue(this.settings.summaryCalloutFormat)
+                text.setPlaceholder(">[!note]- Post-Processing\n>{postProcessing}")
+                    .setValue(this.settings.postProcessingCalloutFormat)
                     .onChange(async (value) => {
-                        this.settings.summaryCalloutFormat = value;
+                        this.settings.postProcessingCalloutFormat = value;
                         await this.plugin.saveSettings();
                     });
                 text.inputEl.rows = 4;
@@ -179,16 +179,16 @@ export class SummaryAccordion extends BaseAccordion {
 
     private addMaxTokens(): void {
         new Setting(this.contentEl)
-            .setName("Maximum summary length")
-            .setDesc("Set the maximum number of tokens for the generated summary")
+            .setName("Maximum post-processing length")
+            .setDesc("Set the maximum number of tokens for the post-processing output")
             .addSlider(slider => {
                 this.maxTokensSlider = slider;
                 slider
                     .setLimits(100, 4096, 100)
-                    .setValue(this.settings.summaryMaxTokens)
+                    .setValue(this.settings.postProcessingMaxTokens)
                     .setDynamicTooltip()
                     .onChange(async (value) => {
-                        this.settings.summaryMaxTokens = value;
+                        this.settings.postProcessingMaxTokens = value;
                         await this.plugin.saveSettings();
                     });
             });
@@ -196,16 +196,16 @@ export class SummaryAccordion extends BaseAccordion {
 
     private addTemperatureControl(): void {
         new Setting(this.contentEl)
-            .setName("Summary creativity")
-            .setDesc("Adjust the creativity level of the summary (0 = more focused, 1 = more creative)")
+            .setName("Post-processing creativity")
+            .setDesc("Adjust the creativity level of the post-processing (0 = more focused, 1 = more creative)")
             .addSlider(slider => {
                 this.temperatureSlider = slider;
                 slider
                     .setLimits(0, 1, 0.1)
-                    .setValue(this.settings.summaryTemperature)
+                    .setValue(this.settings.postProcessingTemperature)
                     .setDynamicTooltip()
                     .onChange(async (value) => {
-                        this.settings.summaryTemperature = value;
+                        this.settings.postProcessingTemperature = value;
                         await this.plugin.saveSettings();
                     });
             });
@@ -230,7 +230,7 @@ export class SummaryAccordion extends BaseAccordion {
             const currentValue = parseInt(this.maxTokensSlider.sliderEl.value);
             if (currentValue > maxTokens) {
                 this.maxTokensSlider.setValue(maxTokens);
-                this.settings.summaryMaxTokens = maxTokens;
+                this.settings.postProcessingMaxTokens = maxTokens;
                 await this.plugin.saveSettings();
             }
         }

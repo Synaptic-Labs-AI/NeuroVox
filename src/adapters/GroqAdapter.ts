@@ -42,7 +42,7 @@ export class GroqAdapter extends AIAdapter {
                     'Content-Type': 'application/json'
                 },
                 JSON.stringify({
-                    model: 'mixtral-8x7b-32768',
+                    model: 'llama-3.1-8b-instant',
                     messages: [{ role: 'user', content: 'test' }],
                     max_tokens: 1
                 })

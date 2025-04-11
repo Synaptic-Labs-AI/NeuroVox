@@ -17,11 +17,14 @@
 - Audio chunking and concatenation
 - Progress indicators
 - Fuzzy file search
+- Fixed data persistence issue (data.json reset on restart)
+- Audio quality settings (low/medium/high)
 
 ## In Progress
 - Performance optimization for large files
 - Extended testing of video processing
 - Documentation updates for new features
+- Testing of audio quality settings
 
 ## Pending
 - Additional AI provider integrations
@@ -42,6 +45,7 @@
 3. Documentation
    - New features need more detailed documentation
    - Video processing workflow needs documentation
+   - Need to document recent data persistence fix
 
 ## Next Milestone
 1. Performance Enhancement
@@ -64,13 +68,16 @@
    - More AI providers
    - Additional video formats
    - Enhanced summary options
+   - Additional audio format options
 
 2. Technical Improvements
    - Streaming transcription
    - Better error recovery
    - Enhanced progress tracking
+   - Advanced audio processing options
 
 3. User Interface
    - More customization options
    - Enhanced visual feedback
    - Improved settings organization
+   - Audio visualization during recording

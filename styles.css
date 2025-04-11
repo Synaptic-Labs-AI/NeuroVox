@@ -433,6 +433,31 @@
     opacity: 1;
 }
 
+/* Mobile optimization for accordion content */
+@media (max-width: 768px) {
+    .neurovox-accordion-open .neurovox-accordion-content {
+        max-height: 60vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+    }
+
+    /* Improve touch scrolling experience */
+    .neurovox-accordion-content::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .neurovox-accordion-content::-webkit-scrollbar-track {
+        background: var(--background-secondary);
+    }
+
+    .neurovox-accordion-content::-webkit-scrollbar-thumb {
+        background-color: var(--background-modifier-border);
+        border-radius: 2px;
+    }
+}
+
 /************************************
  * FORM CONTROLS
  ************************************/

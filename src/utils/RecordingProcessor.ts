@@ -1,7 +1,7 @@
 import { Notice, TFile, EditorPosition, TFolder } from 'obsidian';
 import { AIProvider, AIAdapter } from '../adapters/AIAdapter';
-import { PluginData } from '../types';
 import NeuroVoxPlugin from '../main';
+import { AudioQuality } from '../settings/Settings';
 /**
  * Represents a single step in the processing pipeline
  */
@@ -24,7 +24,7 @@ interface ProcessingConfig {
  */
 interface ProcessingResult {
     transcription: string;
-    summary?: string;
+    postProcessing?: string;
     timings: Record<string, number>;
     audioFilePath: string;
     audioBlob: Blob;
@@ -35,7 +35,7 @@ interface ProcessingState {
     currentStep: ProcessingStep | null;
     audioBlob?: Blob;
     transcription?: string;
-    summary?: string;
+    postProcessing?: string;
     startTime: number;
     error?: string;
     processedChunks?: number;
@@ -44,7 +44,7 @@ interface ProcessingState {
 
 /**
  * Handles the processing of audio recordings including saving,
- * transcription, summarization, and file insertion
+ * transcription, post-processing, and file insertion
  */
 export class RecordingProcessor {
     private static instance: RecordingProcessor | null = null;
@@ -54,7 +54,6 @@ export class RecordingProcessor {
         startTime: Date.now()
     };
     private steps: ProcessingStep[] = [];
-    private currentStep: ProcessingStep | null = null;
 
     private readonly config: ProcessingConfig = {
         maxRetries: 3,
@@ -64,17 +63,24 @@ export class RecordingProcessor {
     private readonly MAX_AUDIO_SIZE_MB = 25;
     private readonly MAX_AUDIO_SIZE_BYTES = this.MAX_AUDIO_SIZE_MB * 1024 * 1024;
     private readonly CHUNK_OVERLAP_SECONDS = 2;
-    private readonly SAMPLE_RATE = 44100; // CD quality audio for better fidelity
+    
+    // Audio quality settings (sample rates in Hz)
+    private readonly QUALITY_SETTINGS = {
+        [AudioQuality.Low]: 22050,    // Voice optimized (smaller files)
+        [AudioQuality.Medium]: 44100,  // CD quality (balanced)
+        [AudioQuality.High]: 66150     // Enhanced quality (larger files)
+    };
 
-    private constructor(
-        private plugin: NeuroVoxPlugin,
-        private pluginData: PluginData
-    ) {}
+    private constructor(private plugin: NeuroVoxPlugin) {}
 
-    public static getInstance(plugin: NeuroVoxPlugin, pluginData: PluginData): RecordingProcessor {
-        return this.instance ??= new RecordingProcessor(plugin, pluginData);
+    public static getInstance(plugin: NeuroVoxPlugin): RecordingProcessor {
+        return this.instance ??= new RecordingProcessor(plugin);
     }
 
+    /**
+     * Saves the current processing state to plugin data storage
+     * Removes the audioBlob from saved state to prevent excessive storage usage
+     */
     private async saveState(): Promise<void> {
         try {
             const state = {
@@ -83,9 +89,13 @@ export class RecordingProcessor {
             };
             await this.plugin.saveData(state);
         } catch (error) {
+            console.error("Failed to save processing state:", error);
         }
     }
 
+    /**
+     * Loads the processing state from plugin data storage
+     */
     private async loadState(): Promise<void> {
         try {
             const state = await this.plugin.loadData();
@@ -93,6 +103,7 @@ export class RecordingProcessor {
                 this.processingState = { ...state, audioBlob: undefined };
             }
         } catch (error) {
+            console.error("Failed to load processing state:", error);
         }
     }
 
@@ -100,8 +111,7 @@ export class RecordingProcessor {
         audioBlob: Blob,
         activeFile: TFile,
         cursorPosition: EditorPosition,
-        audioFilePath?: string,
-        shouldSaveAudio: boolean = false
+        audioFilePath?: string
     ): Promise<void> {
         this.processingState.audioBlob = audioBlob;
         this.processingState.startTime = Date.now();
@@ -119,9 +129,9 @@ export class RecordingProcessor {
             
             await this.validateRequirements();
 
-            // Use provided audioFilePath or save if requested
+            // Use provided audioFilePath or save new file
             let finalPath = audioFilePath || '';
-            if (!audioFilePath && shouldSaveAudio) {
+            if (!audioFilePath) {
                 finalPath = await this.saveAudioFile(audioBlob);
             }
 
@@ -129,7 +139,7 @@ export class RecordingProcessor {
                 const result = await this.executeProcessingPipelineWithRecovery(audioBlob, finalPath);
                 await this.insertResults(result, activeFile, cursorPosition);
             } else {
-                await this.processLargeAudioFile(audioBlob, shouldSaveAudio, finalPath, activeFile, cursorPosition);
+                await this.processLargeAudioFile(audioBlob, finalPath, activeFile, cursorPosition);
             }
 
         } catch (error) {
@@ -142,6 +152,14 @@ export class RecordingProcessor {
         }
     }
 
+    /**
+     * Gets the sample rate based on the current audio quality setting
+     * @returns The sample rate in Hz
+     */
+    private getSampleRate(): number {
+        return this.QUALITY_SETTINGS[this.plugin.settings.audioQuality] || this.QUALITY_SETTINGS[AudioQuality.Medium];
+    }
+
     private async splitAudioBlob(audioBlob: Blob): Promise<Blob[]> {
         if (audioBlob.size <= this.MAX_AUDIO_SIZE_BYTES) {
             return [audioBlob];
@@ -149,7 +167,9 @@ export class RecordingProcessor {
 
         try {
             // Create an audio context to properly decode the WebM audio
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+                sampleRate: this.getSampleRate()
+            });
             const arrayBuffer = await audioBlob.arrayBuffer();
             const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
             
@@ -218,27 +238,15 @@ export class RecordingProcessor {
         }
     }
 
-    private async convertToFloat32Array(arrayBuffer: ArrayBuffer): Promise<Float32Array> {
-        try {
-            return new Float32Array(arrayBuffer);
-        } catch (error) {
-            const view = new DataView(arrayBuffer);
-            const samples = new Float32Array(arrayBuffer.byteLength / 4);
-            for (let i = 0; i < samples.length; i++) {
-                samples[i] = view.getFloat32(i * 4, true);
-            }
-            return samples;
-        }
-    }
 
     private async validateRequirements(): Promise<void> {
         const transcriptionAdapter = this.getAdapter(
-            this.pluginData.transcriptionProvider,
+            this.plugin.settings.transcriptionProvider,
             'transcription'
         );
 
-        if (this.pluginData.generateSummary) {
-            this.getAdapter(this.pluginData.summaryProvider, 'language');
+        if (this.plugin.settings.generatePostProcessing) {
+            this.getAdapter(this.plugin.settings.postProcessingProvider, 'language');
         }
 
         await this.ensureRecordingFolderExists();
@@ -264,7 +272,7 @@ export class RecordingProcessor {
     }
 
     private async ensureRecordingFolderExists(): Promise<void> {
-        const folderPath = this.pluginData.recordingFolderPath;
+        const folderPath = this.plugin.settings.recordingFolderPath;
         if (!folderPath) return;
 
         const parts = folderPath.split('/').filter(Boolean);
@@ -285,7 +293,7 @@ export class RecordingProcessor {
     private async saveAudioFile(audioBlob: Blob): Promise<string> {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const baseFileName = `recording-${timestamp}.webm`;
-        const folderPath = this.pluginData.recordingFolderPath || '';
+        const folderPath = this.plugin.settings.recordingFolderPath || '';
         let fileName = baseFileName;
         let filePath = folderPath ? `${folderPath}/${fileName}` : fileName;
         let count = 1;
@@ -328,16 +336,16 @@ export class RecordingProcessor {
             () => this.transcribeAudio(audioBuffer)
         );
 
-        const summary = this.pluginData.generateSummary
+        const postProcessing = this.plugin.settings.generatePostProcessing
             ? await this.executeStep(
-                'Summarization',
-                () => this.generateSummary(transcription)
+                'Post-Processing',
+                () => this.generatePostProcessing(transcription)
             )
             : undefined;
 
         return {
             transcription,
-            summary,
+            postProcessing,
             timings: this.calculateTimings(),
             audioFilePath,
             audioBlob
@@ -355,7 +363,7 @@ export class RecordingProcessor {
             if (this.processingState.transcription) {
                 return {
                     transcription: this.processingState.transcription,
-                    summary: this.processingState.summary,
+                    postProcessing: this.processingState.postProcessing,
                     timings: this.calculateTimings(),
                     audioFilePath,
                     audioBlob
@@ -369,7 +377,9 @@ export class RecordingProcessor {
         try {
             // Create a MediaStream from the first chunk to get the correct format
             const firstChunk = chunks[0];
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+                sampleRate: this.getSampleRate()
+            });
             
             // Process all chunks sequentially
             const processedChunks: Blob[] = [];
@@ -430,8 +440,7 @@ export class RecordingProcessor {
 
     private async processLargeAudioFile(
         audioBlob: Blob,
-        shouldSaveAudio: boolean,
-        audioFilePath: string | undefined,
+        audioFilePath: string,
         activeFile: TFile,
         cursorPosition: EditorPosition
     ): Promise<void> {
@@ -445,7 +454,7 @@ export class RecordingProcessor {
                 const chunk = chunks[i];
                 const chunkPath = audioFilePath ? 
                     `${audioFilePath}.part${i}` : 
-                    (shouldSaveAudio ? await this.saveAudioFile(chunk) : '');
+                    await this.saveAudioFile(chunk);
                 
                 if (chunkPath) {
                     chunkPaths.push(chunkPath);
@@ -460,6 +469,8 @@ export class RecordingProcessor {
                 
                 new Notice(`Processing chunk ${i + 1} of ${chunks.length}`);
             } catch (error) {
+                console.error(`Failed to process chunk ${i + 1}:`, error);
+                new Notice(`Failed to process chunk ${i + 1}. Continuing with next chunk.`);
             }
         }
 
@@ -469,23 +480,22 @@ export class RecordingProcessor {
                 const concatenatedAudio = await this.concatenateAudioChunks(chunks);
                 
                 // Save the concatenated audio file
-                const finalPath = audioFilePath || (shouldSaveAudio ? await this.saveAudioFile(concatenatedAudio) : '');
+                const finalPath = audioFilePath || await this.saveAudioFile(concatenatedAudio);
                 
                 // Clean up temporary chunk files
-                if (shouldSaveAudio) {
-                    for (const chunkPath of chunkPaths) {
-                        try {
-                            await this.plugin.app.vault.adapter.remove(chunkPath);
-                        } catch (error) {
-                        }
+                for (const chunkPath of chunkPaths) {
+                    try {
+                        await this.plugin.app.vault.adapter.remove(chunkPath);
+                    } catch (error) {
+                        console.error(`Failed to remove temporary chunk file ${chunkPath}:`, error);
                     }
                 }
                 
                 // Create final result with concatenated audio
                 const finalResult: ProcessingResult = {
                     transcription: allResults.map(r => r.transcription).join('\n'),
-                    summary: allResults.some(r => r.summary) ? 
-                        allResults.map(r => r.summary).filter(Boolean).join('\n') : 
+                    postProcessing: allResults.some(r => r.postProcessing) ? 
+                        allResults.map(r => r.postProcessing).filter(Boolean).join('\n') : 
                         undefined,
                     timings: this.calculateTimings(),
                     audioFilePath: finalPath,
@@ -524,39 +534,51 @@ export class RecordingProcessor {
     }
 
     private async transcribeAudio(audioBuffer: ArrayBuffer): Promise<string> {
-        const adapter = this.getAdapter(this.pluginData.transcriptionProvider, 'transcription');
-        return adapter.transcribeAudio(audioBuffer, this.pluginData.transcriptionModel);
+        const adapter = this.getAdapter(this.plugin.settings.transcriptionProvider, 'transcription');
+        return adapter.transcribeAudio(audioBuffer, this.plugin.settings.transcriptionModel);
     }
 
-    private async generateSummary(transcription: string): Promise<string> {
-        const adapter = this.getAdapter(this.pluginData.summaryProvider, 'language');
-        const prompt = `${this.pluginData.summaryPrompt}\n\n${transcription}`;
+    private async generatePostProcessing(transcription: string): Promise<string> {
+        const adapter = this.getAdapter(this.plugin.settings.postProcessingProvider, 'language');
+        const prompt = `${this.plugin.settings.postProcessingPrompt}\n\n${transcription}`;
         
-        return adapter.generateResponse(prompt, this.pluginData.summaryModel, {
-            maxTokens: this.pluginData.summaryMaxTokens,
-            temperature: this.pluginData.summaryTemperature
+        return adapter.generateResponse(prompt, this.plugin.settings.postProcessingModel, {
+            maxTokens: this.plugin.settings.postProcessingMaxTokens,
+            temperature: this.plugin.settings.postProcessingTemperature
         });
     }
 
     private formatContent(result: ProcessingResult): string {
-        let content = '';
+        let format = this.plugin.settings.transcriptionCalloutFormat;
         
-        if (result.audioFilePath) {
-            content = this.pluginData.transcriptionCalloutFormat
-                .replace('{audioPath}', result.audioFilePath)
-                .replace('{transcription}', result.transcription)
-                + '\n';
-        } else {
-            content = '> [!note] Transcription\n> ' + result.transcription.replace(/\n/g, '\n> ') + '\n';
+        // If there's no audio file path, remove the audio file link from the format
+        if (!result.audioFilePath) {
+            format = format
+                .replace(/!?\[\[{audioPath}\]\]\n?/, '') // Remove audio file link and optional newline
+                .replace('[[{audioPath}]]', '') // Also try without newline
+                .replace('{audioPath}', ''); // Fallback for any other format
         }
         
-        if (this.pluginData.generateSummary && result.summary) {
-            content += '---\n' + this.pluginData.summaryCalloutFormat
-                .replace('{summary}', result.summary)
-                + '\n\n';
+        let content = format
+            .replace('{audioPath}', result.audioFilePath || '')
+            .replace('{transcription}', result.transcription);
+
+        // Ensure proper line breaks and indentation for transcription
+        content = content.split('\n')
+            .map(line => line.trim() ? `>${line}` : '>')  // Empty lines get just '>', content lines get '>' prefix
+            .join('\n');
+        
+        // Add post-processing if enabled
+        if (this.plugin.settings.generatePostProcessing && result.postProcessing) {
+            const postContent = this.plugin.settings.postProcessingCalloutFormat
+                .replace('{postProcessing}', result.postProcessing)
+                .split('\n')
+                .map(line => line.trim() ? `>${line}` : '>')  // Ensure post-processing uses same callout formatting
+                .join('\n');
+            content += '\n---\n' + postContent + '\n\n';
         }
         
-        return content;
+        return content + '\n';
     }
 
     private async insertResults(
@@ -579,14 +601,14 @@ export class RecordingProcessor {
         cursorPosition: EditorPosition
     ): Promise<void> {
         let combinedTranscription = '';
-        let combinedSummary = '';
+        let combinedPostProcessing = '';
         for (const r of results) {
             combinedTranscription += r.transcription + '\n';
-            if (r.summary) combinedSummary += r.summary + '\n';
+            if (r.postProcessing) combinedPostProcessing += r.postProcessing + '\n';
         }
         const merged: ProcessingResult = {
             transcription: combinedTranscription.trim(),
-            summary: combinedSummary.trim() || undefined,
+            postProcessing: combinedPostProcessing.trim() || undefined,
             timings: {},
             audioFilePath: results.map(r => r.audioFilePath).join(', '),
             audioBlob: new Blob()
@@ -608,13 +630,13 @@ export class RecordingProcessor {
     }
 
     private startStep(name: string): void {
-        this.currentStep = { name, startTime: performance.now() };
-        this.steps.push(this.currentStep);
+        this.processingState.currentStep = { name, startTime: performance.now() };
+        this.steps.push(this.processingState.currentStep);
     }
 
     private completeStep(): void {
-        if (this.currentStep) {
-            this.currentStep.endTime = performance.now();
+        if (this.processingState.currentStep) {
+            this.processingState.currentStep.endTime = performance.now();
         }
     }
 
@@ -631,9 +653,6 @@ export class RecordingProcessor {
         new Notice(`${context}: ${message}`);
     }
 
-    private showSuccessMessage(): void {
-        new Notice(`Recording processed successfully.`);
-    }
 
     private deduplicateChunks(results: ProcessingResult[]): ProcessingResult[] {
         if (results.length <= 1) return results;
@@ -676,15 +695,6 @@ export class RecordingProcessor {
         return overlap;
     }
 
-    private cleanupTranscription(text: string): string {
-        return text
-            .replace(/\s+/g, ' ')
-            .replace(/(\w)\s+(\W)/g, '$1$2')
-            .replace(/(\W)\s+(\w)/g, '$1 $2')
-            .replace(/\s+\./g, '.')
-            .replace(/\s+,/g, ',')
-            .trim();
-    }
 
     private cleanup(): void {
         this.processingState = {

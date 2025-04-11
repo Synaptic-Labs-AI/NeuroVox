@@ -122,7 +122,7 @@ export default class NeuroVoxPlugin extends Plugin {
         this.registerCommands();
         this.registerEvents();
         
-        this.recordingProcessor = RecordingProcessor.getInstance(this, this.pluginData);
+        this.recordingProcessor = RecordingProcessor.getInstance(this);
         this.initializeUI();
     }
 
@@ -155,7 +155,21 @@ export default class NeuroVoxPlugin extends Plugin {
 
     public async loadPluginData(): Promise<void> {
         const data = await this.loadData();
-        this.pluginData = data ? { ...DEFAULT_SETTINGS, ...data } : { ...DEFAULT_SETTINGS };
+        if (data) {
+            // Create a new object with all default settings
+            const mergedData = { ...DEFAULT_SETTINGS };
+            
+            // Override with any saved settings
+            for (const key in data) {
+                if (data.hasOwnProperty(key)) {
+                    (mergedData as any)[key] = (data as any)[key];
+                }
+            }
+            
+            this.pluginData = mergedData;
+        } else {
+            this.pluginData = { ...DEFAULT_SETTINGS };
+        }
         this.settings = this.pluginData;
     }
 
@@ -319,7 +333,7 @@ export default class NeuroVoxPlugin extends Plugin {
 
     public async processVideoFile(file: TFile): Promise<void> {
         try {
-            const videoProcessor = await VideoProcessor.getInstance(this, this.pluginData);
+            const videoProcessor = await VideoProcessor.getInstance(this);
             await videoProcessor.processVideo(file);
         } catch (error) {
             new Notice('❌ Failed to process video file');
@@ -427,7 +441,7 @@ export default class NeuroVoxPlugin extends Plugin {
             if (this.modalInstance) return;
             
             this.modalInstance = new TimerModal(this.app);
-            this.modalInstance.onStop = async (audioBlob: Blob, shouldSave: boolean) => {
+            this.modalInstance.onStop = async (audioBlob: Blob) => {
                 try {
                     const adapter = this.aiAdapters.get(this.pluginData.transcriptionProvider);
                     if (!adapter) {
@@ -441,9 +455,7 @@ export default class NeuroVoxPlugin extends Plugin {
                     await this.recordingProcessor.processRecording(
                         audioBlob, 
                         activeFile,
-                        activeView.editor.getCursor(),
-                        undefined,
-                        shouldSave
+                        activeView.editor.getCursor()
                     );
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -477,6 +489,7 @@ export default class NeuroVoxPlugin extends Plugin {
 
 
     onunload() {
+        this.savePluginData();
         this.cleanupUI();
     }
 }

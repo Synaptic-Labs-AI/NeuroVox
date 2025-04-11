@@ -1,7 +1,6 @@
 import { Notice, TFile } from 'obsidian';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
-import { PluginData } from '../types';
 import NeuroVoxPlugin from '../main';
 import { RecordingProcessor } from './RecordingProcessor';
 
@@ -10,14 +9,11 @@ export class VideoProcessor {
     private ffmpeg: any;
     private isProcessing = false;
 
-    private constructor(
-        private plugin: NeuroVoxPlugin,
-        private pluginData: PluginData
-    ) {}
+    private constructor(private plugin: NeuroVoxPlugin) {}
 
-    public static async getInstance(plugin: NeuroVoxPlugin, pluginData: PluginData): Promise<VideoProcessor> {
+    public static async getInstance(plugin: NeuroVoxPlugin): Promise<VideoProcessor> {
         if (!this.instance) {
-            this.instance = new VideoProcessor(plugin, pluginData);
+            this.instance = new VideoProcessor(plugin);
             await this.instance.initializeFFmpeg();
         }
         return this.instance;
@@ -50,7 +46,7 @@ export class VideoProcessor {
             const audioBuffer = await this.extractAudioFromVideo(file);
 
             // Process the audio using RecordingProcessor
-            const recordingProcessor = RecordingProcessor.getInstance(this.plugin, this.pluginData);
+            const recordingProcessor = RecordingProcessor.getInstance(this.plugin);
             const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
 
             await recordingProcessor.processRecording(
@@ -75,7 +71,25 @@ export class VideoProcessor {
     private async createTranscriptFile(videoFile: TFile): Promise<TFile> {
         const baseName = videoFile.basename.replace(/[\\/:*?"<>|]/g, '');
         const fileName = `${baseName} - Video Transcript.md`;
-        return this.plugin.app.vault.create(fileName, '');
+        const folderPath = this.plugin.settings.transcriptFolderPath;
+
+        // Ensure transcript folder exists
+        if (folderPath) {
+            const parts = folderPath.split('/').filter(Boolean);
+            let currentPath = '';
+            
+            for (const part of parts) {
+                currentPath = currentPath ? `${currentPath}/${part}` : part;
+                const folder = this.plugin.app.vault.getAbstractFileByPath(currentPath);
+                
+                if (!folder) {
+                    await this.plugin.app.vault.createFolder(currentPath);
+                }
+            }
+        }
+
+        const filePath = folderPath ? `${folderPath}/${fileName}` : fileName;
+        return this.plugin.app.vault.create(filePath, '');
     }
 
     private async extractAudioFromVideo(file: TFile): Promise<ArrayBuffer> {
