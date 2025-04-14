@@ -34,13 +34,17 @@ export class AudioRecordingManager {
     private recorder: RecordRTC | null = null;
     private stream: MediaStream | null = null;
 
+    private currentOptions?: {
+        timeSlice?: number;
+        onDataAvailable?: (blob: Blob) => Promise<void>;
+    };
+
     private readonly AUDIO_CONFIG: AudioRecorderOptions = {
         type: 'audio',
-        mimeType: "audio/webm;codecs=pcm",  // Use PCM encoding for better quality
+        mimeType: "audio/webm",  // Remove PCM codec for better compression
         recorderType: RecordRTC.StereoAudioRecorder,
         numberOfAudioChannels: 1 as AudioChannels,
-        desiredSampRate: 44100,  // CD quality audio
-        timeSlice: 1000  // Update each second
+        desiredSampRate: 22050,  // Reduced from CD quality for better efficiency
     };
 
     /**
@@ -55,16 +59,34 @@ export class AudioRecordingManager {
                     autoGainControl: true
                 }
             });
-            this.recorder = new RecordRTC(this.stream, this.AUDIO_CONFIG);
         } catch (error) {
             throw new Error('Failed to access microphone');
         }
     }
 
-    start(): void {
-        if (!this.recorder) {
+    start(options?: { timeSlice?: number; onDataAvailable?: (blob: Blob) => Promise<void> }): void {
+        if (!this.stream) {
             throw new Error('Audio recorder not initialized');
         }
+
+        // Store options for potential recorder recreation
+        this.currentOptions = options;
+
+        // Create recorder with current options
+        const config = {
+            ...this.AUDIO_CONFIG,
+            timeSlice: options?.timeSlice
+        };
+
+        this.recorder = new RecordRTC(this.stream, config);
+
+        // Set up data available handler if provided
+        if (options?.onDataAvailable) {
+            (this.recorder as any).addEventListener('dataavailable', async (event: { data: Blob }) => {
+                await options.onDataAvailable?.(event.data);
+            });
+        }
+
         this.recorder.startRecording();
     }
 

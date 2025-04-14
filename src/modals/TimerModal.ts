@@ -6,6 +6,7 @@ interface TimerConfig {
     maxDuration: number;
     warningThreshold: number;
     updateInterval: number;
+    chunkDuration: number;  // Duration in ms for each recording chunk
 }
 
 /**
@@ -19,11 +20,13 @@ export class TimerModal extends Modal {
     private seconds: number = 0;
     private isClosing: boolean = false;
     private currentState: RecordingState = 'inactive';
+    private processingQueue: Blob[] = [];
 
     private readonly CONFIG: TimerConfig = {
         maxDuration: 12 * 60,
         warningThreshold: 60,
-        updateInterval: 1000
+        updateInterval: 1000,
+        chunkDuration: 10000  // Process audio in 10-second chunks
     };
 
     public onStop: (audioBlob: Blob) => void;
@@ -177,7 +180,7 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Starts or resumes recording
+     * Starts or resumes recording with progressive chunk processing
      */
     private async startRecording(): Promise<void> {
         try {
@@ -185,7 +188,13 @@ export class TimerModal extends Modal {
                 this.recordingManager.resume();
                 this.resumeTimer();
             } else {
-                this.recordingManager.start();
+                // Configure recorder with chunk processing
+                this.recordingManager.start({
+                    timeSlice: this.CONFIG.chunkDuration,
+                    onDataAvailable: async (blob: Blob) => {
+                        await this.processAudioChunk(blob);
+                    }
+                });
                 this.startTimer();
             }
             
@@ -195,6 +204,15 @@ export class TimerModal extends Modal {
         } catch (error) {
             this.handleError('Failed to start recording', error);
         }
+    }
+
+    /**
+     * Processes each audio chunk as it becomes available
+     */
+    private async processAudioChunk(blob: Blob): Promise<void> {
+        this.processingQueue.push(blob);
+        // Could potentially start transcription here for real-time processing
+        // For now, we just store the chunks for final processing
     }
 
     /**
@@ -229,9 +247,19 @@ export class TimerModal extends Modal {
      */
     private async handleStop(): Promise<void> {
         try {
-            const blob = await this.recordingManager.stop();
-            if (!blob) {
+            const finalBlob = await this.recordingManager.stop();
+            if (!finalBlob && this.processingQueue.length === 0) {
                 throw new Error('No audio data received from recorder');
+            }
+
+            // Combine all chunks if we have them
+            let resultBlob: Blob;
+            if (this.processingQueue.length > 0) {
+                // If we have chunks, combine them
+                resultBlob = new Blob(this.processingQueue, { type: 'audio/webm' });
+            } else {
+                // Otherwise use the final blob
+                resultBlob = finalBlob!;
             }
 
             // Close recording modal first
@@ -240,7 +268,7 @@ export class TimerModal extends Modal {
 
             // Always save the recording
             if (this.onStop) {
-                await this.onStop(blob);
+                await this.onStop(resultBlob);
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -307,6 +335,9 @@ export class TimerModal extends Modal {
             this.pauseTimer();
             this.recordingManager.cleanup();
             this.ui?.cleanup();
+            
+            // Clear processing queue
+            this.processingQueue = [];
         } catch (error) {
         } finally {
             // Reset states

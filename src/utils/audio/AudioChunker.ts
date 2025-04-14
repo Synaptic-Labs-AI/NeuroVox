@@ -20,28 +20,33 @@ export class AudioChunker {
         }
 
         try {
-            // Create an audio context to properly decode the WebM audio
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
-                sampleRate: this.sampleRate
-            });
-            const arrayBuffer = await audioBlob.arrayBuffer();
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            
-            // Calculate chunk duration in seconds
-            const totalDuration = audioBuffer.duration;
-            const chunkDuration = Math.floor(totalDuration * (this.MAX_AUDIO_SIZE_BYTES / audioBlob.size));
+            // Instead of decoding the entire file at once, process it in segments
             const chunks: Blob[] = [];
-            
-            // Process audio in chunks
-            for (let startTime = 0; startTime < totalDuration; startTime += chunkDuration) {
-                const endTime = Math.min(startTime + chunkDuration + this.CHUNK_OVERLAP_SECONDS, totalDuration);
-                const chunk = await this.createChunk(audioContext, audioBuffer, startTime, endTime, audioBlob.type);
-                chunks.push(chunk);
+            const chunkSize = this.MAX_AUDIO_SIZE_BYTES;
+            let offset = 0;
+
+            while (offset < audioBlob.size) {
+                const end = Math.min(offset + chunkSize, audioBlob.size);
+                const chunk = audioBlob.slice(offset, end);
+                
+                // Create a small audio context just for this chunk
+                const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+                    sampleRate: this.sampleRate
+                });
+                
+                // Process the chunk
+                const arrayBuffer = await chunk.arrayBuffer();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                const processedChunk = await this.bufferToBlob(audioContext, audioBuffer, audioBlob.type);
+                chunks.push(processedChunk);
+                
+                // Clean up the audio context
+                await audioContext.close();
+                
+                offset += chunkSize;
             }
             
-            await audioContext.close();
             return chunks;
-            
         } catch (error) {
             console.error('Error splitting audio:', error);
             return [audioBlob];
