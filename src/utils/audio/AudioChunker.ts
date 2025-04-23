@@ -7,7 +7,11 @@ export class AudioChunker {
     private readonly MAX_AUDIO_SIZE_BYTES = this.MAX_AUDIO_SIZE_MB * 1024 * 1024;
     private readonly CHUNK_OVERLAP_SECONDS = 2;
 
-    constructor(private readonly sampleRate: number) {}
+    constructor(
+        private readonly sampleRate: number,
+        private readonly bitRate: number,
+        private readonly mimeType: string = 'audio/webm; codecs=opus'
+    ) {}
 
     /**
      * Splits an audio blob into smaller chunks if necessary
@@ -141,7 +145,10 @@ export class AudioChunker {
             const destination = audioContext.createMediaStreamDestination();
             source.connect(destination);
             
-            const recorder = new MediaRecorder(destination.stream, { mimeType });
+            const recorder = new MediaRecorder(destination.stream, { 
+                mimeType: this.mimeType,
+                bitsPerSecond: this.bitRate
+            });
             const chunks: Blob[] = [];
             
             recorder.ondataavailable = (e) => {

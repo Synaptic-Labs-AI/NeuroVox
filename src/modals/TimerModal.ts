@@ -1,6 +1,7 @@
 import { App, Modal, Notice, Platform } from 'obsidian';
 import { AudioRecordingManager } from '../utils/RecordingManager';
 import { RecordingUI, RecordingState } from '../ui/RecordingUI';
+import NeuroVoxPlugin from '../main';
 
 interface TimerConfig {
     maxDuration: number;
@@ -31,9 +32,9 @@ export class TimerModal extends Modal {
 
     public onStop: (audioBlob: Blob) => void;
 
-    constructor(app: App) {
-        super(app);
-        this.recordingManager = new AudioRecordingManager();
+    constructor(private plugin: NeuroVoxPlugin) {
+        super(plugin.app);
+        this.recordingManager = new AudioRecordingManager(plugin);
         this.setupCloseHandlers();
     }
 

@@ -1,13 +1,8 @@
 import RecordRTC from 'recordrtc';
+import { AudioQuality } from '../settings/Settings';
+import NeuroVoxPlugin from '../main';
 
-/**
- * Audio-specific MIME types supported by RecordRTC
- */
-type AudioMimeType = 
-    | "audio/wav"
-    | "audio/webm"
-    | "audio/webm;codecs=pcm"
-    | "audio/ogg";
+import { Options } from 'recordrtc';
 
 /**
  * Valid number of audio channels for RecordRTC
@@ -15,14 +10,14 @@ type AudioMimeType =
 type AudioChannels = 1 | 2;
 
 /**
- * Configuration options for audio recording that match RecordRTC requirements
+ * Configuration options for audio recording that extend RecordRTC Options
  */
-interface AudioRecorderOptions {
+interface AudioRecorderOptions extends Options {
     type: 'audio';
-    mimeType: AudioMimeType;
     recorderType: typeof RecordRTC.StereoAudioRecorder;
     numberOfAudioChannels: AudioChannels;
     desiredSampRate: number;
+    bitsPerSecond: number;
     timeSlice?: number;
 }
 
@@ -39,13 +34,37 @@ export class AudioRecordingManager {
         onDataAvailable?: (blob: Blob) => Promise<void>;
     };
 
-    private readonly AUDIO_CONFIG: AudioRecorderOptions = {
-        type: 'audio',
-        mimeType: "audio/webm",  // Remove PCM codec for better compression
-        recorderType: RecordRTC.StereoAudioRecorder,
-        numberOfAudioChannels: 1 as AudioChannels,
-        desiredSampRate: 22050,  // Reduced from CD quality for better efficiency
+    // Audio quality settings (sample rates in Hz)
+    private readonly SAMPLE_RATES = {
+        [AudioQuality.Low]: 22050,    // Voice optimized
+        [AudioQuality.Medium]: 32000,  // High quality voice
+        [AudioQuality.High]: 44100     // CD quality
     };
+
+    // Bitrate settings (bits per second)
+    private readonly BIT_RATES = {
+        [AudioQuality.Low]: 64000,     // Good for voice
+        [AudioQuality.Medium]: 128000, // Excellent voice quality
+        [AudioQuality.High]: 192000    // Studio quality
+    };
+
+    constructor(private plugin: NeuroVoxPlugin) {}
+
+    /**
+     * Gets audio configuration based on current quality settings
+     */
+    private getAudioConfig(): AudioRecorderOptions {
+        const quality = this.plugin.settings.audioQuality;
+        return {
+            type: 'audio',
+            mimeType: "audio/webm",  // Use WebM container for better compression
+            recorderType: RecordRTC.StereoAudioRecorder,
+            numberOfAudioChannels: 1 as AudioChannels,
+            desiredSampRate: this.SAMPLE_RATES[quality] || this.SAMPLE_RATES[AudioQuality.Medium],
+            // Add bitrate control for better compression
+            bitsPerSecond: this.BIT_RATES[quality] || this.BIT_RATES[AudioQuality.Medium]
+        };
+    }
 
     /**
      * Initializes the recording manager with microphone access
@@ -74,7 +93,7 @@ export class AudioRecordingManager {
 
         // Create recorder with current options
         const config = {
-            ...this.AUDIO_CONFIG,
+            ...this.getAudioConfig(),
             timeSlice: options?.timeSlice
         };
 

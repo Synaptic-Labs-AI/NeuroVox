@@ -13,14 +13,25 @@ export class AudioProcessor {
     private readonly audioFileManager: AudioFileManager;
 
     // Audio quality settings (sample rates in Hz)
-    private readonly QUALITY_SETTINGS = {
+    private readonly SAMPLE_RATES = {
         [AudioQuality.Low]: 22050,    // Voice optimized (smaller files)
-        [AudioQuality.Medium]: 44100,  // CD quality (balanced)
-        [AudioQuality.High]: 66150     // Enhanced quality (larger files)
+        [AudioQuality.Medium]: 32000,  // High quality voice (balanced)
+        [AudioQuality.High]: 44100     // CD quality (larger files)
+    };
+
+    // Bitrate settings for different quality levels (bits per second)
+    private readonly BIT_RATES = {
+        [AudioQuality.Low]: 64000,     // Good for voice
+        [AudioQuality.Medium]: 128000, // Excellent voice quality
+        [AudioQuality.High]: 192000    // Studio quality
     };
 
     constructor(private plugin: NeuroVoxPlugin) {
-        this.audioChunker = new AudioChunker(this.getSampleRate());
+        this.audioChunker = new AudioChunker(
+            this.getSampleRate(),
+            this.getBitRate(),
+            'audio/webm; codecs=opus'
+        );
         this.audioFileManager = new AudioFileManager(plugin);
     }
 
@@ -94,7 +105,15 @@ export class AudioProcessor {
      * Gets the sample rate based on the current audio quality setting
      */
     private getSampleRate(): number {
-        return this.QUALITY_SETTINGS[this.plugin.settings.audioQuality] || 
-               this.QUALITY_SETTINGS[AudioQuality.Medium];
+        return this.SAMPLE_RATES[this.plugin.settings.audioQuality] || 
+               this.SAMPLE_RATES[AudioQuality.Medium];
+    }
+
+    /**
+     * Gets the bit rate based on the current audio quality setting
+     */
+    private getBitRate(): number {
+        return this.BIT_RATES[this.plugin.settings.audioQuality] || 
+               this.BIT_RATES[AudioQuality.Medium];
     }
 }
