@@ -25,3 +25,5 @@ data.json
 
 codeSummary.js
 codeSummaryLogs/
+.history
+chats.db

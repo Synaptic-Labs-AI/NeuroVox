@@ -46,7 +46,7 @@ export class ToolbarButton {
             const editor = activeLeaf.editor;
             const cursorPosition = editor.getCursor();
 
-            const modal = new TimerModal(this.plugin.app);
+            const modal = new TimerModal(this.plugin);
             modal.onStop = (audioBlob: Blob) => {
                 // Use the RecordingProcessor instance
                 this.plugin.recordingProcessor.processRecording(audioBlob, activeFile, cursorPosition);

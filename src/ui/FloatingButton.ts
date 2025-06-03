@@ -2,7 +2,8 @@
 
 import { MarkdownView, Notice, setIcon } from 'obsidian';
 import { ButtonPositionManager } from '../utils/ButtonPositionManager';
-import { NeuroVoxPlugin, PluginData, Position } from '../types'; // Import NeuroVoxPlugin interface
+import { PluginData, Position } from '../types';
+import NeuroVoxPlugin from '../main'; // Import the actual class instead of interface
 import { AudioRecordingManager } from '../utils/RecordingManager';
 import { RecordingProcessor } from '../utils/RecordingProcessor';
 
@@ -419,9 +420,8 @@ export class FloatingButton {
      * Starts direct recording mode
      */
     public async startDirectRecording() {
-        try {
-            if (!this.audioManager) {
-                this.audioManager = new AudioRecordingManager();
+        try {            if (!this.audioManager) {
+                this.audioManager = new AudioRecordingManager(this.plugin);
                 await this.audioManager.initialize();
             }
     

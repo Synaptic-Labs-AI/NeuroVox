@@ -19,6 +19,7 @@ import { ToolbarButton } from './ui/ToolbarButton';
 import { TimerModal } from './modals/TimerModal';
 import { OpenAIAdapter } from './adapters/OpenAIAdapter';
 import { GroqAdapter } from './adapters/GroqAdapter';
+import { DeepgramAdapter } from './adapters/DeepgramAdapter';
 import { AIProvider, AIAdapter } from './adapters/AIAdapter';
 import { PluginData } from './types';
 import { RecordingProcessor } from './utils/RecordingProcessor';
@@ -205,13 +206,12 @@ export default class NeuroVoxPlugin extends Plugin {
             console.error("Failed to save settings:", error);
             new Notice("Failed to save NeuroVox settings");
         }
-    }
-
-    private async validateApiKeys(): Promise<void> {
+    }    private async validateApiKeys(): Promise<void> {
         try {
             // Set API keys from settings
             const openaiAdapter = this.aiAdapters.get(AIProvider.OpenAI);
             const groqAdapter = this.aiAdapters.get(AIProvider.Groq);
+            const deepgramAdapter = this.aiAdapters.get(AIProvider.Deepgram);
 
             if (openaiAdapter) {
                 openaiAdapter.setApiKey(this.settings.openaiApiKey);
@@ -223,6 +223,11 @@ export default class NeuroVoxPlugin extends Plugin {
                 await groqAdapter.validateApiKey();
             }
 
+            if (deepgramAdapter) {
+                deepgramAdapter.setApiKey(this.settings.deepgramApiKey);
+                await deepgramAdapter.validateApiKey();
+            }
+
             // Only show notice if validation fails
             if (openaiAdapter && !openaiAdapter.isReady() && this.settings.openaiApiKey) {
                 new Notice('❌ OpenAI API key validation failed');
@@ -230,16 +235,18 @@ export default class NeuroVoxPlugin extends Plugin {
             if (groqAdapter && !groqAdapter.isReady() && this.settings.groqApiKey) {
                 new Notice('❌ Groq API key validation failed');
             }
+            if (deepgramAdapter && !deepgramAdapter.isReady() && this.settings.deepgramApiKey) {
+                new Notice('❌ Deepgram API key validation failed');
+            }
         } catch (error) {
             console.error("API key validation failed:", error);
         }
-    }
-
-    public initializeAIAdapters(): void {
+    }public initializeAIAdapters(): void {
         try {
             const adapters: Array<[AIProvider, AIAdapter]> = [
                 [AIProvider.OpenAI, new OpenAIAdapter(this.settings)],
-                [AIProvider.Groq, new GroqAdapter(this.settings)]
+                [AIProvider.Groq, new GroqAdapter(this.settings)],
+                [AIProvider.Deepgram, new DeepgramAdapter(this.settings)]
             ];
             
             this.aiAdapters = new Map<AIProvider, AIAdapter>(adapters);
@@ -508,12 +515,10 @@ export default class NeuroVoxPlugin extends Plugin {
         if (!activeFile) {
             new Notice('❌ No active file found.');
             return;
-        }
-    
-        if (this.settings.useRecordingModal) {
+        }        if (this.settings.useRecordingModal) {
             if (this.modalInstance) return;
             
-            this.modalInstance = new TimerModal(this.app);
+            this.modalInstance = new TimerModal(this);
             this.modalInstance.onStop = async (audioBlob: Blob) => {
                 try {
                     const adapter = this.aiAdapters.get(this.settings.transcriptionProvider);

@@ -201,13 +201,11 @@ export class RecordingAccordion extends BaseAccordion {
                     }
                 });
             });
-    }
-
-    private async setupModelDropdown(dropdown: DropdownComponent): Promise<void> {
+    }    private async setupModelDropdown(dropdown: DropdownComponent): Promise<void> {
         dropdown.selectEl.empty();
         let hasValidProvider = false;
 
-        for (const provider of [AIProvider.OpenAI, AIProvider.Groq]) {
+        for (const provider of [AIProvider.OpenAI, AIProvider.Groq, AIProvider.Deepgram]) {
             const apiKey = this.settings[`${provider}ApiKey` as keyof NeuroVoxSettings];
             if (apiKey) {
                 const adapter = this.getAdapter(provider);

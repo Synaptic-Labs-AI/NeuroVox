@@ -4,6 +4,7 @@ import { NeuroVoxSettings } from '../settings/Settings';
 export enum AIProvider {
     OpenAI = 'openai',
     Groq = 'groq',
+    Deepgram = 'deepgram',
 }
 
 export interface AIModel {
@@ -31,6 +32,10 @@ export const AIModels: Record<AIProvider, AIModel[]> = {
         { id: 'meta-llama/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout', category: 'language', maxTokens: 8192 },
         { id: 'meta-llama/llama-4-maverick-17b-128e-instruct', name: 'Llama 4 Maverick', category: 'language', maxTokens: 8192 },
         { id: 'mistral-saba-24b', name: 'Mistral Saba 24B', category: 'language', maxTokens: 8192 },
+    ],
+    [AIProvider.Deepgram]: [
+        { id: 'nova-2', name: 'Nova-2', category: 'transcription' },
+        { id: 'nova-3', name: 'Nova-3', category: 'transcription' },
     ],
 };
 

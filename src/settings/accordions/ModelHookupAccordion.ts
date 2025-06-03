@@ -105,5 +105,39 @@ export class ModelHookupAccordion extends BaseAccordion {
                         }
                     });
             });
+
+        const deepgramSetting = new Setting(this.contentEl)
+            .setName("Deepgram API Key")
+            .setDesc("Enter your Deepgram API key")
+            .addText(text => {
+                text
+                    .setPlaceholder("Enter your Deepgram API key...")
+                    .setValue(this.settings.deepgramApiKey);
+                text.inputEl.type = "password";
+                text.onChange(async (value: string) => {
+                        const trimmedValue = value.trim();
+                        this.settings.deepgramApiKey = trimmedValue;
+                        await this.plugin.saveSettings();
+
+                        const adapter = this.getAdapter(AIProvider.Deepgram);
+                        if (!adapter) {
+                            return;
+                        }
+
+                        adapter.setApiKey(trimmedValue);
+                        const isValid = await adapter.validateApiKey();
+
+                        if (isValid) {
+                            deepgramSetting.setDesc("✅ API key validated successfully");
+                            try {
+                                await this.refreshAccordions();
+                            } catch (error) {
+                                deepgramSetting.setDesc("✅ API key valid, but failed to update model lists");
+                            }
+                        } else {
+                            deepgramSetting.setDesc("❌ Invalid API key. Please check your credentials.");
+                        }
+                    });
+            });
     }
 }

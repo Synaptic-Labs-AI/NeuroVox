@@ -12,6 +12,7 @@ export type NeuroVoxSettings = {
     // AI Providers
     openaiApiKey: string;
     groqApiKey: string;
+    deepgramApiKey: string;
 
     // Recording
     audioQuality: AudioQuality;
@@ -45,6 +46,7 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     // AI Providers
     openaiApiKey: '',
     groqApiKey: '',
+    deepgramApiKey: '',
 
     // Recording
     audioQuality: AudioQuality.Medium,
