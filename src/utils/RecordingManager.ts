@@ -1,6 +1,7 @@
 import RecordRTC from 'recordrtc';
 import { AudioQuality } from '../settings/Settings';
 import NeuroVoxPlugin from '../main';
+import { DeviceDetection } from './DeviceDetection';
 
 import { Options } from 'recordrtc';
 
@@ -28,6 +29,7 @@ interface AudioRecorderOptions extends Options {
 export class AudioRecordingManager {
     private recorder: RecordRTC | null = null;
     private stream: MediaStream | null = null;
+    private deviceDetection: DeviceDetection;
 
     private currentOptions?: {
         timeSlice?: number;
@@ -41,6 +43,13 @@ export class AudioRecordingManager {
         [AudioQuality.High]: 44100     // CD quality
     };
 
+    // Mobile-optimized sample rates
+    private readonly MOBILE_SAMPLE_RATES = {
+        [AudioQuality.Low]: 16000,     // Mobile voice optimized
+        [AudioQuality.Medium]: 22050,  // Mobile high quality voice
+        [AudioQuality.High]: 32000     // Mobile max quality
+    };
+
     // Bitrate settings (bits per second)
     private readonly BIT_RATES = {
         [AudioQuality.Low]: 64000,     // Good for voice
@@ -48,21 +57,36 @@ export class AudioRecordingManager {
         [AudioQuality.High]: 192000    // Studio quality
     };
 
-    constructor(private plugin: NeuroVoxPlugin) {}
+    // Mobile-optimized bitrates
+    private readonly MOBILE_BIT_RATES = {
+        [AudioQuality.Low]: 16000,     // Mobile voice optimized
+        [AudioQuality.Medium]: 32000,  // Mobile good quality
+        [AudioQuality.High]: 48000     // Mobile high quality
+    };
+
+    constructor(private plugin: NeuroVoxPlugin) {
+        this.deviceDetection = DeviceDetection.getInstance();
+    }
 
     /**
      * Gets audio configuration based on current quality settings
      */
     private getAudioConfig(): AudioRecorderOptions {
         const quality = this.plugin.settings.audioQuality;
+        const isMobile = this.deviceDetection.isMobile();
+        
+        // Use mobile-optimized settings if on mobile device
+        const sampleRates = isMobile ? this.MOBILE_SAMPLE_RATES : this.SAMPLE_RATES;
+        const bitRates = isMobile ? this.MOBILE_BIT_RATES : this.BIT_RATES;
+        
         return {
             type: 'audio',
             mimeType: "audio/webm",  // Use WebM container for better compression
             recorderType: RecordRTC.StereoAudioRecorder,
             numberOfAudioChannels: 1 as AudioChannels,
-            desiredSampRate: this.SAMPLE_RATES[quality] || this.SAMPLE_RATES[AudioQuality.Medium],
+            desiredSampRate: sampleRates[quality] || sampleRates[AudioQuality.Medium],
             // Add bitrate control for better compression
-            bitsPerSecond: this.BIT_RATES[quality] || this.BIT_RATES[AudioQuality.Medium]
+            bitsPerSecond: bitRates[quality] || bitRates[AudioQuality.Medium]
         };
     }
 
@@ -92,20 +116,16 @@ export class AudioRecordingManager {
         this.currentOptions = options;
 
         // Create recorder with current options
-        const config = {
+        const config: any = {
             ...this.getAudioConfig(),
-            timeSlice: options?.timeSlice
+            timeSlice: options?.timeSlice,
+            // RecordRTC uses ondataavailable callback for time-sliced recording
+            ondataavailable: options?.onDataAvailable ? async (blob: Blob) => {
+                await options.onDataAvailable!(blob);
+            } : undefined
         };
 
         this.recorder = new RecordRTC(this.stream, config);
-
-        // Set up data available handler if provided
-        if (options?.onDataAvailable) {
-            (this.recorder as any).addEventListener('dataavailable', async (event: { data: Blob }) => {
-                await options.onDataAvailable?.(event.data);
-            });
-        }
-
         this.recorder.startRecording();
     }
 

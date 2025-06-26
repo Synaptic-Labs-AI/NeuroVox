@@ -16,6 +16,34 @@ export interface PluginData extends NeuroVoxSettings {
     buttonPosition?: Position;
 }
 
+export interface ChunkMetadata {
+    id: string;
+    index: number;
+    duration: number;
+    timestamp: number;
+    size: number;
+}
+
+export interface StreamingOptions {
+    chunkDuration: number;  // 5-10 seconds
+    maxQueueSize: number;   // 3-5 chunks max in memory
+    bitrate: number;        // Lower for mobile
+    processingMode: 'streaming' | 'batch';
+    memoryLimit: number;    // MB
+}
+
+export interface TranscriptionChunk {
+    metadata: ChunkMetadata;
+    transcript: string;
+    processed: boolean;
+}
+
+export interface StreamingCallbacks {
+    onChunkReady?: (chunk: Blob, metadata: ChunkMetadata) => Promise<void>;
+    onProgress?: (processed: number, total: number) => void;
+    onMemoryWarning?: (usage: number) => void;
+}
+
 export interface NeuroVoxPlugin extends Plugin {
     settings: NeuroVoxSettings;
     aiAdapters: Map<AIProvider, AIAdapter>;

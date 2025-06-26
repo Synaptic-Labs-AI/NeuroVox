@@ -47,9 +47,15 @@ export class ToolbarButton {
             const cursorPosition = editor.getCursor();
 
             const modal = new TimerModal(this.plugin);
-            modal.onStop = (audioBlob: Blob) => {
-                // Use the RecordingProcessor instance
-                this.plugin.recordingProcessor.processRecording(audioBlob, activeFile, cursorPosition);
+            modal.onStop = async (result: Blob | string) => {
+                // Handle both streaming (string) and legacy (Blob) results
+                if (typeof result === 'string') {
+                    // Streaming mode - transcription already done
+                    await this.plugin.recordingProcessor.processStreamingResult(result, activeFile, cursorPosition);
+                } else {
+                    // Legacy mode - need to transcribe
+                    await this.plugin.recordingProcessor.processRecording(result, activeFile, cursorPosition);
+                }
             };
             modal.open();
         } else {

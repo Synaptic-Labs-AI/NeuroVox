@@ -2,6 +2,9 @@ import { App, Modal, Notice, Platform } from 'obsidian';
 import { AudioRecordingManager } from '../utils/RecordingManager';
 import { RecordingUI, RecordingState } from '../ui/RecordingUI';
 import NeuroVoxPlugin from '../main';
+import { StreamingTranscriptionService } from '../utils/transcription/StreamingTranscriptionService';
+import { DeviceDetection } from '../utils/DeviceDetection';
+import { ChunkMetadata } from '../types';
 
 interface TimerConfig {
     maxDuration: number;
@@ -21,20 +24,32 @@ export class TimerModal extends Modal {
     private seconds: number = 0;
     private isClosing: boolean = false;
     private currentState: RecordingState = 'inactive';
-    private processingQueue: Blob[] = [];
+    private streamingService: StreamingTranscriptionService | null = null;
+    private deviceDetection: DeviceDetection;
+    private useStreaming: boolean = false;
+    private chunkIndex: number = 0;
+    private recordingStartTime: number = 0;
 
-    private readonly CONFIG: TimerConfig = {
-        maxDuration: 12 * 60,
-        warningThreshold: 60,
-        updateInterval: 1000,
-        chunkDuration: 10000  // Process audio in 10-second chunks
-    };
+    private readonly CONFIG: TimerConfig;
 
-    public onStop: (audioBlob: Blob) => void;
+    public onStop: (result: Blob | string) => void;
 
     constructor(private plugin: NeuroVoxPlugin) {
         super(plugin.app);
         this.recordingManager = new AudioRecordingManager(plugin);
+        this.deviceDetection = DeviceDetection.getInstance();
+        
+        // Configure based on device type
+        const streamingOptions = this.deviceDetection.getOptimalStreamingOptions();
+        this.useStreaming = this.deviceDetection.shouldUseStreamingMode();
+        
+        this.CONFIG = {
+            maxDuration: 12 * 60,
+            warningThreshold: 60,
+            updateInterval: 1000,
+            chunkDuration: streamingOptions.chunkDuration * 1000  // Convert to milliseconds
+        };
+        
         this.setupCloseHandlers();
     }
 
@@ -189,6 +204,21 @@ export class TimerModal extends Modal {
                 this.recordingManager.resume();
                 this.resumeTimer();
             } else {
+                // Initialize streaming service if using streaming mode
+                if (this.useStreaming && !this.streamingService) {
+                    this.streamingService = new StreamingTranscriptionService(
+                        this.plugin,
+                        {
+                            onMemoryWarning: (usage) => {
+                                new Notice(`Memory usage high: ${Math.round(usage)}%`);
+                            }
+                        }
+                    );
+                }
+                
+                this.recordingStartTime = Date.now();
+                this.chunkIndex = 0;
+                
                 // Configure recorder with chunk processing
                 this.recordingManager.start({
                     timeSlice: this.CONFIG.chunkDuration,
@@ -211,9 +241,30 @@ export class TimerModal extends Modal {
      * Processes each audio chunk as it becomes available
      */
     private async processAudioChunk(blob: Blob): Promise<void> {
-        this.processingQueue.push(blob);
-        // Could potentially start transcription here for real-time processing
-        // For now, we just store the chunks for final processing
+        if (this.useStreaming && this.streamingService) {
+            // Create chunk metadata
+            const metadata: ChunkMetadata = {
+                id: `chunk_${this.chunkIndex}`,
+                index: this.chunkIndex,
+                duration: this.CONFIG.chunkDuration,
+                timestamp: Date.now(),
+                size: blob.size
+            };
+            
+            // Send chunk for immediate processing
+            const added = await this.streamingService.addChunk(blob, metadata);
+            
+            if (!added) {
+                console.warn('Failed to add chunk to streaming service - memory limit reached');
+                // Could potentially pause recording here if needed
+                if (this.streamingService.isQueuePaused()) {
+                    new Notice('Memory limit reached - processing chunks...');
+                }
+            }
+            
+            this.chunkIndex++;
+        }
+        // If not using streaming, chunks are handled in the legacy way by the final stop method
     }
 
     /**
@@ -249,18 +300,23 @@ export class TimerModal extends Modal {
     private async handleStop(): Promise<void> {
         try {
             const finalBlob = await this.recordingManager.stop();
-            if (!finalBlob && this.processingQueue.length === 0) {
-                throw new Error('No audio data received from recorder');
-            }
-
-            // Combine all chunks if we have them
-            let resultBlob: Blob;
-            if (this.processingQueue.length > 0) {
-                // If we have chunks, combine them
-                resultBlob = new Blob(this.processingQueue, { type: 'audio/webm' });
+            
+            let result: Blob | string;
+            
+            if (this.useStreaming && this.streamingService) {
+                // Streaming mode - get transcription result
+                new Notice('Finishing transcription...');
+                result = await this.streamingService.finishProcessing();
+                
+                if (!result || result.trim().length === 0) {
+                    throw new Error('No transcription result received');
+                }
             } else {
-                // Otherwise use the final blob
-                resultBlob = finalBlob!;
+                // Legacy mode - return audio blob
+                if (!finalBlob) {
+                    throw new Error('No audio data received from recorder');
+                }
+                result = finalBlob;
             }
 
             // Close recording modal first
@@ -269,7 +325,7 @@ export class TimerModal extends Modal {
 
             // Always save the recording
             if (this.onStop) {
-                await this.onStop(resultBlob);
+                await this.onStop(result);
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -337,14 +393,19 @@ export class TimerModal extends Modal {
             this.recordingManager.cleanup();
             this.ui?.cleanup();
             
-            // Clear processing queue
-            this.processingQueue = [];
+            // Clean up streaming service
+            if (this.streamingService) {
+                this.streamingService.abort();
+                this.streamingService = null;
+            }
         } catch (error) {
         } finally {
             // Reset states
             this.currentState = 'inactive';
             this.seconds = 0;
             this.isClosing = false;
+            this.chunkIndex = 0;
+            this.recordingStartTime = 0;
         }
     }
 

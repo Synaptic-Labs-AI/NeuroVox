@@ -7,7 +7,7 @@ import NeuroVoxPlugin from '../../main';
 export interface InsertContent {
     transcription: string;
     postProcessing?: string;
-    audioFilePath: string;
+    audioFilePath?: string;
 }
 
 /**

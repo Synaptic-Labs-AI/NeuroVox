@@ -519,22 +519,32 @@ export default class NeuroVoxPlugin extends Plugin {
             if (this.modalInstance) return;
             
             this.modalInstance = new TimerModal(this);
-            this.modalInstance.onStop = async (audioBlob: Blob) => {
+            this.modalInstance.onStop = async (result: Blob | string) => {
                 try {
-                    const adapter = this.aiAdapters.get(this.settings.transcriptionProvider);
-                    if (!adapter) {
-                        throw new Error(`Transcription provider ${this.settings.transcriptionProvider} not found`);
-                    }
+                    if (typeof result === 'string') {
+                        // Streaming mode - transcription already done
+                        await this.recordingProcessor.processStreamingResult(
+                            result,
+                            activeFile,
+                            activeView.editor.getCursor()
+                        );
+                    } else {
+                        // Legacy mode - need to transcribe
+                        const adapter = this.aiAdapters.get(this.settings.transcriptionProvider);
+                        if (!adapter) {
+                            throw new Error(`Transcription provider ${this.settings.transcriptionProvider} not found`);
+                        }
 
-                    if (!adapter.getApiKey()) {
-                        throw new Error(`API key not set for ${this.settings.transcriptionProvider}`);
-                    }
+                        if (!adapter.getApiKey()) {
+                            throw new Error(`API key not set for ${this.settings.transcriptionProvider}`);
+                        }
 
-                    await this.recordingProcessor.processRecording(
-                        audioBlob, 
-                        activeFile,
-                        activeView.editor.getCursor()
-                    );
+                        await this.recordingProcessor.processRecording(
+                            result, 
+                            activeFile,
+                            activeView.editor.getCursor()
+                        );
+                    }
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                     new Notice(`❌ Failed to process recording: ${errorMessage}`);

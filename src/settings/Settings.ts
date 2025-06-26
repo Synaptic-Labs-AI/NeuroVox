@@ -40,6 +40,13 @@ export type NeuroVoxSettings = {
 
     // Current Provider
     currentProvider: AIProvider;
+
+    // Mobile Optimization
+    enableMobileOptimization: boolean;
+    streamingMode: boolean;
+    adaptiveQuality: boolean;
+    maxMemoryUsage: number; // MB
+    includeTimestamps: boolean;
 };
 
 export const DEFAULT_SETTINGS: NeuroVoxSettings = {
@@ -74,4 +81,11 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
 
     // Current Provider
     currentProvider: AIProvider.OpenAI,
+
+    // Mobile Optimization
+    enableMobileOptimization: true,
+    streamingMode: true, // Auto-detected based on device
+    adaptiveQuality: true,
+    maxMemoryUsage: 200, // MB
+    includeTimestamps: false,
 };
