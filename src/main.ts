@@ -336,14 +336,20 @@ export default class NeuroVoxPlugin extends Plugin {
 
     public async processExistingAudioFile(file: TFile): Promise<void> {
         try {
+            console.log('🔍 NeuroVox: Starting audio file processing for:', file.path);
+            
             const adapter = this.aiAdapters.get(this.settings.transcriptionProvider);
             if (!adapter) {
                 throw new Error(`Transcription provider ${this.settings.transcriptionProvider} not found`);
             }
 
+            console.log('🔍 NeuroVox: Using adapter:', this.settings.transcriptionProvider);
+            
             if (!adapter.getApiKey()) {
                 throw new Error(`API key not set for ${this.settings.transcriptionProvider}`);
             }
+
+            console.log('🔍 NeuroVox: API key is configured');
 
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
             const sanitizedName = file.basename.replace(/[\\/:*?"<>|]/g, '');
@@ -375,16 +381,20 @@ export default class NeuroVoxPlugin extends Plugin {
                 ''
             ].join('\n');
 
+            console.log('🔍 NeuroVox: Creating transcript file:', newFileName);
             const newFile = await this.app.vault.create(newFileName, initialContent);
             await this.app.workspace.getLeaf().openFile(newFile);
 
+            console.log('🔍 NeuroVox: Reading audio file...');
             const audioBuffer = await this.app.vault.readBinary(file);
             const blob = new Blob([audioBuffer], { 
                 type: this.getAudioMimeType(file.extension) 
             });
 
+            console.log('🔍 NeuroVox: Audio blob created, size:', blob.size, 'bytes');
             new Notice('🎙️ Processing audio file...');
 
+            console.log('🔍 NeuroVox: Starting processing with RecordingProcessor...');
             await this.recordingProcessor.processRecording(
                 blob,
                 newFile,
@@ -392,9 +402,11 @@ export default class NeuroVoxPlugin extends Plugin {
                 file.path
             );
 
+            console.log('🔍 NeuroVox: Processing completed successfully!');
             new Notice('✨ Transcription completed successfully!');
             
         } catch (error) {
+            console.error('❌ NeuroVox: Error in processExistingAudioFile:', error);
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             new Notice(`❌ Failed to process audio file: ${errorMessage}`);
             throw error;

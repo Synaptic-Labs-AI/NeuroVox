@@ -57,13 +57,16 @@ export class RecordingProcessor {
         }
 
         try {
+            console.log('🔍 RecordingProcessor: Starting processRecording...');
             this.processingState.setIsProcessing(true);
             this.processingState.reset();
             
             // Process the audio file
+            console.log('🔍 RecordingProcessor: Starting audio processing...');
             this.processingState.startStep('Audio Processing');
             const audioResult = await this.audioProcessor.processAudio(audioBlob, audioFilePath);
             this.processingState.completeStep();
+            console.log('🔍 RecordingProcessor: Audio processing completed');
 
             // Update progress if chunks were processed
             if (audioResult.processedChunks && audioResult.totalChunks) {
@@ -74,14 +77,18 @@ export class RecordingProcessor {
             }
 
             // Transcribe the audio
+            console.log('🔍 RecordingProcessor: Starting transcription...');
             this.processingState.startStep('Transcription');
             const audioBuffer = await audioResult.audioBlob.arrayBuffer();
+            console.log('🔍 RecordingProcessor: Audio buffer size:', audioBuffer.byteLength);
             const result = await this.executeWithRetry(() => 
                 this.transcriptionService.transcribeContent(audioBuffer)
             );
             this.processingState.completeStep();
+            console.log('🔍 RecordingProcessor: Transcription completed, length:', result.transcription.length);
 
             // Insert the content
+            console.log('🔍 RecordingProcessor: Starting content insertion...');
             this.processingState.startStep('Content Insertion');
             await this.documentInserter.insertContent(
                 {
@@ -93,8 +100,10 @@ export class RecordingProcessor {
                 cursorPosition
             );
             this.processingState.completeStep();
+            console.log('🔍 RecordingProcessor: Content insertion completed');
 
         } catch (error) {
+            console.error('❌ RecordingProcessor: Error in processRecording:', error);
             this.handleError('Processing failed', error);
             this.processingState.setError(error as Error);
             throw error;

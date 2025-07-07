@@ -12,6 +12,9 @@ export class AudioProcessor {
     private readonly audioChunker: AudioChunker;
     private readonly audioFileManager: AudioFileManager;
 
+    // Maximum audio size before skipping chunking (25MB)
+    private readonly MAX_AUDIO_SIZE_BYTES = 25 * 1024 * 1024;
+
     // Audio quality settings (sample rates in Hz)
     private readonly SAMPLE_RATES = {
         [AudioQuality.Low]: 22050,    // Voice optimized (smaller files)
@@ -51,51 +54,17 @@ export class AudioProcessor {
         totalChunks?: number;
     }> {
         try {
-            // Split audio into chunks if necessary
-            const chunks = await this.audioChunker.splitAudioBlob(audioBlob);
+            console.log('🔍 AudioProcessor: Processing audio, size:', audioBlob.size, 'bytes');
             
-            if (chunks.length === 1) {
-                // No chunking needed, save single file
-                const finalPath = audioFilePath || await this.audioFileManager.saveAudioFile(audioBlob);
-                return { finalPath, audioBlob };
-            }
-
-            // Process chunks
-            const chunkPaths: string[] = [];
-            for (let i = 0; i < chunks.length; i++) {
-                try {
-                    const chunkPath = audioFilePath ? 
-                        `${audioFilePath}.part${i}` : 
-                        await this.audioFileManager.saveAudioFile(chunks[i]);
-                    
-                    if (chunkPath) {
-                        chunkPaths.push(chunkPath);
-                    }
-                    
-                    new Notice(`Processing chunk ${i + 1} of ${chunks.length}`);
-                } catch (error) {
-                    console.error(`Failed to process chunk ${i + 1}:`, error);
-                    throw error;
-                }
-            }
-
-            // Concatenate chunks
-            const concatenatedAudio = await this.audioChunker.concatenateAudioChunks(chunks);
-            
-            // Save final concatenated file
-            const finalPath = audioFilePath || await this.audioFileManager.saveAudioFile(concatenatedAudio);
-            
-            // Clean up temporary chunk files
-            await this.audioFileManager.removeTemporaryFiles(chunkPaths);
-
-            return {
-                finalPath,
-                audioBlob: concatenatedAudio,
-                processedChunks: chunks.length,
-                totalChunks: chunks.length
-            };
+            // For existing audio files, skip chunking entirely and process directly
+            // The AudioChunker is designed for real-time recording streams, not existing MP3/audio files
+            // Chunking existing audio files by bytes creates invalid audio data that can't be decoded
+            console.log('🔍 AudioProcessor: Processing existing audio file directly without chunking');
+            const finalPath = audioFilePath || await this.audioFileManager.saveAudioFile(audioBlob);
+            return { finalPath, audioBlob };
 
         } catch (error) {
+            console.error('❌ AudioProcessor: Error in processAudio:', error);
             const message = error instanceof Error ? error.message : 'Unknown error';
             throw new Error(`Failed to process audio: ${message}`);
         }

@@ -23,19 +23,25 @@ export class TranscriptionService {
      */
     public async transcribeContent(audioBuffer: ArrayBuffer): Promise<TranscriptionResult> {
         try {
+            console.log('🔍 TranscriptionService: Starting transcription, buffer size:', audioBuffer.byteLength);
+            
             // Get transcription
             const transcription = await this.transcribeAudio(audioBuffer);
+            console.log('🔍 TranscriptionService: Transcription completed, length:', transcription.length);
 
             // Generate post-processing if enabled
             const postProcessing = this.plugin.settings.generatePostProcessing
                 ? await this.generatePostProcessing(transcription)
                 : undefined;
 
+            console.log('🔍 TranscriptionService: Post-processing enabled:', this.plugin.settings.generatePostProcessing);
+
             return {
                 transcription,
                 postProcessing
             };
         } catch (error) {
+            console.error('❌ TranscriptionService: Error in transcribeContent:', error);
             const message = error instanceof Error ? error.message : 'Unknown error';
             throw new Error(`Transcription failed: ${message}`);
         }
@@ -45,15 +51,22 @@ export class TranscriptionService {
      * Transcribes audio using the configured AI adapter
      */
     private async transcribeAudio(audioBuffer: ArrayBuffer): Promise<string> {
+        console.log('🔍 TranscriptionService: Getting adapter for provider:', this.plugin.settings.transcriptionProvider);
+        
         const adapter = this.getAdapter(
             this.plugin.settings.transcriptionProvider,
             'transcription'
         );
         
-        return adapter.transcribeAudio(
+        console.log('🔍 TranscriptionService: Adapter found, calling transcribeAudio with model:', this.plugin.settings.transcriptionModel);
+        
+        const result = await adapter.transcribeAudio(
             audioBuffer,
             this.plugin.settings.transcriptionModel
         );
+        
+        console.log('🔍 TranscriptionService: Adapter returned result, length:', result.length);
+        return result;
     }
 
     /**
