@@ -110,7 +110,7 @@ export class ButtonPositionManager {
         document.addEventListener('mousemove', this._boundHandlers.move);
         document.addEventListener('mouseup', this._boundHandlers.end);
 
-        this.buttonEl.addEventListener('touchstart', this.handleTouchStart.bind(this));
+        this.buttonEl.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
         document.addEventListener('touchmove', this._boundHandlers.touchMove);
         document.addEventListener('touchend', this._boundHandlers.touchEnd);
     }
