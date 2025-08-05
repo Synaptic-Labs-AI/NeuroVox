@@ -32,6 +32,8 @@ export const AIModels: Record<AIProvider, AIModel[]> = {
         { id: 'meta-llama/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B', category: 'language', maxTokens: 8192 },
         { id: 'meta-llama/llama-4-maverick-17b-128e-instruct', name: 'Llama 4 Maverick 17B', category: 'language', maxTokens: 8192 },
         { id: 'qwen/qwen3-32b', name: 'Qwen 3 32B', category: 'language', maxTokens: 8192 },
+        { id: 'openai/gpt-oss-20b', name: 'OpenAI GPT-OSS 20B', category: 'language', maxTokens: 32768 },
+        { id: 'openai/gpt-oss-120b', name: 'OpenAI GPT-OSS 120B', category: 'language', maxTokens: 32768 },
     ],
     [AIProvider.Deepgram]: [
         { id: 'nova-2', name: 'Nova-2', category: 'transcription' },
