@@ -143,7 +143,6 @@ export default class NeuroVoxPlugin extends Plugin {
     private registerFloatingButtonEvents(): void {
         // Listen for floating button setting changes
         this.events.on('floating-button-setting-changed', (isEnabled: boolean) => {
-            console.log(`Floating button setting changed to: ${isEnabled}`);
             
             // Always clean up existing buttons first
             this.cleanupUI();
@@ -164,7 +163,6 @@ export default class NeuroVoxPlugin extends Plugin {
      */
     public async loadSettings(): Promise<void> {
         try {
-            console.log("Loading NeuroVox settings...");
             const data = await this.loadData();
             
             // Start with a deep copy of defaults
@@ -178,9 +176,7 @@ export default class NeuroVoxPlugin extends Plugin {
                         (this.settings as any)[key] = (data as any)[key];
                     }
                 });
-                console.log("Settings loaded successfully");
             } else {
-                console.log("No saved settings found, using defaults");
             }
         } catch (error) {
             console.error("Failed to load settings:", error);
@@ -194,14 +190,12 @@ export default class NeuroVoxPlugin extends Plugin {
      */
     public async saveSettings(): Promise<void> {
         try {
-            console.log("Saving NeuroVox settings...", this.settings);
             await this.saveData(this.settings);
             this.initializeUI();
             
             // Trigger the floating button setting changed event to ensure UI is in sync
             this.events.trigger('floating-button-setting-changed', this.settings.showFloatingButton);
             
-            console.log("Settings saved successfully");
         } catch (error) {
             console.error("Failed to save settings:", error);
             new Notice("Failed to save NeuroVox settings");

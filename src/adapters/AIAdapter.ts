@@ -19,9 +19,11 @@ export const AIModels: Record<AIProvider, AIModel[]> = {
         { id: 'whisper-1', name: 'Whisper', category: 'transcription' },
         { id: 'gpt-4o-mini-transcribe', name: 'GPT-4o Mini Transcribe', category: 'transcription' },
         { id: 'gpt-4o-transcribe', name: 'GPT-4o Transcribe', category: 'transcription' },
-        { id: 'gpt-5', name: 'GPT 5', category: 'language', maxTokens: 128000 },
-        { id: 'gpt-5-mini', name: 'GPT 5 Mini', category: 'language', maxTokens: 128000 },
-        { id: 'gpt-5-nano', name: 'GPT 5 Nano', category: 'language', maxTokens: 128000 }
+        { id: 'gpt-4o', name: 'GPT 4o', category: 'language', maxTokens: 16000 },
+        { id: 'gpt-4o-mini', name: 'GPT 4o Mini', category: 'language', maxTokens: 16000 },
+        { id: 'gpt-5', name: 'GPT 5', category: 'language', maxTokens: 400000 },
+        { id: 'gpt-5-mini', name: 'GPT 5 Mini', category: 'language', maxTokens: 400000 },
+        { id: 'gpt-5-nano', name: 'GPT 5 Nano', category: 'language', maxTokens: 400000 },
     ],
     [AIProvider.Groq]: [
         { id: 'whisper-large-v3-turbo', name: 'Whisper Large v3 Turbo', category: 'transcription' },
