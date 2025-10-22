@@ -1,6 +1,6 @@
 {
 	"name": "neurovox",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"description": "Enhances your note-taking with voice transcription and AI capabilities",
 	"main": "main.js",
 	"scripts": {
