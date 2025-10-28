@@ -92,12 +92,10 @@ export class MemoryMonitor {
 
         // Check for warnings
         if (this.isMemoryPressureCritical()) {
-            console.warn(`Critical memory pressure: ${usage.toFixed(1)}%`);
             if (this.emergencyCleanupCallback) {
                 this.emergencyCleanupCallback();
             }
         } else if (this.isMemoryPressureHigh()) {
-            console.warn(`High memory pressure: ${usage.toFixed(1)}%`);
             if (this.warningCallback) {
                 this.warningCallback(usage);
             }

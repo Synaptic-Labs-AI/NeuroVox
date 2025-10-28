@@ -132,7 +132,6 @@ export default class NeuroVoxPlugin extends Plugin {
             // Trigger initial state
             this.events.trigger('floating-button-setting-changed', this.settings.showFloatingButton);
         } catch (error) {
-            console.error("Failed to load plugin:", error);
             new Notice("Failed to initialize NeuroVox plugin");
         }
     }
@@ -179,7 +178,6 @@ export default class NeuroVoxPlugin extends Plugin {
             } else {
             }
         } catch (error) {
-            console.error("Failed to load settings:", error);
             this.settings = { ...DEFAULT_SETTINGS };
             new Notice("Failed to load NeuroVox settings. Using defaults.");
         }
@@ -197,7 +195,6 @@ export default class NeuroVoxPlugin extends Plugin {
             this.events.trigger('floating-button-setting-changed', this.settings.showFloatingButton);
             
         } catch (error) {
-            console.error("Failed to save settings:", error);
             new Notice("Failed to save NeuroVox settings");
         }
     }    private async validateApiKeys(): Promise<void> {
@@ -233,7 +230,7 @@ export default class NeuroVoxPlugin extends Plugin {
                 new Notice('❌ Deepgram API key validation failed');
             }
         } catch (error) {
-            console.error("API key validation failed:", error);
+            // Silent fail for API key validation
         }
     }public initializeAIAdapters(): void {
         try {
@@ -245,7 +242,6 @@ export default class NeuroVoxPlugin extends Plugin {
             
             this.aiAdapters = new Map<AIProvider, AIAdapter>(adapters);
         } catch (error) {
-            console.error("Failed to initialize AI adapters:", error);
             throw new Error("Failed to initialize AI adapters");
         }
     }
@@ -576,8 +572,8 @@ export default class NeuroVoxPlugin extends Plugin {
 
     onunload() {
         // Make sure to save settings on plugin unload
-        this.saveSettings().catch(error => {
-            console.error("Failed to save settings on unload:", error);
+        this.saveSettings().catch(() => {
+            // Silent fail on unload
         });
         this.cleanupUI();
     }

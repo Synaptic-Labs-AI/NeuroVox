@@ -52,7 +52,6 @@ export class AudioChunker {
             
             return chunks;
         } catch (error) {
-            console.error('Error splitting audio:', error);
             return [audioBlob];
         }
     }
@@ -79,7 +78,6 @@ export class AudioChunker {
             return new Blob(processedChunks, { type: firstChunk.type });
             
         } catch (error) {
-            console.error('Error concatenating audio:', error);
             return chunks[0];
         }
     }
@@ -126,7 +124,6 @@ export class AudioChunker {
             const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
             return await this.bufferToBlob(audioContext, audioBuffer, mimeType);
         } catch (error) {
-            console.error('Error processing chunk:', error);
             return chunk;
         }
     }

@@ -255,7 +255,6 @@ export class TimerModal extends Modal {
             const added = await this.streamingService.addChunk(blob, metadata);
             
             if (!added) {
-                console.warn('Failed to add chunk to streaming service - memory limit reached');
                 // Could potentially pause recording here if needed
                 if (this.streamingService.isQueuePaused()) {
                     new Notice('Memory limit reached - processing chunks...');

@@ -62,7 +62,7 @@ export class AudioFileManager {
             try {
                 await this.plugin.app.vault.adapter.remove(path);
             } catch (error) {
-                console.error(`Failed to remove temporary file ${path}:`, error);
+                // Silent fail for cleanup
             }
         }
     }

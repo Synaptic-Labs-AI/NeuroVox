@@ -39,7 +39,6 @@ export class StreamingTranscriptionService {
         const added = await this.chunkQueue.enqueue(chunk, metadata);
         
         if (!added) {
-            console.warn('Failed to add chunk to queue - memory limit reached');
             return false;
         }
 
@@ -72,7 +71,6 @@ export class StreamingTranscriptionService {
                     // Process the chunk
                     await this.processChunk(queueItem.chunk, queueItem.metadata);
                 } catch (error) {
-                    console.error('Error processing chunk:', error);
                     // Continue with next chunk even if one fails
                 }
             }
@@ -111,7 +109,6 @@ export class StreamingTranscriptionService {
             this.cleanupBlob(chunk);
 
         } catch (error) {
-            console.error(`Failed to process chunk ${metadata.id}:`, error);
             throw error;
         }
     }
@@ -139,7 +136,7 @@ export class StreamingTranscriptionService {
             try {
                 await this.processingPromise;
             } catch (error) {
-                console.error('Error waiting for processing to complete:', error);
+                // Silent fail
             }
         }
 
