@@ -1,24 +1,22 @@
 # NeuroVox
 
-NeuroVoxSalad is a fork of NeuroVox 1.0.4 (https://github.com/Synaptic-Labs-AI/NeuroVox) Obsidian plugin that enhances your note-taking with voice transcription and AI capabilities. Record your voice, transcribe it, and apply custom AI prompts to the transcription.
+NeuroVox is an Obsidian plugin that enhances your note-taking with voice transcription and AI capabilities. Record your voice, transcribe it, and apply custom AI prompts to the transcription.
 
-## Features (new in this fork)
+## Features
 
-- Ability to enter Salad Transcription API key and use it
-- Abillity to add Perplexity Sonar as post-processing
-- Debug mode for mobiles
-- Fixed a bug causing audio file was not created on mobiles
+- **Voice Recording**: A mic icon will appear in your note, which you can press to record.
+- **Transcription**: Automatically transcribes your voice recordings using the [OpenAI Whisper API](https://openai.com/index/whisper/) along with Groq.
+- **Custom Prompts**: Apply custom prompts to the transcription to summarize, extract to-dos, or other actions.
+- **Audio Playback**: Embeds the audio file in your note for easy access.
+- **Embedded Output**: Transcriptions and AI-generated outputs are embedded in your notes as callouts wherever your cursor is.
 
 ## Installation
 
-Manual:
-- Create neurovoxsalad folder in your .obsidian/plugins
-- copy 3 files into this folder:
--- main.js
--- manifest.json
--- styles.css 
-- restart obsidian
-- activate plugin
+1. Download the NeuroVox plugin from Community Plugins.
+2. Enable the plugin from the Obsidian settings by toggling it on.
+3. Input your OpenAI, Deepgram and/or Groq API Key (instructions below).
+4. Choose a folder to save the Recordings.
+5. Turn on the Floating Button Mic (optional), or otherwise use the toolbar icon or command pallette to start a recording.
 
 ## API Key Setup
 
@@ -26,7 +24,30 @@ If you need to obtain an OpenAI API key, follow the steps below:
 
 ### Steps to Get an API Key
 
-same as in original plugin (but you can add Salad Transcription API and Preplexity Sonar, yay!)
+1. **Create an Account**:
+    - Visit the [OpenAI website](https://platform.openai.com) and sign up for an account.
+    - Visit the [Groq website](https://console.groq.com/) to get an account there.
+    - Visit the [Deepgram website](https://console.deepgram.com/signup) to create an account.
+    - Visit the [Salad Portal](https://portal.salad.com/) to create an account.
+
+    - Visit [Perplexity](https://www.perplexity.ai/) to create an account.
+
+2. **Access API Keys**:
+    - Log in to your account.
+    - **OpenAI**: Click on the ⚙️ in the top right corner and select "API Keys" from the dropdown menu.
+    - **Groq**: Click "API Keys" on the left sidebar.
+    - **Deepgram**: Click the "Free API key button in the top right.
+    - **Salad**: go to "API Access" in menu 
+    - **Perplexity**: click on profile icon and select API 
+
+3. **Create a New Key**:
+    - On the API Keys page, click "Create new secret key."
+
+4. **Secure Your API Key**:
+    - Copy the newly generated API key into the `🔑 Api Keys` accordion in the Neurovox Settings. Treat this key like a password and do not share it with anyone.
+
+5. **Billing Information**:
+    - You need to add billing information to your account to make API calls.
 
 ## Contribution
 

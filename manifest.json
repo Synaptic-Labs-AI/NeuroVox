@@ -1,12 +1,12 @@
 {
-	"id": "neurovoxsalad",
-	"name": "NeuroVoxSalad",
-	"version": "1.0.5",
+	"id": "neurovox",
+	"name": "NeuroVox",
+	"version": "1.0.4",
 	"minAppVersion": "0.15.0",
 	"description": "Enhances your note-taking with voice transcription and AI capabilities",
-	"author": "Synaptic Labs + some new features by palik.it",
-	"authorUrl": "https://palik.it",
-	"fundingUrl": "https://buycoffee.to/palik",
+	"author": "Synaptic Labs",
+	"authorUrl": "https://www.synapticlabs.ai",
+	"fundingUrl": "https://donate.stripe.com/bIY4gsgDo2mJ5kkfZ6",
 	"isDesktopOnly": false,
 	"settings": {
 		"showFloatingButton": true
