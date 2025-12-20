@@ -87,7 +87,11 @@ export class RecordingProcessor {
                 {
                     transcription: result.transcription,
                     postProcessing: result.postProcessing,
-                    audioFilePath: audioResult.finalPath
+                    audioFilePath: audioResult.finalPath,
+                    transcriptionProvider: this.plugin.settings.transcriptionProvider,
+                    transcriptionModel: this.plugin.settings.transcriptionModel,
+                    postProcessingProvider: this.plugin.settings.postProcessingProvider,
+                    postProcessingModel: this.plugin.settings.postProcessingModel
                 },
                 activeFile,
                 cursorPosition
@@ -137,8 +141,12 @@ export class RecordingProcessor {
             await this.documentInserter.insertContent(
                 {
                     transcription: transcriptionResult,
-                    postProcessing
+                    postProcessing,
                     // No audioFilePath for streaming mode
+                    transcriptionProvider: this.plugin.settings.transcriptionProvider,
+                    transcriptionModel: this.plugin.settings.transcriptionModel,
+                    postProcessingProvider: this.plugin.settings.postProcessingProvider,
+                    postProcessingModel: this.plugin.settings.postProcessingModel
                 },
                 activeFile,
                 cursorPosition

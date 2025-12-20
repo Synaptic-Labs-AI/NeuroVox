@@ -8,6 +8,10 @@ export interface InsertContent {
     transcription: string;
     postProcessing?: string;
     audioFilePath?: string;
+    transcriptionProvider?: string;
+    transcriptionModel?: string;
+    postProcessingProvider?: string;
+    postProcessingModel?: string;
 }
 
 /**
@@ -74,10 +78,15 @@ export class DocumentInserter {
                 .replace('{audioPath}', ''); // Fallback for any other format
         }
         
+        // Add model info to transcription
+        const transcriptionWithModelInfo = content.transcriptionProvider && content.transcriptionModel
+            ? `*Transcribed with ${content.transcriptionProvider} (${content.transcriptionModel})*\n\n${content.transcription}`
+            : content.transcription;
+        
         // Format transcription content
         let formattedContent = format
             .replace('{audioPath}', content.audioFilePath || '')
-            .replace('{transcription}', content.transcription);
+            .replace('{transcription}', transcriptionWithModelInfo);
 
         // Only use callout formatting if the format includes callout syntax
         const useTranscriptionCallout = this.isCalloutFormat(format);
@@ -88,8 +97,13 @@ export class DocumentInserter {
             const postFormat = this.plugin.settings.postProcessingCalloutFormat;
             const usePostCallout = this.isCalloutFormat(postFormat);
             
+            // Add model info to post-processing
+            const postProcessingWithModelInfo = content.postProcessingProvider && content.postProcessingModel
+                ? `*Generated with ${content.postProcessingProvider} (${content.postProcessingModel})*\n\n${content.postProcessing}`
+                : content.postProcessing;
+            
             let postContent = postFormat
-                .replace('{postProcessing}', content.postProcessing);
+                .replace('{postProcessing}', postProcessingWithModelInfo);
             
             postContent = this.formatLines(postContent, usePostCallout);
             formattedContent += '\n---\n' + postContent + '\n\n';
