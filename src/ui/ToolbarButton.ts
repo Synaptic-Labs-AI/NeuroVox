@@ -47,11 +47,19 @@ export class ToolbarButton {
             const cursorPosition = editor.getCursor();
 
             const modal = new TimerModal(this.plugin);
-            modal.onStop = async (result: Blob | string) => {
+            modal.onStop = async (result: Blob | string, audioBlob?: Blob) => {
                 // Handle both streaming (string) and legacy (Blob) results
                 if (typeof result === 'string') {
                     // Streaming mode - transcription already done
-                    await this.plugin.recordingProcessor.processStreamingResult(result, activeFile, cursorPosition);
+                    // If we have audio blob, save it first
+                    let audioFilePath: string | undefined;
+                    if (audioBlob) {
+                        const { AudioFileManager } = await import('../utils/audio/AudioFileManager');
+                        const audioFileManager = new AudioFileManager(this.plugin);
+                        audioFilePath = await audioFileManager.saveAudioFile(audioBlob);
+                    }
+                    
+                    await this.plugin.recordingProcessor.processStreamingResult(result, activeFile, cursorPosition, audioFilePath);
                 } else {
                     // Legacy mode - need to transcribe
                     await this.plugin.recordingProcessor.processRecording(result, activeFile, cursorPosition);

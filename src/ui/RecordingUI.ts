@@ -14,6 +14,7 @@ export interface RecordingUIHandlers {
  */
 export class RecordingUI {
     private timerText: HTMLElement;
+    private debugText: HTMLElement | null = null;
     private pauseButton: TouchableButton;
     private stopButton: TouchableButton;
     private waveContainer: HTMLElement;
@@ -70,6 +71,13 @@ export class RecordingUI {
             cls: 'neurovox-timer-display',
             text: '00:00'
         });
+        
+        // Create debug text element (hidden by default)
+        this.debugText = this.container.createDiv({
+            cls: 'neurovox-debug-display',
+            text: ''
+        });
+        this.debugText.style.display = 'none';
     }
 
     private createControls(): void {
@@ -110,14 +118,35 @@ export class RecordingUI {
         }
     }
 
-    public updateTimer(seconds: number, maxDuration: number, warningThreshold: number): void {
+    public updateTimer(seconds: number | string, maxDuration?: number, warningThreshold?: number): void {
+        if (typeof seconds === 'string') {
+            // Allow custom text (e.g., "Processing...")
+            this.timerText.setText(seconds);
+            return;
+        }
+        
         const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
         const remainingSeconds = (seconds % 60).toString().padStart(2, '0');
         
         this.timerText.setText(`${minutes}:${remainingSeconds}`);
 
-        const timeLeft = maxDuration - seconds;
-        this.timerText.toggleClass('is-warning', timeLeft <= warningThreshold);
+        if (maxDuration !== undefined && warningThreshold !== undefined) {
+            const timeLeft = maxDuration - seconds;
+            this.timerText.toggleClass('is-warning', timeLeft <= warningThreshold);
+        }
+    }
+
+    public updateDebugInfo(queueSize: number, processedCount: number): void {
+        if (this.debugText) {
+            this.debugText.setText(`Queue: ${queueSize} | Processed: ${processedCount}`);
+            this.debugText.style.display = 'block';
+        }
+    }
+
+    public hideDebugInfo(): void {
+        if (this.debugText) {
+            this.debugText.style.display = 'none';
+        }
     }
 
     public updateState(state: RecordingState): void {

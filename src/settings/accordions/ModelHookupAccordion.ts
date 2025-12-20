@@ -139,5 +139,101 @@ export class ModelHookupAccordion extends BaseAccordion {
                         }
                     });
             });
+
+        // Salad Organization Name
+        new Setting(this.contentEl)
+            .setName("Salad Organization")
+            .setDesc("Enter your SaladCloud organization name")
+            .addText(text => {
+                text
+                    .setPlaceholder("my-organization")
+                    .setValue(this.settings.saladOrganization);
+                text.onChange(async (value: string) => {
+                    const trimmedValue = value.trim();
+                    this.settings.saladOrganization = trimmedValue;
+                    await this.plugin.saveSettings();
+
+                    const adapter = this.getAdapter(AIProvider.Salad);
+                    if (adapter && 'setOrganization' in adapter) {
+                        (adapter as any).setOrganization(trimmedValue);
+                    }
+                });
+            });
+
+        // Salad API Key
+        const saladSetting = new Setting(this.contentEl)
+            .setName("Salad API Key")
+            .setDesc("Enter your SaladCloud API key")
+            .addText(text => {
+                text
+                    .setPlaceholder("Enter your Salad API key...")
+                    .setValue(this.settings.saladApiKey);
+                text.inputEl.type = "password";
+                text.onChange(async (value: string) => {
+                        const trimmedValue = value.trim();
+                        this.settings.saladApiKey = trimmedValue;
+                        await this.plugin.saveSettings();
+
+                        const adapter = this.getAdapter(AIProvider.Salad);
+                        if (!adapter) {
+                            return;
+                        }
+
+                        adapter.setApiKey(trimmedValue);
+                        
+                        // Also set organization if available
+                        if ('setOrganization' in adapter) {
+                            (adapter as any).setOrganization(this.settings.saladOrganization);
+                        }
+
+                        const isValid = await adapter.validateApiKey();
+
+                        if (isValid) {
+                            saladSetting.setDesc("✅ API key validated successfully");
+                            try {
+                                await this.refreshAccordions();
+                            } catch (error) {
+                                saladSetting.setDesc("✅ API key valid, but failed to update model lists");
+                            }
+                        } else {
+                            saladSetting.setDesc("❌ Invalid API key or organization. Please check your credentials.");
+                        }
+                    });
+            });
+
+        // Perplexity API Key
+        const perplexitySetting = new Setting(this.contentEl)
+            .setName("Perplexity API Key")
+            .setDesc("Enter your Perplexity API key")
+            .addText(text => {
+                text
+                    .setPlaceholder("pplx-...")
+                    .setValue(this.settings.perplexityApiKey);
+                text.inputEl.type = "password";
+                text.onChange(async (value: string) => {
+                        const trimmedValue = value.trim();
+                        this.settings.perplexityApiKey = trimmedValue;
+                        await this.plugin.saveSettings();
+
+                        const adapter = this.getAdapter(AIProvider.Perplexity);
+                        if (!adapter) {
+                            return;
+                        }
+
+                        adapter.setApiKey(trimmedValue);
+                        const isValid = await adapter.validateApiKey();
+
+                        if (isValid) {
+                            perplexitySetting.setDesc("✅ API key validated successfully");
+                            try {
+                                await this.refreshAccordions();
+                            } catch (error) {
+                                perplexitySetting.setDesc("✅ API key valid, but failed to update model lists");
+                            }
+                        } else {
+                            perplexitySetting.setDesc("❌ Invalid API key. Please check your credentials.");
+                        }
+                    });
+            });
     }
 }

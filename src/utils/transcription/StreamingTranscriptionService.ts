@@ -114,37 +114,53 @@ export class StreamingTranscriptionService {
     }
 
     async finishProcessing(): Promise<string> {
-        // Stop accepting new chunks
-        this.isProcessing = false;
+        const initialQueueSize = this.chunkQueue.size();
+        
+        if (this.plugin.settings.debugMode) {
+            console.log(`[NeuroVox Debug] Starting finishProcessing with ${initialQueueSize} chunks in queue, ${this.processedChunks.size} already processed`);
+        }
 
-        // Wait for queue to be processed
+        // Keep processing running until queue is empty
         let attempts = 0;
-        const maxAttempts = 300; // 30 seconds timeout
+        const maxAttempts = 600; // 60 seconds timeout
         
         while (this.chunkQueue.size() > 0 && attempts < maxAttempts) {
+            if (this.plugin.settings.debugMode && attempts % 10 === 0) {
+                console.log(`[NeuroVox Debug] Waiting for chunks: ${this.chunkQueue.size()} remaining, ${this.processedChunks.size} processed`);
+            }
             await this.sleep(100);
             attempts++;
         }
 
-        // Abort if still processing after timeout
-        if (this.abortController) {
-            this.abortController.abort();
+        // Now stop accepting new chunks and stop processing
+        this.isProcessing = false;
+
+        if (this.plugin.settings.debugMode) {
+            console.log(`[NeuroVox Debug] Queue processing complete. Processed: ${this.processedChunks.size}, Remaining: ${this.chunkQueue.size()}`);
         }
 
-        // Wait for processing to complete
+        // Wait for processing loop to complete
         if (this.processingPromise) {
             try {
                 await this.processingPromise;
             } catch (error) {
-                // Silent fail
+                if (this.plugin.settings.debugMode) {
+                    console.error('[NeuroVox Debug] Error in processing promise:', error);
+                }
             }
         }
 
         // Get final result
-        return this.resultCompiler.getFinalResult(
+        const result = this.resultCompiler.getFinalResult(
             this.plugin.settings.includeTimestamps || false,
             true // Include metadata
         );
+        
+        if (this.plugin.settings.debugMode) {
+            console.log(`[NeuroVox Debug] Final result length: ${result.length} characters, segments: ${this.resultCompiler.getSegmentCount()}`);
+        }
+        
+        return result;
     }
 
     getPartialResult(): string {

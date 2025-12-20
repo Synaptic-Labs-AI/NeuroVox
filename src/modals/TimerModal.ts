@@ -32,7 +32,7 @@ export class TimerModal extends Modal {
 
     private readonly CONFIG: TimerConfig;
 
-    public onStop: (result: Blob | string) => void;
+    public onStop: (result: Blob | string, audioBlob?: Blob) => void;
 
     constructor(private plugin: NeuroVoxPlugin) {
         super(plugin.app);
@@ -300,31 +300,64 @@ export class TimerModal extends Modal {
         try {
             const finalBlob = await this.recordingManager.stop();
             
-            let result: Blob | string;
-            
             if (this.useStreaming && this.streamingService) {
-                // Streaming mode - get transcription result
-                new Notice('Finishing transcription...');
-                result = await this.streamingService.finishProcessing();
+                // Streaming mode - keep modal open and show processing status
+                const audioBlob = finalBlob || undefined;
                 
-                if (!result || result.trim().length === 0) {
-                    throw new Error('No transcription result received');
+                // Update UI to show processing state
+                this.ui?.updateState('stopped');
+                this.ui?.updateTimer('Processing...');
+                this.ui?.hideDebugInfo();
+                
+                // Get stats before processing
+                const stats = this.streamingService.getStats();
+                
+                // Show notice with chunk status if debug mode is enabled
+                if (this.plugin.settings.debugMode) {
+                    new Notice(`Processing ${stats.queueStats.queueSize} remaining chunks...`);
+                }
+                
+                // Continue processing with modal still open
+                new Notice('Finishing transcription...');
+                
+                try {
+                    const result = await this.streamingService.finishProcessing();
+                    
+                    if (!result || result.trim().length === 0) {
+                        throw new Error('No transcription result received');
+                    }
+                    
+                    // Now close modal after successful processing
+                    this.cleanup();
+                    super.close();
+                    
+                    // Call onStop handler with results
+                    if (this.onStop) {
+                        await this.onStop(result, audioBlob);
+                    }
+                } catch (processingError) {
+                    // Close modal on error too
+                    this.cleanup();
+                    super.close();
+                    
+                    const errorMsg = processingError instanceof Error ? processingError.message : 'Unknown error';
+                    new Notice(`❌ Transcription failed: ${errorMsg}`);
+                    throw processingError;
                 }
             } else {
                 // Legacy mode - return audio blob
                 if (!finalBlob) {
                     throw new Error('No audio data received from recorder');
                 }
-                result = finalBlob;
-            }
+                
+                // Close recording modal first
+                this.cleanup();
+                super.close();
 
-            // Close recording modal first
-            this.cleanup();
-            super.close();
-
-            // Always save the recording
-            if (this.onStop) {
-                await this.onStop(result);
+                // Always save the recording
+                if (this.onStop) {
+                    await this.onStop(finalBlob);
+                }
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -354,11 +387,20 @@ export class TimerModal extends Modal {
      * Updates the timer display
      */
     private updateTimerDisplay(): void {
+        // Update timer
         this.ui.updateTimer(
             this.seconds,
             this.CONFIG.maxDuration,
             this.CONFIG.warningThreshold
         );
+        
+        // In debug mode with streaming, show chunk queue status on separate line
+        if (this.plugin.settings.debugMode && this.useStreaming && this.streamingService) {
+            const stats = this.streamingService.getStats();
+            this.ui.updateDebugInfo(stats.queueStats.queueSize, stats.processedChunks);
+        } else {
+            this.ui.hideDebugInfo();
+        }
     }
 
     /**

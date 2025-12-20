@@ -13,6 +13,9 @@ export type NeuroVoxSettings = {
     openaiApiKey: string;
     groqApiKey: string;
     deepgramApiKey: string;
+    saladApiKey: string;
+    saladOrganization: string;
+    perplexityApiKey: string;
 
     // Recording
     audioQuality: AudioQuality;
@@ -38,6 +41,9 @@ export type NeuroVoxSettings = {
     postProcessingTemperature: number;
     postProcessingCalloutFormat: string;
 
+    // Debug
+    debugMode: boolean;
+
     // Current Provider
     currentProvider: AIProvider;
 
@@ -54,6 +60,9 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     openaiApiKey: '',
     groqApiKey: '',
     deepgramApiKey: '',
+    saladApiKey: '',
+    saladOrganization: '',
+    perplexityApiKey: '',
 
     // Recording
     audioQuality: AudioQuality.Medium,
@@ -78,6 +87,9 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     postProcessingProvider: AIProvider.OpenAI,
     postProcessingTemperature: 0.7,
     postProcessingCalloutFormat: '>[!note]- Post-Processing\n>{postProcessing}',
+    
+    // Debug
+    debugMode: false,
 
     // Current Provider
     currentProvider: AIProvider.OpenAI,

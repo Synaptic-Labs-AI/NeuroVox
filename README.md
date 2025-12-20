@@ -28,12 +28,17 @@ If you need to obtain an OpenAI API key, follow the steps below:
     - Visit the [OpenAI website](https://platform.openai.com) and sign up for an account.
     - Visit the [Groq website](https://console.groq.com/) to get an account there.
     - Visit the [Deepgram website](https://console.deepgram.com/signup) to create an account.
+    - Visit the [Salad Portal](https://portal.salad.com/) to create an account.
+
+    - Visit [Perplexity](https://www.perplexity.ai/) to create an account.
 
 2. **Access API Keys**:
     - Log in to your account.
     - **OpenAI**: Click on the ⚙️ in the top right corner and select "API Keys" from the dropdown menu.
     - **Groq**: Click "API Keys" on the left sidebar.
     - **Deepgram**: Click the "Free API key button in the top right.
+    - **Salad**: go to "API Access" in menu 
+    - **Perplexity**: click on profile icon and select API 
 
 3. **Create a New Key**:
     - On the API Keys page, click "Create new secret key."
