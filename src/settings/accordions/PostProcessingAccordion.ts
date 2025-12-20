@@ -95,7 +95,7 @@ export class PostProcessingAccordion extends BaseAccordion {
         dropdown.selectEl.empty();
         let hasValidProvider = false;
         
-        for (const provider of [AIProvider.OpenAI, AIProvider.Groq]) {
+        for (const provider of [AIProvider.OpenAI, AIProvider.Groq, AIProvider.Perplexity]) {
             const apiKey = this.settings[`${provider}ApiKey` as keyof NeuroVoxSettings];
             if (apiKey) {
                 const models = AIModels[provider].filter(model => model.category === 'language');

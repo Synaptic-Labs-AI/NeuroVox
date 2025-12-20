@@ -15,6 +15,7 @@ export type NeuroVoxSettings = {
     deepgramApiKey: string;
     saladApiKey: string;
     saladOrganization: string;
+    perplexityApiKey: string;
 
     // Recording
     audioQuality: AudioQuality;
@@ -58,6 +59,7 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     deepgramApiKey: '',
     saladApiKey: '',
     saladOrganization: '',
+    perplexityApiKey: '',
 
     // Recording
     audioQuality: AudioQuality.Medium,

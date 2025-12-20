@@ -200,5 +200,40 @@ export class ModelHookupAccordion extends BaseAccordion {
                         }
                     });
             });
+
+        // Perplexity API Key
+        const perplexitySetting = new Setting(this.contentEl)
+            .setName("Perplexity API Key")
+            .setDesc("Enter your Perplexity API key")
+            .addText(text => {
+                text
+                    .setPlaceholder("pplx-...")
+                    .setValue(this.settings.perplexityApiKey);
+                text.inputEl.type = "password";
+                text.onChange(async (value: string) => {
+                        const trimmedValue = value.trim();
+                        this.settings.perplexityApiKey = trimmedValue;
+                        await this.plugin.saveSettings();
+
+                        const adapter = this.getAdapter(AIProvider.Perplexity);
+                        if (!adapter) {
+                            return;
+                        }
+
+                        adapter.setApiKey(trimmedValue);
+                        const isValid = await adapter.validateApiKey();
+
+                        if (isValid) {
+                            perplexitySetting.setDesc("✅ API key validated successfully");
+                            try {
+                                await this.refreshAccordions();
+                            } catch (error) {
+                                perplexitySetting.setDesc("✅ API key valid, but failed to update model lists");
+                            }
+                        } else {
+                            perplexitySetting.setDesc("❌ Invalid API key. Please check your credentials.");
+                        }
+                    });
+            });
     }
 }
