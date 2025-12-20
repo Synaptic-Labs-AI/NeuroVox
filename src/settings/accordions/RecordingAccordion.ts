@@ -38,6 +38,9 @@ export class RecordingAccordion extends BaseAccordion {
         // Mic Button Color
         this.createMicButtonColorSetting();
         
+        // Debug Mode Toggle
+        this.createDebugModeSetting();
+        
         // Add this before createTranscriptionModelSetting
         this.createTranscriptionFormatSetting();
 
@@ -159,6 +162,20 @@ export class RecordingAccordion extends BaseAccordion {
                         this.settings.micButtonColor = value;
                         // Update all floating button colors using public method
                         this.plugin.updateAllButtonColors();
+                        await this.plugin.saveSettings();
+                    });
+            });
+    }
+
+    private createDebugModeSetting(): void {
+        new Setting(this.contentEl)
+            .setName("Debug mode")
+            .setDesc("Enable detailed logging of operations (chunks, API calls, file operations, timing). Debug info will be added to transcription notes.")
+            .addToggle(toggle => {
+                toggle
+                    .setValue(this.settings.debugMode)
+                    .onChange(async (value) => {
+                        this.settings.debugMode = value;
                         await this.plugin.saveSettings();
                     });
             });

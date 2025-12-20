@@ -541,14 +541,23 @@ export default class NeuroVoxPlugin extends Plugin {
             if (this.modalInstance) return;
             
             this.modalInstance = new TimerModal(this);
-            this.modalInstance.onStop = async (result: Blob | string) => {
+            this.modalInstance.onStop = async (result: Blob | string, audioBlob?: Blob) => {
                 try {
                     if (typeof result === 'string') {
                         // Streaming mode - transcription already done
+                        // If we have audio blob, save it first
+                        let audioFilePath: string | undefined;
+                        if (audioBlob) {
+                            const AudioFileManager = (await import('./utils/audio/AudioFileManager')).AudioFileManager;
+                            const audioFileManager = new AudioFileManager(this);
+                            audioFilePath = await audioFileManager.saveAudioFile(audioBlob);
+                        }
+                        
                         await this.recordingProcessor.processStreamingResult(
                             result,
                             activeFile,
-                            activeView.editor.getCursor()
+                            activeView.editor.getCursor(),
+                            audioFilePath
                         );
                     } else {
                         // Legacy mode - need to transcribe

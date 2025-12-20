@@ -32,7 +32,7 @@ export class TimerModal extends Modal {
 
     private readonly CONFIG: TimerConfig;
 
-    public onStop: (result: Blob | string) => void;
+    public onStop: (result: Blob | string, audioBlob?: Blob) => void;
 
     constructor(private plugin: NeuroVoxPlugin) {
         super(plugin.app);
@@ -301,6 +301,7 @@ export class TimerModal extends Modal {
             const finalBlob = await this.recordingManager.stop();
             
             let result: Blob | string;
+            let audioBlob: Blob | undefined;
             
             if (this.useStreaming && this.streamingService) {
                 // Streaming mode - get transcription result
@@ -310,6 +311,9 @@ export class TimerModal extends Modal {
                 if (!result || result.trim().length === 0) {
                     throw new Error('No transcription result received');
                 }
+                
+                // Store audio blob for saving even in streaming mode
+                audioBlob = finalBlob || undefined;
             } else {
                 // Legacy mode - return audio blob
                 if (!finalBlob) {
@@ -324,7 +328,12 @@ export class TimerModal extends Modal {
 
             // Always save the recording
             if (this.onStop) {
-                await this.onStop(result);
+                // Pass both result and audio blob if in streaming mode
+                if (this.useStreaming && audioBlob) {
+                    await this.onStop(result, audioBlob);
+                } else {
+                    await this.onStop(result);
+                }
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';

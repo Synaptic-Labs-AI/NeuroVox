@@ -4,6 +4,7 @@ import { AudioProcessor } from './audio/AudioProcessor';
 import { TranscriptionService, TranscriptionResult } from './transcription/TranscriptionService';
 import { DocumentInserter } from './document/DocumentInserter';
 import { ProcessingState } from './state/ProcessingState';
+import { DebugLogger } from './DebugLogger';
 
 /**
  * Configuration for the processing pipeline
@@ -113,7 +114,8 @@ export class RecordingProcessor {
     public async processStreamingResult(
         transcriptionResult: string,
         activeFile: TFile,
-        cursorPosition: EditorPosition
+        cursorPosition: EditorPosition,
+        audioFilePath?: string
     ): Promise<void> {
         if (this.processingState.getIsProcessing()) {
             throw new Error('Recording is already in progress.');
@@ -142,7 +144,7 @@ export class RecordingProcessor {
                 {
                     transcription: transcriptionResult,
                     postProcessing,
-                    // No audioFilePath for streaming mode
+                    audioFilePath,
                     transcriptionProvider: this.plugin.settings.transcriptionProvider,
                     transcriptionModel: this.plugin.settings.transcriptionModel,
                     postProcessingProvider: this.plugin.settings.postProcessingProvider,

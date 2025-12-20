@@ -41,6 +41,9 @@ export type NeuroVoxSettings = {
     postProcessingTemperature: number;
     postProcessingCalloutFormat: string;
 
+    // Debug
+    debugMode: boolean;
+
     // Current Provider
     currentProvider: AIProvider;
 
@@ -84,6 +87,9 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     postProcessingProvider: AIProvider.OpenAI,
     postProcessingTemperature: 0.7,
     postProcessingCalloutFormat: '>[!note]- Post-Processing\n>{postProcessing}',
+    
+    // Debug
+    debugMode: false,
 
     // Current Provider
     currentProvider: AIProvider.OpenAI,
