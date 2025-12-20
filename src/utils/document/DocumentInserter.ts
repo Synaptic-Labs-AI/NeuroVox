@@ -12,6 +12,7 @@ export interface InsertContent {
     transcriptionModel?: string;
     postProcessingProvider?: string;
     postProcessingModel?: string;
+    debugLogs?: string;
 }
 
 /**
@@ -107,6 +108,11 @@ export class DocumentInserter {
             
             postContent = this.formatLines(postContent, usePostCallout);
             formattedContent += '\n---\n' + postContent + '\n\n';
+        }
+        
+        // Add debug logs if available
+        if (content.debugLogs) {
+            formattedContent += '\n---\n' + content.debugLogs + '\n\n';
         }
         
         return formattedContent + '\n';

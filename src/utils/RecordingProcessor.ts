@@ -32,12 +32,15 @@ export class RecordingProcessor {
         maxRetries: 3,
         retryDelay: 1000
     };
+    
+    private debugLogger: DebugLogger;
 
     private constructor(private plugin: NeuroVoxPlugin) {
         this.processingState = new ProcessingState();
         this.audioProcessor = new AudioProcessor(plugin);
         this.transcriptionService = new TranscriptionService(plugin);
         this.documentInserter = new DocumentInserter(plugin);
+        this.debugLogger = new DebugLogger(plugin);
     }
 
     public static getInstance(plugin: NeuroVoxPlugin): RecordingProcessor {
@@ -124,6 +127,12 @@ export class RecordingProcessor {
         try {
             this.processingState.setIsProcessing(true);
             this.processingState.reset();
+            this.debugLogger.clear();
+            
+            this.debugLogger.log('general', 'Streaming result processing started', {
+                transcriptionLength: transcriptionResult.length,
+                hasAudioFile: !!audioFilePath
+            });
             
             // Skip audio processing since we already have the transcription
             this.processingState.startStep('Content Processing');
@@ -132,9 +141,15 @@ export class RecordingProcessor {
             let postProcessing: string | undefined;
             if (this.plugin.settings.generatePostProcessing) {
                 this.processingState.startStep('Post-processing');
+                this.debugLogger.startTimer('post-processing');
                 postProcessing = await this.executeWithRetry(() => 
                     this.generatePostProcessing(transcriptionResult)
                 );
+                this.debugLogger.endTimer('post-processing', 'api', 'Post-processing generation', {
+                    provider: this.plugin.settings.postProcessingProvider,
+                    model: this.plugin.settings.postProcessingModel,
+                    resultLength: postProcessing?.length || 0
+                });
                 this.processingState.completeStep();
             }
 
@@ -148,7 +163,8 @@ export class RecordingProcessor {
                     transcriptionProvider: this.plugin.settings.transcriptionProvider,
                     transcriptionModel: this.plugin.settings.transcriptionModel,
                     postProcessingProvider: this.plugin.settings.postProcessingProvider,
-                    postProcessingModel: this.plugin.settings.postProcessingModel
+                    postProcessingModel: this.plugin.settings.postProcessingModel,
+                    debugLogs: this.plugin.settings.debugMode ? this.debugLogger.getFormattedLogs() : undefined
                 },
                 activeFile,
                 cursorPosition
@@ -156,6 +172,9 @@ export class RecordingProcessor {
             this.processingState.completeStep();
 
         } catch (error) {
+            this.debugLogger.log('general', 'Processing error', {
+                error: error instanceof Error ? error.message : 'Unknown error'
+            });
             this.handleError('Processing failed', error);
             this.processingState.setError(error as Error);
             throw error;
