@@ -45,6 +45,11 @@ export class TranscriptionService {
      * Transcribes audio using the configured AI adapter
      */
     private async transcribeAudio(audioBuffer: ArrayBuffer): Promise<string> {
+        console.log('NeuroVox Debug - Transcription Settings:', {
+            provider: this.plugin.settings.transcriptionProvider,
+            model: this.plugin.settings.transcriptionModel
+        });
+        
         const adapter = this.getAdapter(
             this.plugin.settings.transcriptionProvider,
             'transcription'
@@ -85,6 +90,13 @@ export class TranscriptionService {
         if (!adapter) {
             throw new Error(`${provider} adapter not found`);
         }
+
+        console.log('NeuroVox Debug - Adapter check:', {
+            provider,
+            category,
+            isReady: adapter.isReady(category),
+            apiKey: adapter.getApiKey() ? 'present' : 'missing'
+        });
 
         if (!adapter.isReady(category)) {
             const apiKey = adapter.getApiKey();

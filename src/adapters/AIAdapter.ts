@@ -5,6 +5,7 @@ export enum AIProvider {
     OpenAI = 'openai',
     Groq = 'groq',
     Deepgram = 'deepgram',
+    Salad = 'salad',
 }
 
 export interface AIModel {
@@ -40,6 +41,10 @@ export const AIModels: Record<AIProvider, AIModel[]> = {
     [AIProvider.Deepgram]: [
         { id: 'nova-2', name: 'Nova-2', category: 'transcription' },
         { id: 'nova-3', name: 'Nova-3', category: 'transcription' },
+    ],
+    [AIProvider.Salad]: [
+        { id: 'transcribe', name: 'Salad Transcription', category: 'transcription' },
+        { id: 'transcription-lite', name: 'Transcription Lite', category: 'transcription' },
     ],
 };
 

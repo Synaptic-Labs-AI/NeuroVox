@@ -195,9 +195,17 @@ export class RecordingAccordion extends BaseAccordion {
                 dropdown.onChange(async (value) => {
                     this.settings.transcriptionModel = value;
                     const provider = this.getProviderFromModel(value);
+                    console.log('NeuroVox Debug - Model changed:', {
+                        model: value,
+                        detectedProvider: provider
+                    });
                     if (provider) {
                         this.settings.transcriptionProvider = provider;
                         await this.plugin.saveSettings();
+                        console.log('NeuroVox Debug - Settings saved:', {
+                            transcriptionProvider: this.settings.transcriptionProvider,
+                            transcriptionModel: this.settings.transcriptionModel
+                        });
                     }
                 });
             });
@@ -205,7 +213,7 @@ export class RecordingAccordion extends BaseAccordion {
         dropdown.selectEl.empty();
         let hasValidProvider = false;
 
-        for (const provider of [AIProvider.OpenAI, AIProvider.Groq, AIProvider.Deepgram]) {
+        for (const provider of [AIProvider.OpenAI, AIProvider.Groq, AIProvider.Deepgram, AIProvider.Salad]) {
             const apiKey = this.settings[`${provider}ApiKey` as keyof NeuroVoxSettings];
             if (apiKey) {
                 const adapter = this.getAdapter(provider);

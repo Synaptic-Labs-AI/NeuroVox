@@ -1,6 +1,6 @@
 {
-	"id": "neurovox",
-	"name": "NeuroVox",
+	"id": "neurovoxsalad",
+	"name": "NeuroVoxSalad",
 	"version": "1.0.4",
 	"minAppVersion": "0.15.0",
 	"description": "Enhances your note-taking with voice transcription and AI capabilities",

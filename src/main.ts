@@ -20,6 +20,7 @@ import { TimerModal } from './modals/TimerModal';
 import { OpenAIAdapter } from './adapters/OpenAIAdapter';
 import { GroqAdapter } from './adapters/GroqAdapter';
 import { DeepgramAdapter } from './adapters/DeepgramAdapter';
+import { SaladAdapter } from './adapters/SaladAdapter';
 import { AIProvider, AIAdapter } from './adapters/AIAdapter';
 import { PluginData } from './types';
 import { RecordingProcessor } from './utils/RecordingProcessor';
@@ -189,6 +190,10 @@ export default class NeuroVoxPlugin extends Plugin {
     public async saveSettings(): Promise<void> {
         try {
             await this.saveData(this.settings);
+            
+            // Validate API keys after settings change to ensure adapters are ready
+            await this.validateApiKeys();
+            
             this.initializeUI();
             
             // Trigger the floating button setting changed event to ensure UI is in sync
@@ -219,6 +224,15 @@ export default class NeuroVoxPlugin extends Plugin {
                 await deepgramAdapter.validateApiKey();
             }
 
+            const saladAdapter = this.aiAdapters.get(AIProvider.Salad);
+            if (saladAdapter) {
+                saladAdapter.setApiKey(this.settings.saladApiKey);
+                if ('setOrganization' in saladAdapter) {
+                    (saladAdapter as SaladAdapter).setOrganization(this.settings.saladOrganization);
+                }
+                await saladAdapter.validateApiKey();
+            }
+
             // Only show notice if validation fails
             if (openaiAdapter && !openaiAdapter.isReady() && this.settings.openaiApiKey) {
                 new Notice('❌ OpenAI API key validation failed');
@@ -229,15 +243,22 @@ export default class NeuroVoxPlugin extends Plugin {
             if (deepgramAdapter && !deepgramAdapter.isReady() && this.settings.deepgramApiKey) {
                 new Notice('❌ Deepgram API key validation failed');
             }
+            if (saladAdapter && !saladAdapter.isReady() && this.settings.saladApiKey) {
+                new Notice('❌ Salad API key validation failed');
+            }
         } catch (error) {
             // Silent fail for API key validation
         }
     }public initializeAIAdapters(): void {
         try {
+            const saladAdapter = new SaladAdapter(this.settings);
+            saladAdapter.setOrganization(this.settings.saladOrganization);
+            
             const adapters: Array<[AIProvider, AIAdapter]> = [
                 [AIProvider.OpenAI, new OpenAIAdapter(this.settings)],
                 [AIProvider.Groq, new GroqAdapter(this.settings)],
-                [AIProvider.Deepgram, new DeepgramAdapter(this.settings)]
+                [AIProvider.Deepgram, new DeepgramAdapter(this.settings)],
+                [AIProvider.Salad, saladAdapter]
             ];
             
             this.aiAdapters = new Map<AIProvider, AIAdapter>(adapters);
