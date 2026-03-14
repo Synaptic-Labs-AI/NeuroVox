@@ -4,6 +4,7 @@ import { BaseAccordion } from "./BaseAccordion";
 import { NeuroVoxSettings, AudioQuality } from "../Settings";
 import { Setting, DropdownComponent } from "obsidian";
 import { AIAdapter, AIProvider, AIModels } from "../../adapters/AIAdapter";
+import { MoonshineAdapter, MoonshineModelStatus } from "../../adapters/MoonshineAdapter";
 import NeuroVoxPlugin from "../../main";
 
 export class RecordingAccordion extends BaseAccordion {
@@ -205,6 +206,7 @@ export class RecordingAccordion extends BaseAccordion {
         dropdown.selectEl.empty();
         let hasValidProvider = false;
 
+        // Cloud providers (require API keys)
         for (const provider of [AIProvider.OpenAI, AIProvider.Groq, AIProvider.Deepgram]) {
             const apiKey = this.settings[`${provider}ApiKey` as keyof NeuroVoxSettings];
             if (apiKey) {
@@ -215,27 +217,51 @@ export class RecordingAccordion extends BaseAccordion {
                         hasValidProvider = true;
                         const group = document.createElement("optgroup");
                         group.label = `${provider.toUpperCase()} Models`;
-                        
+
                         models.forEach(model => {
                             const option = document.createElement("option");
                             option.value = model.id;
                             option.text = `${model.name}`;
                             group.appendChild(option);
                         });
-                        
+
                         dropdown.selectEl.appendChild(group);
                     }
                 }
             }
         }
 
+        // Moonshine local models (require download, not API key)
+        const moonshineAdapter = this.getAdapter(AIProvider.Moonshine) as MoonshineAdapter | undefined;
+        if (moonshineAdapter) {
+            const downloadedModels = AIModels[AIProvider.Moonshine].filter(model => {
+                const status = moonshineAdapter.getModelStatus(model.id);
+                return status === MoonshineModelStatus.Ready;
+            });
+
+            if (downloadedModels.length > 0) {
+                hasValidProvider = true;
+                const group = document.createElement("optgroup");
+                group.label = "LOCAL Models (No API)";
+
+                downloadedModels.forEach(model => {
+                    const option = document.createElement("option");
+                    option.value = model.id;
+                    option.text = `${model.name}`;
+                    group.appendChild(option);
+                });
+
+                dropdown.selectEl.appendChild(group);
+            }
+        }
+
         if (!hasValidProvider) {
-            dropdown.addOption("none", "No API keys configured");
+            dropdown.addOption("none", "No models available - add API key or download local model");
             dropdown.setDisabled(true);
             this.settings.transcriptionModel = '';
         } else {
             dropdown.setDisabled(false);
-            
+
             if (!this.settings.transcriptionModel || !this.getProviderFromModel(this.settings.transcriptionModel)) {
                 const firstOption = dropdown.selectEl.querySelector('option:not([value="none"])') as HTMLOptionElement;
                 if (firstOption) {

@@ -14,6 +14,10 @@ export type NeuroVoxSettings = {
     groqApiKey: string;
     deepgramApiKey: string;
 
+    // Local Models (Moonshine)
+    moonshineModel: string;
+    moonshineAutoLoad: boolean;
+
     // Recording
     audioQuality: AudioQuality;
     recordingFolderPath: string;
@@ -54,6 +58,10 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     openaiApiKey: '',
     groqApiKey: '',
     deepgramApiKey: '',
+
+    // Local Models (Moonshine)
+    moonshineModel: 'moonshine-tiny',
+    moonshineAutoLoad: false,
 
     // Recording
     audioQuality: AudioQuality.Medium,

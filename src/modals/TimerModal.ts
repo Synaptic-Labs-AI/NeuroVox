@@ -26,7 +26,6 @@ export class TimerModal extends Modal {
     private currentState: RecordingState = 'inactive';
     private streamingService: StreamingTranscriptionService | null = null;
     private deviceDetection: DeviceDetection;
-    private useStreaming: boolean = false;
     private chunkIndex: number = 0;
     private recordingStartTime: number = 0;
 
@@ -41,8 +40,7 @@ export class TimerModal extends Modal {
         
         // Configure based on device type
         const streamingOptions = this.deviceDetection.getOptimalStreamingOptions();
-        this.useStreaming = this.deviceDetection.shouldUseStreamingMode();
-        
+
         this.CONFIG = {
             maxDuration: 12 * 60,
             warningThreshold: 60,
@@ -204,8 +202,8 @@ export class TimerModal extends Modal {
                 this.recordingManager.resume();
                 this.resumeTimer();
             } else {
-                // Initialize streaming service if using streaming mode
-                if (this.useStreaming && !this.streamingService) {
+                // Initialize streaming service
+                if (!this.streamingService) {
                     this.streamingService = new StreamingTranscriptionService(
                         this.plugin,
                         {
@@ -215,7 +213,7 @@ export class TimerModal extends Modal {
                         }
                     );
                 }
-                
+
                 this.recordingStartTime = Date.now();
                 this.chunkIndex = 0;
                 
@@ -241,29 +239,28 @@ export class TimerModal extends Modal {
      * Processes each audio chunk as it becomes available
      */
     private async processAudioChunk(blob: Blob): Promise<void> {
-        if (this.useStreaming && this.streamingService) {
-            // Create chunk metadata
-            const metadata: ChunkMetadata = {
-                id: `chunk_${this.chunkIndex}`,
-                index: this.chunkIndex,
-                duration: this.CONFIG.chunkDuration,
-                timestamp: Date.now(),
-                size: blob.size
-            };
-            
-            // Send chunk for immediate processing
-            const added = await this.streamingService.addChunk(blob, metadata);
-            
-            if (!added) {
-                // Could potentially pause recording here if needed
-                if (this.streamingService.isQueuePaused()) {
-                    new Notice('Memory limit reached - processing chunks...');
-                }
+        if (!this.streamingService) return;
+
+        // Create chunk metadata
+        const metadata: ChunkMetadata = {
+            id: `chunk_${this.chunkIndex}`,
+            index: this.chunkIndex,
+            duration: this.CONFIG.chunkDuration,
+            timestamp: Date.now(),
+            size: blob.size
+        };
+
+        // Send chunk for immediate processing
+        const added = await this.streamingService.addChunk(blob, metadata);
+
+        if (!added) {
+            // Could potentially pause recording here if needed
+            if (this.streamingService.isQueuePaused()) {
+                new Notice('Memory limit reached - processing chunks...');
             }
-            
-            this.chunkIndex++;
         }
-        // If not using streaming, chunks are handled in the legacy way by the final stop method
+
+        this.chunkIndex++;
     }
 
     /**
@@ -298,24 +295,18 @@ export class TimerModal extends Modal {
      */
     private async handleStop(): Promise<void> {
         try {
-            const finalBlob = await this.recordingManager.stop();
-            
-            let result: Blob | string;
-            
-            if (this.useStreaming && this.streamingService) {
-                // Streaming mode - get transcription result
-                new Notice('Finishing transcription...');
-                result = await this.streamingService.finishProcessing();
-                
-                if (!result || result.trim().length === 0) {
-                    throw new Error('No transcription result received');
-                }
-            } else {
-                // Legacy mode - return audio blob
-                if (!finalBlob) {
-                    throw new Error('No audio data received from recorder');
-                }
-                result = finalBlob;
+            await this.recordingManager.stop();
+
+            if (!this.streamingService) {
+                throw new Error('Streaming service not initialized');
+            }
+
+            // Get transcription result from streaming service
+            new Notice('Finishing transcription...');
+            const result = await this.streamingService.finishProcessing();
+
+            if (!result || result.trim().length === 0) {
+                throw new Error('No transcription result received');
             }
 
             // Close recording modal first
@@ -327,7 +318,6 @@ export class TimerModal extends Modal {
                 await this.onStop(result);
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.handleError('Failed to stop recording', error);
         }
     }

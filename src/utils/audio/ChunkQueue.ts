@@ -121,19 +121,9 @@ export class ChunkQueue {
 
     // Clear all chunks and free memory
     clear(): void {
-        // Explicitly clear blob references to help GC
-        for (const item of this.queue) {
-            // Revoke any object URLs if they exist
-            if (item.chunk && typeof URL.revokeObjectURL === 'function') {
-                try {
-                    // This will fail silently if the blob wasn't created from an object URL
-                    URL.revokeObjectURL(item.chunk as any);
-                } catch (e) {
-                    // Ignore
-                }
-            }
-        }
-        
+        // Clear the queue - Blobs will be garbage collected when no longer referenced
+        // Note: URL.revokeObjectURL only works on URLs created by URL.createObjectURL,
+        // not on Blob objects directly
         this.queue = [];
         this.currentMemoryUsage = 0;
         this.processingCount = 0;

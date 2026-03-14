@@ -20,6 +20,7 @@ import { TimerModal } from './modals/TimerModal';
 import { OpenAIAdapter } from './adapters/OpenAIAdapter';
 import { GroqAdapter } from './adapters/GroqAdapter';
 import { DeepgramAdapter } from './adapters/DeepgramAdapter';
+import { MoonshineAdapter } from './adapters/MoonshineAdapter';
 import { AIProvider, AIAdapter } from './adapters/AIAdapter';
 import { PluginData } from './types';
 import { RecordingProcessor } from './utils/RecordingProcessor';
@@ -162,22 +163,15 @@ export default class NeuroVoxPlugin extends Plugin {
      */
     public async loadSettings(): Promise<void> {
         try {
-            const data = await this.loadData();
-            
-            // Start with a deep copy of defaults
-            this.settings = { ...DEFAULT_SETTINGS };
-            
-            // Only override with saved settings if data exists and isn't null
-            if (data && typeof data === 'object') {
-                // Safely merge saved settings with defaults
-                Object.keys(DEFAULT_SETTINGS).forEach(key => {
-                    if (key in data) {
-                        (this.settings as any)[key] = (data as any)[key];
-                    }
-                });
-            } else {
-            }
-        } catch (error) {
+            const data = await this.loadData() as Partial<NeuroVoxSettings> | null;
+
+            // Merge saved settings with defaults using type-safe spread
+            // This ensures all default values are present, with saved values overriding
+            this.settings = {
+                ...DEFAULT_SETTINGS,
+                ...(data && typeof data === 'object' ? data : {})
+            };
+        } catch {
             this.settings = { ...DEFAULT_SETTINGS };
             new Notice("Failed to load NeuroVox settings. Using defaults.");
         }
@@ -237,9 +231,10 @@ export default class NeuroVoxPlugin extends Plugin {
             const adapters: Array<[AIProvider, AIAdapter]> = [
                 [AIProvider.OpenAI, new OpenAIAdapter(this.settings)],
                 [AIProvider.Groq, new GroqAdapter(this.settings)],
-                [AIProvider.Deepgram, new DeepgramAdapter(this.settings)]
+                [AIProvider.Deepgram, new DeepgramAdapter(this.settings)],
+                [AIProvider.Moonshine, new MoonshineAdapter(this.settings)]
             ];
-            
+
             this.aiAdapters = new Map<AIProvider, AIAdapter>(adapters);
         } catch (error) {
             throw new Error("Failed to initialize AI adapters");
@@ -330,8 +325,9 @@ export default class NeuroVoxPlugin extends Plugin {
             if (!adapter) {
                 throw new Error(`Transcription provider ${this.settings.transcriptionProvider} not found`);
             }
-            
-            if (!adapter.getApiKey()) {
+
+            // Moonshine doesn't require an API key (local model)
+            if (this.settings.transcriptionProvider !== AIProvider.Moonshine && !adapter.getApiKey()) {
                 throw new Error(`API key not set for ${this.settings.transcriptionProvider}`);
             }
 
@@ -525,12 +521,13 @@ export default class NeuroVoxPlugin extends Plugin {
                             throw new Error(`Transcription provider ${this.settings.transcriptionProvider} not found`);
                         }
 
-                        if (!adapter.getApiKey()) {
+                        // Moonshine doesn't require an API key (local model)
+                        if (this.settings.transcriptionProvider !== AIProvider.Moonshine && !adapter.getApiKey()) {
                             throw new Error(`API key not set for ${this.settings.transcriptionProvider}`);
                         }
 
                         await this.recordingProcessor.processRecording(
-                            result, 
+                            result,
                             activeFile,
                             activeView.editor.getCursor()
                         );

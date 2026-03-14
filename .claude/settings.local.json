@@ -4,7 +4,14 @@
       "Bash(npm run build:*)",
       "Bash(rm:*)",
       "Bash(npm install)",
-      "WebFetch(domain:console.groq.com)"
+      "WebFetch(domain:console.groq.com)",
+      "WebSearch",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(cat:*)",
+      "Bash(npm uninstall:*)"
     ],
     "deny": []
   }

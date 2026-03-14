@@ -116,8 +116,10 @@ export class AudioRecordingManager {
         this.currentOptions = options;
 
         // Create recorder with current options
-        const config: any = {
-            ...this.getAudioConfig(),
+        // Merge audio config with optional time-sliced recording settings
+        const audioConfig = this.getAudioConfig();
+        const config: AudioRecorderOptions & { ondataavailable?: (blob: Blob) => Promise<void> } = {
+            ...audioConfig,
             timeSlice: options?.timeSlice,
             // RecordRTC uses ondataavailable callback for time-sliced recording
             ondataavailable: options?.onDataAvailable ? async (blob: Blob) => {

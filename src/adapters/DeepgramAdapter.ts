@@ -1,6 +1,11 @@
 import { requestUrl } from 'obsidian';
 import { AIAdapter, AIProvider } from './AIAdapter';
 import { NeuroVoxSettings } from '../settings/Settings';
+import {
+    ChatCompletionResponse,
+    DeepgramTranscriptionResponse,
+    DeepgramProjectsResponse
+} from '../types';
 
 export class DeepgramAdapter extends AIAdapter {
     private apiKey: string = '';
@@ -36,24 +41,24 @@ export class DeepgramAdapter extends AIAdapter {
 
         try {
             // Use Deepgram's projects endpoint to validate the API key
-            const response = await this.makeAPIRequest(
+            const response = await this.makeAPIRequest<DeepgramProjectsResponse>(
                 `${this.getApiBaseUrl()}/v1/projects`,
                 'GET',
                 {},
                 null
             );
             return response && Array.isArray(response.projects);
-        } catch (error) {
+        } catch {
             return false;
         }
     }
 
-    protected parseTextGenerationResponse(response: any): string {
+    protected parseTextGenerationResponse(_response: ChatCompletionResponse): string {
         // Deepgram doesn't support text generation
         throw new Error('Text generation not supported by Deepgram');
     }
 
-    protected parseTranscriptionResponse(response: any): string {
+    protected parseTranscriptionResponse(response: DeepgramTranscriptionResponse): string {
         if (response?.results?.channels?.[0]?.alternatives?.[0]?.transcript) {
             return response.results.channels[0].alternatives[0].transcript;
         }
@@ -65,8 +70,8 @@ export class DeepgramAdapter extends AIAdapter {
         try {
             // Deepgram API expects the audio file directly in the body, not as form data
             const endpoint = `${this.getApiBaseUrl()}${this.getTranscriptionEndpoint()}?model=${model}`;
-            
-            const response = await this.makeAPIRequest(
+
+            const response = await this.makeAPIRequest<DeepgramTranscriptionResponse>(
                 endpoint,
                 'POST',
                 {
@@ -74,7 +79,7 @@ export class DeepgramAdapter extends AIAdapter {
                 },
                 audioArrayBuffer
             );
-            
+
             return this.parseTranscriptionResponse(response);
         } catch (error) {
             const message = this.getErrorMessage(error);
@@ -83,33 +88,29 @@ export class DeepgramAdapter extends AIAdapter {
     }
 
     // Override the makeAPIRequest method to handle Deepgram's authorization header format
-    protected async makeAPIRequest(
-        endpoint: string, 
-        method: string, 
+    protected async makeAPIRequest<T = unknown>(
+        endpoint: string,
+        method: string,
         headers: Record<string, string>,
         body: string | ArrayBuffer | null
-    ): Promise<any> {
-        try {
-            const requestHeaders: Record<string, string> = {
-                'Authorization': `Token ${this.getApiKey()}`, // Deepgram uses "Token" instead of "Bearer"
-                ...headers
-            };
+    ): Promise<T> {
+        const requestHeaders: Record<string, string> = {
+            'Authorization': `Token ${this.getApiKey()}`, // Deepgram uses "Token" instead of "Bearer"
+            ...headers
+        };
 
-            const response = await requestUrl({
-                url: endpoint,
-                method,
-                headers: requestHeaders,
-                body: body || undefined,
-                throw: true
-            });
+        const response = await requestUrl({
+            url: endpoint,
+            method,
+            headers: requestHeaders,
+            body: body || undefined,
+            throw: true
+        });
 
-            if (!response.json) {
-                throw new Error('Invalid response format');
-            }
-
-            return response.json;
-        } catch (error: any) {
-            throw error;
+        if (!response.json) {
+            throw new Error('Invalid response format');
         }
+
+        return response.json as T;
     }
 }

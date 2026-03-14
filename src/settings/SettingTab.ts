@@ -4,7 +4,7 @@ import { App, PluginSettingTab } from 'obsidian';
 import { ModelHookupAccordion } from './accordions/ModelHookupAccordion';
 import { RecordingAccordion } from './accordions/RecordingAccordion';
 import { PostProcessingAccordion } from './accordions/PostProcessingAccordion';
-import { AIProvider } from '../adapters/AIAdapter';
+import { AIAdapter, AIProvider } from '../adapters/AIAdapter';
 import NeuroVoxPlugin from '../main';
 
 export class NeuroVoxSettingTab extends PluginSettingTab {
@@ -26,26 +26,35 @@ export class NeuroVoxSettingTab extends PluginSettingTab {
         const recordingContainer = containerEl.createDiv();
         const postProcessingContainer = containerEl.createDiv();
 
+        // Helper to get adapter with runtime validation
+        const getAdapter = (provider: AIProvider): AIAdapter => {
+            const adapter = this.plugin.aiAdapters.get(provider);
+            if (!adapter) {
+                throw new Error(`Adapter not found for provider: ${provider}`);
+            }
+            return adapter;
+        };
+
         // Create Recording and Post-Processing accordions first
         this.recordingAccordion = new RecordingAccordion(
             recordingContainer,
             this.plugin.settings,
-            (provider: AIProvider) => this.plugin.aiAdapters.get(provider)!,
-            this.plugin
-        );
-        
-        this.postProcessingAccordion = new PostProcessingAccordion(
-            postProcessingContainer,
-            this.plugin.settings,
-            (provider: AIProvider) => this.plugin.aiAdapters.get(provider)!,
+            getAdapter,
             this.plugin
         );
 
-        // Create ModelHookup after accordions are initialized
-        const modelHookupAccordion = new ModelHookupAccordion(
-            modelHookupContainer, 
+        this.postProcessingAccordion = new PostProcessingAccordion(
+            postProcessingContainer,
             this.plugin.settings,
-            (provider: AIProvider) => this.plugin.aiAdapters.get(provider)!,
+            getAdapter,
+            this.plugin
+        );
+
+        // Create ModelHookup (includes Moonshine local model management)
+        const modelHookupAccordion = new ModelHookupAccordion(
+            modelHookupContainer,
+            this.plugin.settings,
+            getAdapter,
             this.plugin
         );
 

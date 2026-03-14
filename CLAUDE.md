@@ -10,7 +10,7 @@ NeuroVox is an Obsidian plugin that enhances note-taking with voice transcriptio
 
 - Voice recording with transcription via multiple AI services
 - Video file processing (extracts audio for transcription)
-- Chunk-based processing for large audio files
+- Streaming transcription with real-time chunk processing
 - Smart note formatting with timestamps and organization
 - Floating button and toolbar integration for quick access
 - Real-time recording timer display
@@ -36,9 +36,9 @@ NeuroVox is an Obsidian plugin that enhances note-taking with voice transcriptio
    - Each adapter handles transcription and optional AI processing
 
 2. **Audio Processing** (`src/utils/audio/`)
-   - `AudioChunker`: Splits large audio files for processing
-   - `AudioProcessor`: Handles recording and chunk management
+   - `AudioProcessor`: Handles recording and file management
    - `RecordingProcessor`: Orchestrates transcription workflow
+   - `StreamingTranscriptionService`: Real-time streaming transcription
    - Configurable bitrate and MIME type support
 
 3. **State Management** (`src/utils/state/`)
@@ -59,7 +59,7 @@ NeuroVox is an Obsidian plugin that enhances note-taking with voice transcriptio
 ### Design Patterns
 
 - **Adapter Pattern**: Unified interface for multiple AI providers
-- **Chunk Processing**: Handles large files by splitting into manageable segments
+- **Streaming Mode**: All platforms use real-time streaming transcription with time-sliced chunks
 - **Event-Driven**: Uses Obsidian's event system for UI updates
 - **Async/Await**: Throughout for API calls and file operations
 - **Error Boundaries**: Comprehensive error handling with user feedback
@@ -127,9 +127,10 @@ npm run version
 
 ## Technical Constraints
 
-1. **File Size Limits**
-   - Implements chunking for files > 25MB
-   - Configurable chunk duration (default 300s)
+1. **Streaming Transcription**
+   - Uses real-time streaming mode on all platforms
+   - Audio is processed in small time-slice chunks (5-10 seconds)
+   - Memory-adaptive with configurable queue limits
 
 2. **Browser Compatibility**
    - Requires modern browser with MediaRecorder support
@@ -185,7 +186,7 @@ npm run version
 ### Modifying Audio Processing
 - Check `src/utils/audio/` for core logic
 - Update AudioProcessor for recording changes
-- Modify AudioChunker for chunk handling
+- Modify StreamingTranscriptionService for streaming behavior
 
 ### Working with Settings
 - Settings interface in `src/settings/Settings.ts`
@@ -206,3 +207,11 @@ Currently no formal test suite. Test manually by:
 - Version mismatch between package.json (0.2.0) and manifest.json (0.3.1)
 - Desktop and mobile support (desktop-only: false)
 - Requires manual API key configuration for each provider
+
+<!-- SESSION_START -->
+## Current Session
+<!-- Auto-managed by session_init hook. Overwritten each session. -->
+- Resume: `claude --resume 6dad1cd3-6fce-47ee-aaf9-f24ca6f285fc`
+- Team: `pact-6dad1cd3`
+- Started: 2026-03-14 16:03:15 UTC
+<!-- SESSION_END -->

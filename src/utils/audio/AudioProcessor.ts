@@ -1,6 +1,5 @@
 import { Notice } from 'obsidian';
 import NeuroVoxPlugin from '../../main';
-import { AudioChunker } from './AudioChunker';
 import { AudioFileManager } from './AudioFileManager';
 import { AudioQuality } from '../../settings/Settings';
 import { AIProvider } from '../../adapters/AIAdapter';
@@ -10,7 +9,6 @@ import { AIProvider } from '../../adapters/AIAdapter';
  * Used by RecordingProcessor to handle all audio-related operations
  */
 export class AudioProcessor {
-    private readonly audioChunker: AudioChunker;
     private readonly audioFileManager: AudioFileManager;
 
     // Maximum audio size before skipping chunking (25MB)
@@ -31,11 +29,6 @@ export class AudioProcessor {
     };
 
     constructor(private plugin: NeuroVoxPlugin) {
-        this.audioChunker = new AudioChunker(
-            this.getSampleRate(),
-            this.getBitRate(),
-            'audio/webm; codecs=opus'
-        );
         this.audioFileManager = new AudioFileManager(plugin);
     }
 

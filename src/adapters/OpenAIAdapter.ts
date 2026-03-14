@@ -1,5 +1,6 @@
 import { AIAdapter, AIProvider } from './AIAdapter';
 import { NeuroVoxSettings } from '../settings/Settings';
+import { ChatCompletionResponse, TranscriptionResponse } from '../types';
 
 export class OpenAIAdapter extends AIAdapter {
     private apiKey: string = '';
@@ -53,14 +54,14 @@ export class OpenAIAdapter extends AIAdapter {
         }
     }
 
-    protected parseTextGenerationResponse(response: any): string {
+    protected parseTextGenerationResponse(response: ChatCompletionResponse): string {
         if (response?.choices?.[0]?.message?.content) {
             return response.choices[0].message.content;
         }
         throw new Error('Invalid response format from OpenAI');
     }
 
-    protected parseTranscriptionResponse(response: any): string {
+    protected parseTranscriptionResponse(response: TranscriptionResponse): string {
         if (response?.text) {
             return response.text;
         }

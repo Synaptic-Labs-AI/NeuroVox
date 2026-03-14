@@ -1,9 +1,10 @@
 import { Notice, TFile, EditorPosition } from 'obsidian';
 import NeuroVoxPlugin from '../main';
 import { AudioProcessor } from './audio/AudioProcessor';
-import { TranscriptionService, TranscriptionResult } from './transcription/TranscriptionService';
+import { TranscriptionService } from './transcription/TranscriptionService';
 import { DocumentInserter } from './document/DocumentInserter';
 import { ProcessingState } from './state/ProcessingState';
+import { AIAdapter, AIProvider } from '../adapters/AIAdapter';
 
 /**
  * Configuration for the processing pipeline
@@ -94,9 +95,9 @@ export class RecordingProcessor {
             );
             this.processingState.completeStep();
 
-        } catch (error) {
+        } catch (error: unknown) {
             this.handleError('Processing failed', error);
-            this.processingState.setError(error as Error);
+            this.processingState.setError(error instanceof Error ? error : new Error(String(error)));
             throw error;
         } finally {
             this.processingState.setIsProcessing(false);
@@ -118,15 +119,15 @@ export class RecordingProcessor {
         try {
             this.processingState.setIsProcessing(true);
             this.processingState.reset();
-            
+
             // Skip audio processing since we already have the transcription
             this.processingState.startStep('Content Processing');
-            
+
             // Generate post-processing if enabled
             let postProcessing: string | undefined;
             if (this.plugin.settings.generatePostProcessing) {
                 this.processingState.startStep('Post-processing');
-                postProcessing = await this.executeWithRetry(() => 
+                postProcessing = await this.executeWithRetry(() =>
                     this.generatePostProcessing(transcriptionResult)
                 );
                 this.processingState.completeStep();
@@ -145,9 +146,9 @@ export class RecordingProcessor {
             );
             this.processingState.completeStep();
 
-        } catch (error) {
+        } catch (error: unknown) {
             this.handleError('Processing failed', error);
-            this.processingState.setError(error as Error);
+            this.processingState.setError(error instanceof Error ? error : new Error(String(error)));
             throw error;
         } finally {
             this.processingState.setIsProcessing(false);
@@ -178,7 +179,7 @@ export class RecordingProcessor {
     /**
      * Gets and validates the appropriate AI adapter
      */
-    private getAdapter(provider: any, category: 'transcription' | 'language'): any {
+    private getAdapter(provider: AIProvider, category: 'transcription' | 'language'): AIAdapter {
         const adapter = this.plugin.aiAdapters.get(provider);
         if (!adapter) {
             throw new Error(`${provider} adapter not found`);

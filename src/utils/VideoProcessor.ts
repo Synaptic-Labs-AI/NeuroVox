@@ -6,7 +6,7 @@ import { RecordingProcessor } from './RecordingProcessor';
 
 export class VideoProcessor {
     private static instance: VideoProcessor | null = null;
-    private ffmpeg: any;
+    private ffmpeg: FFmpeg;
     private isProcessing = false;
 
     private constructor(private plugin: NeuroVoxPlugin) {}
@@ -116,13 +116,18 @@ export class VideoProcessor {
             
             // Read the output file
             const data = await this.ffmpeg.readFile('output.mp3');
-            
+
             // Clean up
             URL.revokeObjectURL(videoURL);
             await this.ffmpeg.deleteFile('input.' + file.extension);
             await this.ffmpeg.deleteFile('output.mp3');
-            
-            return (data as Uint8Array).buffer;
+
+            // FFmpeg readFile returns FileData (Uint8Array | string)
+            // For binary files like audio, it returns Uint8Array
+            if (!(data instanceof Uint8Array)) {
+                throw new Error('Expected binary data from FFmpeg');
+            }
+            return data.buffer;
             
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error occurred';

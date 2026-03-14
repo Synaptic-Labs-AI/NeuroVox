@@ -35,15 +35,19 @@ export class StreamingTranscriptionService {
     }
 
     async addChunk(chunk: Blob, metadata: ChunkMetadata): Promise<boolean> {
+        console.log('[StreamingTranscription] Adding chunk:', metadata.id, 'size:', chunk.size);
+
         // Try to add to queue
         const added = await this.chunkQueue.enqueue(chunk, metadata);
-        
+
         if (!added) {
+            console.log('[StreamingTranscription] Failed to add chunk to queue');
             return false;
         }
 
         // Start processing if not already running
         if (!this.isProcessing) {
+            console.log('[StreamingTranscription] Starting processing...');
             this.processingPromise = this.startProcessing();
         }
 
@@ -52,31 +56,36 @@ export class StreamingTranscriptionService {
 
     private async startProcessing(): Promise<void> {
         if (this.isProcessing) return;
-        
+
         this.isProcessing = true;
         this.abortController = new AbortController();
+        console.log('[StreamingTranscription] Started processing loop');
 
         try {
             while (this.isProcessing && !this.abortController.signal.aborted) {
                 // Check if we have chunks to process
                 const queueItem = this.chunkQueue.dequeue();
-                
+
                 if (!queueItem) {
                     // No chunks available, wait a bit
                     await this.sleep(100);
                     continue;
                 }
 
+                console.log('[StreamingTranscription] Processing chunk:', queueItem.metadata.id);
                 try {
                     // Process the chunk
                     await this.processChunk(queueItem.chunk, queueItem.metadata);
+                    console.log('[StreamingTranscription] Chunk processed successfully');
                 } catch (error) {
-                    // Continue with next chunk even if one fails
+                    // Log and continue with next chunk
+                    console.error('[StreamingTranscription] Chunk processing failed:', error);
                 }
             }
         } finally {
             this.isProcessing = false;
             this.abortController = null;
+            console.log('[StreamingTranscription] Processing loop ended');
         }
     }
 
@@ -84,10 +93,12 @@ export class StreamingTranscriptionService {
         try {
             // Convert blob to ArrayBuffer
             const arrayBuffer = await chunk.arrayBuffer();
-            
+            console.log('[StreamingTranscription] Transcribing chunk, size:', arrayBuffer.byteLength);
+
             // Transcribe the chunk
             const result = await this.transcriptionService.transcribeContent(arrayBuffer);
-            
+            console.log('[StreamingTranscription] Chunk transcribed:', result.transcription?.substring(0, 50));
+
             // Create transcription chunk
             const transcriptionChunk: TranscriptionChunk = {
                 metadata,
@@ -109,22 +120,27 @@ export class StreamingTranscriptionService {
             this.cleanupBlob(chunk);
 
         } catch (error) {
+            console.error('[StreamingTranscription] processChunk error:', error);
             throw error;
         }
     }
 
     async finishProcessing(): Promise<string> {
+        console.log('[StreamingTranscription] Finishing processing, queue size:', this.chunkQueue.size(), 'processed:', this.processedChunks.size);
+
         // Stop accepting new chunks
         this.isProcessing = false;
 
         // Wait for queue to be processed
         let attempts = 0;
         const maxAttempts = 300; // 30 seconds timeout
-        
+
         while (this.chunkQueue.size() > 0 && attempts < maxAttempts) {
             await this.sleep(100);
             attempts++;
         }
+
+        console.log('[StreamingTranscription] Queue drained, attempts:', attempts);
 
         // Abort if still processing after timeout
         if (this.abortController) {
@@ -136,15 +152,18 @@ export class StreamingTranscriptionService {
             try {
                 await this.processingPromise;
             } catch (error) {
-                // Silent fail
+                console.error('[StreamingTranscription] Processing promise error:', error);
             }
         }
 
         // Get final result
-        return this.resultCompiler.getFinalResult(
+        const result = this.resultCompiler.getFinalResult(
             this.plugin.settings.includeTimestamps || false,
             true // Include metadata
         );
+        console.log('[StreamingTranscription] Final result length:', result.length, 'segments:', this.resultCompiler.getSegmentCount());
+
+        return result;
     }
 
     getPartialResult(): string {
@@ -179,15 +198,10 @@ export class StreamingTranscriptionService {
         this.processingPromise = null;
     }
 
-    private cleanupBlob(blob: Blob): void {
-        // Attempt to revoke object URL if it exists
-        try {
-            if (blob && typeof URL.revokeObjectURL === 'function') {
-                URL.revokeObjectURL(blob as any);
-            }
-        } catch (e) {
-            // Ignore errors
-        }
+    private cleanupBlob(_blob: Blob): void {
+        // Note: URL.revokeObjectURL only works on URL strings created by URL.createObjectURL,
+        // not on Blob objects directly. Blobs are garbage collected when no longer referenced.
+        // This method is kept for potential future cleanup logic.
     }
 
     private sleep(ms: number): Promise<void> {

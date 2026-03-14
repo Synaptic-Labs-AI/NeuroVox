@@ -46,8 +46,9 @@ export class MemoryMonitor {
     }
 
     getCurrentMemoryInfo(): MemoryInfo | null {
-        if ('memory' in performance && (performance as any).memory) {
-            return (performance as any).memory as MemoryInfo;
+        // performance.memory is typed in types.ts global declaration
+        if (performance.memory) {
+            return performance.memory;
         }
         return null;
     }
@@ -159,10 +160,11 @@ export class MemoryMonitor {
 
     forceGarbageCollection(): void {
         // Force garbage collection if available (only in development or special contexts)
-        if ('gc' in window) {
+        // window.gc is typed in types.ts global declaration
+        if (window.gc) {
             try {
-                (window as any).gc();
-            } catch (e) {
+                window.gc();
+            } catch {
                 // Ignore if not available
             }
         }
@@ -171,7 +173,7 @@ export class MemoryMonitor {
         try {
             const arr = new Array(1000000).fill(0);
             arr.length = 0;
-        } catch (e) {
+        } catch {
             // Ignore
         }
     }

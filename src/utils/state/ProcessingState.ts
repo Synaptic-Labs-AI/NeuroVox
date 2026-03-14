@@ -8,6 +8,20 @@ interface ProcessingStep {
 }
 
 /**
+ * Serialized state for JSON storage/restoration
+ */
+interface ProcessingStateData {
+    isProcessing: boolean;
+    currentStep: ProcessingStep | null;
+    transcription?: string;
+    postProcessing?: string;
+    startTime: number;
+    error?: string;
+    processedChunks?: number;
+    totalChunks?: number;
+}
+
+/**
  * Manages state, timing, and progress for processing operations
  */
 export class ProcessingState {
@@ -136,7 +150,7 @@ export class ProcessingState {
     /**
      * Converts the state to a JSON-compatible object for storage
      */
-    public toJSON(): Record<string, any> {
+    public toJSON(): ProcessingStateData {
         return {
             isProcessing: this.isProcessing,
             currentStep: this.currentStep,
@@ -152,7 +166,7 @@ export class ProcessingState {
     /**
      * Restores state from a saved JSON object
      */
-    public fromJSON(data: Record<string, any>): void {
+    public fromJSON(data: Partial<ProcessingStateData>): void {
         this.isProcessing = data.isProcessing ?? false;
         this.currentStep = data.currentStep ?? null;
         this.transcription = data.transcription;

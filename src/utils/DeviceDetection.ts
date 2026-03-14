@@ -38,12 +38,12 @@ export class DeviceDetection {
 
     private updateMemoryInfo(): void {
         // Try to get memory info if available (Chrome/Edge)
-        if ('memory' in performance && (performance as any).memory) {
-            const memoryInfo = (performance as any).memory;
-            this.availableMemory = memoryInfo.jsHeapSizeLimit - memoryInfo.usedJSHeapSize;
+        // performance.memory is typed in types.ts global declaration
+        if (performance.memory) {
+            this.availableMemory = performance.memory.jsHeapSizeLimit - performance.memory.usedJSHeapSize;
         } else {
             // Fallback: estimate based on device type
-            this.availableMemory = this.isMobileDevice ? 
+            this.availableMemory = this.isMobileDevice ?
                 512 * 1024 * 1024 :  // 512MB for mobile
                 2048 * 1024 * 1024;  // 2GB for desktop
         }
@@ -79,11 +79,6 @@ export class DeviceDetection {
                 memoryLimit: 300       // 300MB limit
             };
         }
-    }
-
-    shouldUseStreamingMode(): boolean {
-        // Always use streaming on mobile or when memory is constrained
-        return this.isMobile() || this.getAvailableMemory() < 1024 * 1024 * 1024;
     }
 
     getRecommendedBitrate(): number {

@@ -1,10 +1,18 @@
 import { Notice, requestUrl } from 'obsidian';
 import { NeuroVoxSettings } from '../settings/Settings';
+import {
+    ChatCompletionResponse,
+    TranscriptionResponse,
+    DeepgramTranscriptionResponse,
+    DeepgramProjectsResponse,
+    MoonshineTranscriptionResponse
+} from '../types';
 
 export enum AIProvider {
     OpenAI = 'openai',
     Groq = 'groq',
     Deepgram = 'deepgram',
+    Moonshine = 'moonshine',
 }
 
 export interface AIModel {
@@ -41,6 +49,10 @@ export const AIModels: Record<AIProvider, AIModel[]> = {
         { id: 'nova-2', name: 'Nova-2', category: 'transcription' },
         { id: 'nova-3', name: 'Nova-3', category: 'transcription' },
     ],
+    [AIProvider.Moonshine]: [
+        { id: 'moonshine-tiny', name: 'Moonshine Tiny (27M, ~50MB)', category: 'transcription' },
+        { id: 'moonshine-base', name: 'Moonshine Base (62M, ~400MB)', category: 'transcription' },
+    ],
 };
 
 export function getModelInfo(modelId: string): AIModel | undefined {
@@ -75,8 +87,10 @@ export abstract class AIAdapter {
     protected abstract getTextGenerationEndpoint(): string;
     protected abstract getTranscriptionEndpoint(): string;
     protected abstract validateApiKeyImpl(): Promise<boolean>;
-    protected abstract parseTextGenerationResponse(response: any): string;
-    protected abstract parseTranscriptionResponse(response: any): string;
+    protected abstract parseTextGenerationResponse(response: ChatCompletionResponse): string;
+    protected abstract parseTranscriptionResponse(
+        response: TranscriptionResponse | DeepgramTranscriptionResponse | MoonshineTranscriptionResponse | string
+    ): string;
 
     public setApiKey(key: string): void {
         const currentKey = this.getApiKey();
@@ -96,7 +110,7 @@ export abstract class AIAdapter {
                 max_tokens: options?.maxTokens || 1000,
                 temperature: options?.temperature || 0.7,
             };
-            const response = await this.makeAPIRequest(
+            const response = await this.makeAPIRequest<ChatCompletionResponse>(
                 endpoint,
                 'POST',
                 { 'Content-Type': 'application/json' },
@@ -113,25 +127,26 @@ export abstract class AIAdapter {
         try {
             const { headers, body } = await this.prepareTranscriptionRequest(audioArrayBuffer, model);
             const endpoint = `${this.getApiBaseUrl()}${this.getTranscriptionEndpoint()}`;
-            
+
             try {
-                const response = await this.makeAPIRequest(
+                const response = await this.makeAPIRequest<TranscriptionResponse>(
                     endpoint,
                     'POST',
                     headers,
                     body
                 );
                 return this.parseTranscriptionResponse(response);
-            } catch (error: any) {
+            } catch (error: unknown) {
                 // Provide more specific error messages based on status codes
-                if (error?.response?.status === 400) {
-                    throw new Error(`Invalid request format: ${error?.response?.data?.error?.message || 'Check audio format and model name'}`);
-                } else if (error?.response?.status === 401) {
+                const httpError = error as { response?: { status?: number; data?: { error?: { message?: string } } } };
+                if (httpError?.response?.status === 400) {
+                    throw new Error(`Invalid request format: ${httpError?.response?.data?.error?.message || 'Check audio format and model name'}`);
+                } else if (httpError?.response?.status === 401) {
                     throw new Error('Invalid API key or unauthorized access');
-                } else if (error?.response?.status === 413) {
+                } else if (httpError?.response?.status === 413) {
                     throw new Error('Audio file too large. Maximum size is 25MB');
                 }
-                
+
                 throw error;
             }
         } catch (error) {
@@ -183,34 +198,30 @@ export abstract class AIAdapter {
         return this.keyValidated && this.lastValidatedKey === currentKey;
     }
 
-    protected async makeAPIRequest(
-        endpoint: string, 
-        method: string, 
+    protected async makeAPIRequest<T = unknown>(
+        endpoint: string,
+        method: string,
         headers: Record<string, string>,
         body: string | ArrayBuffer | null
-    ): Promise<any> {
-        try {
-            const requestHeaders: Record<string, string> = {
-                'Authorization': `Bearer ${this.getApiKey()}`,
-                ...headers
-            };
+    ): Promise<T> {
+        const requestHeaders: Record<string, string> = {
+            'Authorization': `Bearer ${this.getApiKey()}`,
+            ...headers
+        };
 
-            const response = await requestUrl({
-                url: endpoint,
-                method,
-                headers: requestHeaders,
-                body: body || undefined,
-                throw: true
-            });
+        const response = await requestUrl({
+            url: endpoint,
+            method,
+            headers: requestHeaders,
+            body: body || undefined,
+            throw: true
+        });
 
-            if (!response.json) {
-                throw new Error('Invalid response format');
-            }
-
-            return response.json;
-        } catch (error: any) {
-            throw error;
+        if (!response.json) {
+            throw new Error('Invalid response format');
         }
+
+        return response.json as T;
     }
 
     protected async prepareTranscriptionRequest(audioArrayBuffer: ArrayBuffer, model: string): Promise<{
