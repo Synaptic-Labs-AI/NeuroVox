@@ -142,15 +142,17 @@ export class StreamingTranscriptionService {
     }
 
     /**
-     * Transcribes a complete recording blob directly (bypassing the streaming queue) and adds
-     * it to the compiled result. Used on stop when no streamed chunks were produced.
+     * Transcribes a recording blob (or one segment of it) directly, bypassing the streaming
+     * queue, and adds the result to the compiler. Used on stop when no streamed chunks were
+     * produced. Errors are recorded rather than thrown so that, when a long recording is
+     * transcribed segment by segment, one failed segment doesn't discard the whole transcript;
+     * finishProcessing() surfaces the error only if nothing transcribed at all.
      */
     async transcribeFinalBlob(chunk: Blob, metadata: ChunkMetadata): Promise<void> {
         try {
             await this.processChunk(chunk, metadata);
         } catch (error) {
             this.lastError = error instanceof Error ? error : new Error(String(error));
-            throw error;
         }
     }
 
