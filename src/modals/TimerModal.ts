@@ -4,6 +4,7 @@ import { RecordingUI, RecordingState } from '../ui/RecordingUI';
 import NeuroVoxPlugin from '../main';
 import { StreamingTranscriptionService } from '../utils/transcription/StreamingTranscriptionService';
 import { DeviceDetection } from '../utils/DeviceDetection';
+import { splitWavBlob } from '../utils/audio/WavSplitter';
 import { ChunkMetadata } from '../types';
 
 interface TimerConfig {
@@ -28,6 +29,10 @@ export class TimerModal extends Modal {
     private deviceDetection: DeviceDetection;
     private chunkIndex: number = 0;
     private recordingStartTime: number = 0;
+
+    // Transcribe the final recording in segments of this length to bound per-request memory
+    // on long recordings (StereoAudioRecorder yields one large blob rather than live chunks).
+    private readonly SEGMENT_SECONDS = 60;
 
     private readonly CONFIG: TimerConfig;
 
@@ -307,14 +312,7 @@ export class TimerModal extends Modal {
             // chunks arrive during recording. Transcribe the complete recording blob on stop
             // when nothing was streamed (also covers recordings shorter than one chunk).
             if (!this.streamingService.hasReceivedChunks() && finalBlob && finalBlob.size > 0) {
-                const metadata: ChunkMetadata = {
-                    id: 'final-recording',
-                    index: 0,
-                    duration: this.seconds * 1000,
-                    timestamp: this.recordingStartTime,
-                    size: finalBlob.size
-                };
-                await this.streamingService.transcribeFinalBlob(finalBlob, metadata);
+                await this.transcribeFinalRecording(finalBlob);
             }
 
             // Get transcription result from streaming service
@@ -334,6 +332,40 @@ export class TimerModal extends Modal {
             }
         } catch (error) {
             this.handleError('Failed to stop recording', error);
+        }
+    }
+
+    /**
+     * Transcribes the complete recording on stop. Long recordings are split into segments so
+     * each is transcribed and freed in turn, bounding peak memory (important on mobile).
+     * Non-WAV or short recordings fall back to a single whole-blob transcription.
+     */
+    private async transcribeFinalRecording(finalBlob: Blob): Promise<void> {
+        if (!this.streamingService) return;
+
+        const segments = await splitWavBlob(finalBlob, this.SEGMENT_SECONDS);
+
+        if (!segments || segments.length <= 1) {
+            const metadata: ChunkMetadata = {
+                id: 'final-recording',
+                index: 0,
+                duration: this.seconds * 1000,
+                timestamp: this.recordingStartTime,
+                size: finalBlob.size
+            };
+            await this.streamingService.transcribeFinalBlob(finalBlob, metadata);
+            return;
+        }
+
+        for (const segment of segments) {
+            const metadata: ChunkMetadata = {
+                id: `segment_${segment.index}`,
+                index: segment.index,
+                duration: segment.durationMs,
+                timestamp: this.recordingStartTime + segment.offsetMs,
+                size: segment.blob.size
+            };
+            await this.streamingService.transcribeFinalBlob(segment.blob, metadata);
         }
     }
 
