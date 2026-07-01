@@ -115,10 +115,41 @@ export class AudioRecordingManager {
         // Store options for potential recorder recreation
         this.currentOptions = options;
 
-        // Create recorder with current options
-        // Merge audio config with optional time-sliced recording settings
+        this.recorder = new RecordRTC(this.stream, this.buildConfig(options));
+        this.recorder.startRecording();
+    }
+
+    /**
+     * Rotates to a fresh recorder on the same stream, returning the completed segment's blob.
+     *
+     * Used to bound memory on long recordings: the recorder accumulates all samples in RAM, so
+     * we periodically start a new one and drain the old one into a segment that is transcribed
+     * and freed. The new recorder is started *before* the old one is stopped to minimize the
+     * capture gap at the boundary (a few ms of overlap rather than lost audio).
+     */
+    async rotate(): Promise<Blob | null> {
+        if (!this.recorder || !this.stream) {
+            return null;
+        }
+
+        const previous = this.recorder;
+
+        // Start the replacement first so audio keeps being captured across the handoff.
+        this.recorder = new RecordRTC(this.stream, this.buildConfig(this.currentOptions));
+        this.recorder.startRecording();
+
+        const blob = await this.stopRecorder(previous);
+        try {
+            previous.destroy();
+        } catch (error) {
+            // ignore — buffers are released regardless
+        }
+        return blob;
+    }
+
+    private buildConfig(options?: { timeSlice?: number; onDataAvailable?: (blob: Blob) => Promise<void> }): AudioRecorderOptions & { ondataavailable?: (blob: Blob) => Promise<void> } {
         const audioConfig = this.getAudioConfig();
-        const config: AudioRecorderOptions & { ondataavailable?: (blob: Blob) => Promise<void> } = {
+        return {
             ...audioConfig,
             timeSlice: options?.timeSlice,
             // RecordRTC uses ondataavailable callback for time-sliced recording
@@ -126,9 +157,21 @@ export class AudioRecordingManager {
                 await options.onDataAvailable!(blob);
             } : undefined
         };
+    }
 
-        this.recorder = new RecordRTC(this.stream, config);
-        this.recorder.startRecording();
+    private stopRecorder(recorder: RecordRTC): Promise<Blob | null> {
+        return new Promise((resolve) => {
+            recorder.stopRecording(() => {
+                const blob = recorder.getBlob() || null;
+                if (blob) {
+                    Object.defineProperty(blob, 'name', {
+                        value: `recording-${new Date().getTime()}.wav`,
+                        writable: true
+                    });
+                }
+                resolve(blob);
+            });
+        });
     }
 
     pause(): void {
@@ -143,25 +186,7 @@ export class AudioRecordingManager {
 
     async stop(): Promise<Blob | null> {
         if (!this.recorder) return null;
-
-        return new Promise((resolve) => {
-            if (!this.recorder) {
-                resolve(null);
-                return;
-            }
-
-            this.recorder.stopRecording(() => {
-                const blob = this.recorder?.getBlob() || null;
-                if (blob) {
-                    // Set the appropriate filename and type
-                    Object.defineProperty(blob, 'name', {
-                        value: `recording-${new Date().getTime()}.wav`,
-                        writable: true
-                    });
-                }
-                resolve(blob);
-            });
-        });
+        return this.stopRecorder(this.recorder);
     }
 
     cleanup(): void {
