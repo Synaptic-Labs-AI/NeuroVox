@@ -219,4 +219,9 @@ export class AudioRecordingManager {
         return this.recorder !== null;
     }
 
+    /** The live microphone stream, for auxiliary analysis (e.g. silence detection). */
+    getStream(): MediaStream | null {
+        return this.stream;
+    }
+
 }

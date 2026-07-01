@@ -5,6 +5,7 @@ import NeuroVoxPlugin from '../main';
 import { StreamingTranscriptionService } from '../utils/transcription/StreamingTranscriptionService';
 import { DeviceDetection } from '../utils/DeviceDetection';
 import { splitWavBlob } from '../utils/audio/WavSplitter';
+import { VoiceActivityMonitor } from '../utils/audio/VoiceActivityMonitor';
 import { ChunkMetadata } from '../types';
 
 interface TimerConfig {
@@ -32,10 +33,19 @@ export class TimerModal extends Modal {
     private segmentIntervalId: number | null = null;
     private segmentStartSeconds: number = 0;
     private isRotating: boolean = false;
+    private voiceMonitor: VoiceActivityMonitor | null = null;
 
-    // Rotate the recorder every SEGMENT_SECONDS so no more than ~one segment of audio is held
+    // Rotate the recorder into bounded segments so no more than ~one segment of audio is held
     // in memory at a time. StereoAudioRecorder otherwise accumulates the entire recording in
     // RAM (a likely OOM on long mobile recordings) and yields it as one blob only at stop.
+    //
+    // Rotation prefers a natural pause: once a segment is at least MIN_SEGMENT_SECONDS long,
+    // it rotates on the next stretch of silence (SILENCE_HOLD_MS) so the cut falls between
+    // words. MAX_SEGMENT_SECONDS is a hard backstop for continuous speech (memory safety).
+    private readonly MIN_SEGMENT_SECONDS = 15;
+    private readonly MAX_SEGMENT_SECONDS = 90;
+    private readonly SILENCE_HOLD_MS = 500;
+    // Used only as the split size for the whole-blob fallback on very short recordings.
     private readonly SEGMENT_SECONDS = 60;
 
     private readonly CONFIG: TimerConfig;
@@ -228,10 +238,10 @@ export class TimerModal extends Modal {
                 this.segmentStartSeconds = 0;
 
                 // StereoAudioRecorder does not emit timeSlice chunks, so instead of relying on
-                // onDataAvailable we rotate the recorder ourselves on a timer (see rotateSegment).
+                // onDataAvailable we rotate the recorder ourselves (see maybeRotate/rotateSegment).
                 this.recordingManager.start();
                 this.startTimer();
-                this.startSegmentTimer();
+                this.startRotationMonitor();
             }
 
             this.currentState = 'recording';
@@ -243,19 +253,52 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Starts the timer that periodically rotates the recorder into bounded segments.
+     * Starts silence monitoring and the decision loop that rotates the recorder at natural
+     * pauses (with a hard max-duration backstop).
      */
-    private startSegmentTimer(): void {
-        this.stopSegmentTimer();
+    private startRotationMonitor(): void {
+        this.stopRotationMonitor();
+
+        const stream = this.recordingManager.getStream();
+        if (stream) {
+            this.voiceMonitor = new VoiceActivityMonitor(stream);
+            this.voiceMonitor.start();
+        }
+
+        // Check frequently; the actual rotation cadence is governed by maybeRotate().
         this.segmentIntervalId = window.setInterval(() => {
-            void this.rotateSegment();
-        }, this.SEGMENT_SECONDS * 1000);
+            this.maybeRotate();
+        }, 250);
     }
 
-    private stopSegmentTimer(): void {
+    private stopRotationMonitor(): void {
         if (this.segmentIntervalId !== null) {
             window.clearInterval(this.segmentIntervalId);
             this.segmentIntervalId = null;
+        }
+        if (this.voiceMonitor) {
+            this.voiceMonitor.stop();
+            this.voiceMonitor = null;
+        }
+    }
+
+    /**
+     * Decides whether to rotate now: rotate at a silence break once the current segment is at
+     * least MIN_SEGMENT_SECONDS, or unconditionally once it reaches MAX_SEGMENT_SECONDS. If
+     * silence detection is unavailable, MAX_SEGMENT_SECONDS alone drives rotation.
+     */
+    private maybeRotate(): void {
+        if (this.currentState !== 'recording' || this.isRotating) return;
+
+        const elapsed = this.seconds - this.segmentStartSeconds;
+        if (elapsed >= this.MAX_SEGMENT_SECONDS) {
+            void this.rotateSegment();
+            return;
+        }
+
+        const silentMs = this.voiceMonitor?.silentForMs() ?? 0;
+        if (elapsed >= this.MIN_SEGMENT_SECONDS && silentMs >= this.SILENCE_HOLD_MS) {
+            void this.rotateSegment();
         }
     }
 
@@ -340,7 +383,7 @@ export class TimerModal extends Modal {
      */
     private async handleStop(): Promise<void> {
         try {
-            this.stopSegmentTimer();
+            this.stopRotationMonitor();
 
             // Let any in-flight rotation finish so it doesn't race the final stop().
             for (let waited = 0; this.isRotating && waited < 100; waited++) {
@@ -479,7 +522,7 @@ export class TimerModal extends Modal {
     private cleanup(): void {
         try {
             this.pauseTimer();
-            this.stopSegmentTimer();
+            this.stopRotationMonitor();
             this.recordingManager.cleanup();
             this.ui?.cleanup();
             
