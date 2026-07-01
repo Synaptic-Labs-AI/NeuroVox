@@ -148,6 +148,74 @@ export class ModelHookupAccordion extends BaseAccordion {
                     });
             });
 
+        const openrouterSetting = new Setting(this.contentEl)
+            .setName("OpenRouter API Key")
+            .setDesc("Enter your OpenRouter API key (used for post-processing)")
+            .addText(text => {
+                text
+                    .setPlaceholder("sk-or-...")
+                    .setValue(this.settings.openrouterApiKey);
+                text.inputEl.type = "password";
+                text.onChange(async (value: string) => {
+                        const trimmedValue = value.trim();
+                        this.settings.openrouterApiKey = trimmedValue;
+                        await this.plugin.saveSettings();
+
+                        const adapter = this.getAdapter(AIProvider.OpenRouter);
+                        if (!adapter) {
+                            return;
+                        }
+
+                        adapter.setApiKey(trimmedValue);
+                        const isValid = await adapter.validateApiKey();
+
+                        if (isValid) {
+                            openrouterSetting.setDesc("✅ API key validated successfully");
+                            try {
+                                await this.refreshAccordions();
+                            } catch (error) {
+                                openrouterSetting.setDesc("✅ API key valid, but failed to update model lists");
+                            }
+                        } else {
+                            openrouterSetting.setDesc("❌ Invalid API key. Please check your credentials.");
+                        }
+                    });
+            });
+
+        const assemblyaiSetting = new Setting(this.contentEl)
+            .setName("AssemblyAI API Key")
+            .setDesc("Enter your AssemblyAI API key (used for transcription)")
+            .addText(text => {
+                text
+                    .setPlaceholder("Enter your AssemblyAI API key...")
+                    .setValue(this.settings.assemblyaiApiKey);
+                text.inputEl.type = "password";
+                text.onChange(async (value: string) => {
+                        const trimmedValue = value.trim();
+                        this.settings.assemblyaiApiKey = trimmedValue;
+                        await this.plugin.saveSettings();
+
+                        const adapter = this.getAdapter(AIProvider.AssemblyAI);
+                        if (!adapter) {
+                            return;
+                        }
+
+                        adapter.setApiKey(trimmedValue);
+                        const isValid = await adapter.validateApiKey();
+
+                        if (isValid) {
+                            assemblyaiSetting.setDesc("✅ API key validated successfully");
+                            try {
+                                await this.refreshAccordions();
+                            } catch (error) {
+                                assemblyaiSetting.setDesc("✅ API key valid, but failed to update model lists");
+                            }
+                        } else {
+                            assemblyaiSetting.setDesc("❌ Invalid API key. Please check your credentials.");
+                        }
+                    });
+            });
+
         // Moonshine Local Model Section
         this.createMoonshineSection();
     }

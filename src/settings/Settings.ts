@@ -13,6 +13,8 @@ export type NeuroVoxSettings = {
     openaiApiKey: string;
     groqApiKey: string;
     deepgramApiKey: string;
+    openrouterApiKey: string;
+    assemblyaiApiKey: string;
 
     // Local Models (Moonshine)
     moonshineModel: string;
@@ -58,6 +60,8 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     openaiApiKey: '',
     groqApiKey: '',
     deepgramApiKey: '',
+    openrouterApiKey: '',
+    assemblyaiApiKey: '',
 
     // Local Models (Moonshine)
     moonshineModel: 'moonshine-tiny',

@@ -42,6 +42,16 @@ export class TranscriptionService {
     }
 
     /**
+     * Transcribes audio only, without running post-processing. Used by the streaming path,
+     * which transcribes many small chunks and post-processes the assembled result once at the
+     * end — running the language model per chunk would be wasteful and would discard a good
+     * chunk transcription whenever post-processing failed.
+     */
+    public async transcribeAudioOnly(audioBuffer: ArrayBuffer): Promise<string> {
+        return this.transcribeAudio(audioBuffer);
+    }
+
+    /**
      * Transcribes audio using the configured AI adapter
      */
     private async transcribeAudio(audioBuffer: ArrayBuffer): Promise<string> {

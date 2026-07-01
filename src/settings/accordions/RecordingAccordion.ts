@@ -207,7 +207,7 @@ export class RecordingAccordion extends BaseAccordion {
         let hasValidProvider = false;
 
         // Cloud providers (require API keys)
-        for (const provider of [AIProvider.OpenAI, AIProvider.Groq, AIProvider.Deepgram]) {
+        for (const provider of [AIProvider.OpenAI, AIProvider.Groq, AIProvider.Deepgram, AIProvider.AssemblyAI]) {
             const apiKey = this.settings[`${provider}ApiKey` as keyof NeuroVoxSettings];
             if (apiKey) {
                 const adapter = this.getAdapter(provider);

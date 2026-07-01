@@ -295,14 +295,29 @@ export class TimerModal extends Modal {
      */
     private async handleStop(): Promise<void> {
         try {
-            await this.recordingManager.stop();
+            const finalBlob = await this.recordingManager.stop();
 
             if (!this.streamingService) {
                 throw new Error('Streaming service not initialized');
             }
 
-            // Get transcription result from streaming service
             new Notice('Finishing transcription...');
+
+            // RecordRTC's StereoAudioRecorder does not emit timeSlice chunks, so no streamed
+            // chunks arrive during recording. Transcribe the complete recording blob on stop
+            // when nothing was streamed (also covers recordings shorter than one chunk).
+            if (!this.streamingService.hasReceivedChunks() && finalBlob && finalBlob.size > 0) {
+                const metadata: ChunkMetadata = {
+                    id: 'final-recording',
+                    index: 0,
+                    duration: this.seconds * 1000,
+                    timestamp: this.recordingStartTime,
+                    size: finalBlob.size
+                };
+                await this.streamingService.transcribeFinalBlob(finalBlob, metadata);
+            }
+
+            // Get transcription result from streaming service
             const result = await this.streamingService.finishProcessing();
 
             if (!result || result.trim().length === 0) {

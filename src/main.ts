@@ -21,6 +21,8 @@ import { OpenAIAdapter } from './adapters/OpenAIAdapter';
 import { GroqAdapter } from './adapters/GroqAdapter';
 import { DeepgramAdapter } from './adapters/DeepgramAdapter';
 import { MoonshineAdapter } from './adapters/MoonshineAdapter';
+import { OpenRouterAdapter } from './adapters/OpenRouterAdapter';
+import { AssemblyAIAdapter } from './adapters/AssemblyAIAdapter';
 import { AIProvider, AIAdapter } from './adapters/AIAdapter';
 import { PluginData } from './types';
 import { RecordingProcessor } from './utils/RecordingProcessor';
@@ -197,6 +199,8 @@ export default class NeuroVoxPlugin extends Plugin {
             const openaiAdapter = this.aiAdapters.get(AIProvider.OpenAI);
             const groqAdapter = this.aiAdapters.get(AIProvider.Groq);
             const deepgramAdapter = this.aiAdapters.get(AIProvider.Deepgram);
+            const openrouterAdapter = this.aiAdapters.get(AIProvider.OpenRouter);
+            const assemblyaiAdapter = this.aiAdapters.get(AIProvider.AssemblyAI);
 
             if (openaiAdapter) {
                 openaiAdapter.setApiKey(this.settings.openaiApiKey);
@@ -213,6 +217,16 @@ export default class NeuroVoxPlugin extends Plugin {
                 await deepgramAdapter.validateApiKey();
             }
 
+            if (openrouterAdapter) {
+                openrouterAdapter.setApiKey(this.settings.openrouterApiKey);
+                await openrouterAdapter.validateApiKey();
+            }
+
+            if (assemblyaiAdapter) {
+                assemblyaiAdapter.setApiKey(this.settings.assemblyaiApiKey);
+                await assemblyaiAdapter.validateApiKey();
+            }
+
             // Only show notice if validation fails
             if (openaiAdapter && !openaiAdapter.isReady() && this.settings.openaiApiKey) {
                 new Notice('❌ OpenAI API key validation failed');
@@ -223,6 +237,12 @@ export default class NeuroVoxPlugin extends Plugin {
             if (deepgramAdapter && !deepgramAdapter.isReady() && this.settings.deepgramApiKey) {
                 new Notice('❌ Deepgram API key validation failed');
             }
+            if (openrouterAdapter && !openrouterAdapter.isReady('language') && this.settings.openrouterApiKey) {
+                new Notice('❌ OpenRouter API key validation failed');
+            }
+            if (assemblyaiAdapter && !assemblyaiAdapter.isReady() && this.settings.assemblyaiApiKey) {
+                new Notice('❌ AssemblyAI API key validation failed');
+            }
         } catch (error) {
             // Silent fail for API key validation
         }
@@ -232,7 +252,9 @@ export default class NeuroVoxPlugin extends Plugin {
                 [AIProvider.OpenAI, new OpenAIAdapter(this.settings)],
                 [AIProvider.Groq, new GroqAdapter(this.settings)],
                 [AIProvider.Deepgram, new DeepgramAdapter(this.settings)],
-                [AIProvider.Moonshine, new MoonshineAdapter(this.settings)]
+                [AIProvider.Moonshine, new MoonshineAdapter(this.settings)],
+                [AIProvider.OpenRouter, new OpenRouterAdapter(this.settings)],
+                [AIProvider.AssemblyAI, new AssemblyAIAdapter(this.settings)]
             ];
 
             this.aiAdapters = new Map<AIProvider, AIAdapter>(adapters);
