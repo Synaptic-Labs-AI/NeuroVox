@@ -29,9 +29,13 @@ export class TimerModal extends Modal {
     private deviceDetection: DeviceDetection;
     private chunkIndex: number = 0;
     private recordingStartTime: number = 0;
+    private segmentIntervalId: number | null = null;
+    private segmentStartSeconds: number = 0;
+    private isRotating: boolean = false;
 
-    // Transcribe the final recording in segments of this length to bound per-request memory
-    // on long recordings (StereoAudioRecorder yields one large blob rather than live chunks).
+    // Rotate the recorder every SEGMENT_SECONDS so no more than ~one segment of audio is held
+    // in memory at a time. StereoAudioRecorder otherwise accumulates the entire recording in
+    // RAM (a likely OOM on long mobile recordings) and yields it as one blob only at stop.
     private readonly SEGMENT_SECONDS = 60;
 
     private readonly CONFIG: TimerConfig;
@@ -221,17 +225,15 @@ export class TimerModal extends Modal {
 
                 this.recordingStartTime = Date.now();
                 this.chunkIndex = 0;
-                
-                // Configure recorder with chunk processing
-                this.recordingManager.start({
-                    timeSlice: this.CONFIG.chunkDuration,
-                    onDataAvailable: async (blob: Blob) => {
-                        await this.processAudioChunk(blob);
-                    }
-                });
+                this.segmentStartSeconds = 0;
+
+                // StereoAudioRecorder does not emit timeSlice chunks, so instead of relying on
+                // onDataAvailable we rotate the recorder ourselves on a timer (see rotateSegment).
+                this.recordingManager.start();
                 this.startTimer();
+                this.startSegmentTimer();
             }
-            
+
             this.currentState = 'recording';
             this.ui.updateState(this.currentState);
             new Notice('Recording started');
@@ -241,31 +243,69 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Processes each audio chunk as it becomes available
+     * Starts the timer that periodically rotates the recorder into bounded segments.
      */
-    private async processAudioChunk(blob: Blob): Promise<void> {
-        if (!this.streamingService) return;
+    private startSegmentTimer(): void {
+        this.stopSegmentTimer();
+        this.segmentIntervalId = window.setInterval(() => {
+            void this.rotateSegment();
+        }, this.SEGMENT_SECONDS * 1000);
+    }
 
-        // Create chunk metadata
-        const metadata: ChunkMetadata = {
-            id: `chunk_${this.chunkIndex}`,
-            index: this.chunkIndex,
-            duration: this.CONFIG.chunkDuration,
-            timestamp: Date.now(),
-            size: blob.size
-        };
+    private stopSegmentTimer(): void {
+        if (this.segmentIntervalId !== null) {
+            window.clearInterval(this.segmentIntervalId);
+            this.segmentIntervalId = null;
+        }
+    }
 
-        // Send chunk for immediate processing
-        const added = await this.streamingService.addChunk(blob, metadata);
-
-        if (!added) {
-            // Could potentially pause recording here if needed
-            if (this.streamingService.isQueuePaused()) {
-                new Notice('Memory limit reached - processing chunks...');
-            }
+    /**
+     * Rotates the recorder, turning the elapsed audio into a segment that is transcribed and
+     * freed. Skips while paused or if a rotation is already in flight.
+     */
+    private async rotateSegment(): Promise<void> {
+        if (this.currentState !== 'recording' || this.isRotating || !this.streamingService) {
+            return;
         }
 
+        this.isRotating = true;
+        try {
+            const start = this.segmentStartSeconds;
+            const end = this.seconds;
+            const blob = await this.recordingManager.rotate();
+            this.segmentStartSeconds = end;
+            if (blob) {
+                await this.feedSegment(blob, start, end);
+            }
+        } catch (error) {
+            // Keep recording even if one rotation fails; the audio stays in the active recorder.
+            console.error('[TimerModal] Segment rotation failed:', error);
+        } finally {
+            this.isRotating = false;
+        }
+    }
+
+    /**
+     * Feeds a recording segment into the streaming service for transcription. Uses the queue
+     * (which serializes and frees blobs); on backpressure it transcribes directly to avoid
+     * dropping audio.
+     */
+    private async feedSegment(blob: Blob, startSeconds: number, endSeconds: number): Promise<void> {
+        if (!this.streamingService || !blob || blob.size === 0) return;
+
+        const metadata: ChunkMetadata = {
+            id: `segment_${this.chunkIndex}`,
+            index: this.chunkIndex,
+            duration: Math.max(0, endSeconds - startSeconds) * 1000,
+            timestamp: this.recordingStartTime + startSeconds * 1000,
+            size: blob.size
+        };
         this.chunkIndex++;
+
+        const added = await this.streamingService.addChunk(blob, metadata);
+        if (!added) {
+            await this.streamingService.transcribeFinalBlob(blob, metadata);
+        }
     }
 
     /**
@@ -300,6 +340,15 @@ export class TimerModal extends Modal {
      */
     private async handleStop(): Promise<void> {
         try {
+            this.stopSegmentTimer();
+
+            // Let any in-flight rotation finish so it doesn't race the final stop().
+            for (let waited = 0; this.isRotating && waited < 100; waited++) {
+                await new Promise(resolve => setTimeout(resolve, 20));
+            }
+
+            const tailStart = this.segmentStartSeconds;
+            const tailEnd = this.seconds;
             const finalBlob = await this.recordingManager.stop();
 
             if (!this.streamingService) {
@@ -308,11 +357,15 @@ export class TimerModal extends Modal {
 
             new Notice('Finishing transcription...');
 
-            // RecordRTC's StereoAudioRecorder does not emit timeSlice chunks, so no streamed
-            // chunks arrive during recording. Transcribe the complete recording blob on stop
-            // when nothing was streamed (also covers recordings shorter than one chunk).
-            if (!this.streamingService.hasReceivedChunks() && finalBlob && finalBlob.size > 0) {
-                await this.transcribeFinalRecording(finalBlob);
+            if (finalBlob && finalBlob.size > 0) {
+                if (this.streamingService.hasReceivedChunks()) {
+                    // Tail audio recorded since the last rotation.
+                    await this.feedSegment(finalBlob, tailStart, tailEnd);
+                } else {
+                    // Recording was shorter than one segment, so no rotation occurred:
+                    // transcribe the whole blob (split as a safety net if it is unexpectedly long).
+                    await this.transcribeFinalRecording(finalBlob);
+                }
             }
 
             // Get transcription result from streaming service
@@ -426,6 +479,7 @@ export class TimerModal extends Modal {
     private cleanup(): void {
         try {
             this.pauseTimer();
+            this.stopSegmentTimer();
             this.recordingManager.cleanup();
             this.ui?.cleanup();
             
