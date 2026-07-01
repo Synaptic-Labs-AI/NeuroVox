@@ -15,6 +15,8 @@ export class StreamingTranscriptionService {
     private callbacks: StreamingCallbacks;
     private abortController: AbortController | null = null;
     private processingPromise: Promise<void> | null = null;
+    private lastError: Error | null = null;
+    private chunksReceived: number = 0;
 
     constructor(
         private plugin: NeuroVoxPlugin,
@@ -44,6 +46,8 @@ export class StreamingTranscriptionService {
             console.log('[StreamingTranscription] Failed to add chunk to queue');
             return false;
         }
+
+        this.chunksReceived++;
 
         // Start processing if not already running
         if (!this.isProcessing) {
@@ -78,7 +82,9 @@ export class StreamingTranscriptionService {
                     await this.processChunk(queueItem.chunk, queueItem.metadata);
                     console.log('[StreamingTranscription] Chunk processed successfully');
                 } catch (error) {
-                    // Log and continue with next chunk
+                    // Remember the failure so an all-failed run can surface the real cause,
+                    // then continue with the next chunk.
+                    this.lastError = error instanceof Error ? error : new Error(String(error));
                     console.error('[StreamingTranscription] Chunk processing failed:', error);
                 }
             }
@@ -95,14 +101,15 @@ export class StreamingTranscriptionService {
             const arrayBuffer = await chunk.arrayBuffer();
             console.log('[StreamingTranscription] Transcribing chunk, size:', arrayBuffer.byteLength);
 
-            // Transcribe the chunk
-            const result = await this.transcriptionService.transcribeContent(arrayBuffer);
-            console.log('[StreamingTranscription] Chunk transcribed:', result.transcription?.substring(0, 50));
+            // Transcribe the chunk only. Post-processing is applied once to the assembled
+            // transcript after recording stops, not per chunk.
+            const transcription = await this.transcriptionService.transcribeAudioOnly(arrayBuffer);
+            console.log('[StreamingTranscription] Chunk transcribed:', transcription?.substring(0, 50));
 
             // Create transcription chunk
             const transcriptionChunk: TranscriptionChunk = {
                 metadata,
-                transcript: result.transcription,
+                transcript: transcription,
                 processed: true
             };
 
@@ -121,6 +128,28 @@ export class StreamingTranscriptionService {
 
         } catch (error) {
             console.error('[StreamingTranscription] processChunk error:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Whether any time-sliced chunk was received during recording. RecordRTC's
+     * StereoAudioRecorder does not emit timeSlice chunks, so in practice this stays false and
+     * the whole recording is transcribed via transcribeFinalBlob() on stop.
+     */
+    hasReceivedChunks(): boolean {
+        return this.chunksReceived > 0;
+    }
+
+    /**
+     * Transcribes a complete recording blob directly (bypassing the streaming queue) and adds
+     * it to the compiled result. Used on stop when no streamed chunks were produced.
+     */
+    async transcribeFinalBlob(chunk: Blob, metadata: ChunkMetadata): Promise<void> {
+        try {
+            await this.processChunk(chunk, metadata);
+        } catch (error) {
+            this.lastError = error instanceof Error ? error : new Error(String(error));
             throw error;
         }
     }
@@ -154,6 +183,12 @@ export class StreamingTranscriptionService {
             } catch (error) {
                 console.error('[StreamingTranscription] Processing promise error:', error);
             }
+        }
+
+        // If no chunk was transcribed but at least one failed, surface the real cause instead
+        // of an opaque "no transcription result" downstream.
+        if (this.processedChunks.size === 0 && this.lastError) {
+            throw new Error(`Transcription failed: ${this.lastError.message}`);
         }
 
         // Get final result
@@ -196,6 +231,8 @@ export class StreamingTranscriptionService {
         this.isProcessing = false;
         this.abortController = null;
         this.processingPromise = null;
+        this.lastError = null;
+        this.chunksReceived = 0;
     }
 
     private cleanupBlob(_blob: Blob): void {

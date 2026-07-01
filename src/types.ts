@@ -87,6 +87,41 @@ export interface MoonshineTranscriptionResponse {
 }
 
 /**
+ * AssemblyAI upload endpoint response (POST /v2/upload)
+ */
+export interface AssemblyAIUploadResponse {
+    upload_url: string;
+}
+
+/**
+ * AssemblyAI transcript job response (POST /v2/transcript and GET /v2/transcript/{id})
+ */
+export interface AssemblyAITranscriptionResponse {
+    id: string;
+    status: 'queued' | 'processing' | 'completed' | 'error';
+    text?: string;
+    error?: string;
+}
+
+/**
+ * OpenAI-compatible model list response (GET /models).
+ * OpenRouter adds richer per-model metadata (context_length, architecture modalities).
+ */
+export interface ModelListEntry {
+    id: string;
+    name?: string;
+    context_length?: number;
+    architecture?: {
+        input_modalities?: string[];
+        output_modalities?: string[];
+    };
+}
+
+export interface ModelListResponse {
+    data: ModelListEntry[];
+}
+
+/**
  * Transformers.js progress callback data
  */
 export interface TransformersProgressData {
@@ -105,7 +140,8 @@ export type AIApiResponse =
     | ChatCompletionResponse
     | TranscriptionResponse
     | DeepgramTranscriptionResponse
-    | MoonshineTranscriptionResponse;
+    | MoonshineTranscriptionResponse
+    | AssemblyAITranscriptionResponse;
 
 // =============================================================================
 // Browser Compatibility Types

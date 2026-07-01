@@ -5,7 +5,9 @@ import {
     TranscriptionResponse,
     DeepgramTranscriptionResponse,
     DeepgramProjectsResponse,
-    MoonshineTranscriptionResponse
+    MoonshineTranscriptionResponse,
+    AssemblyAITranscriptionResponse,
+    ModelListResponse
 } from '../types';
 
 export enum AIProvider {
@@ -13,6 +15,8 @@ export enum AIProvider {
     Groq = 'groq',
     Deepgram = 'deepgram',
     Moonshine = 'moonshine',
+    OpenRouter = 'openrouter',
+    AssemblyAI = 'assemblyai',
 }
 
 export interface AIModel {
@@ -46,21 +50,56 @@ export const AIModels: Record<AIProvider, AIModel[]> = {
         { id: 'openai/gpt-oss-120b', name: 'OpenAI GPT-OSS 120B', category: 'language', maxTokens: 32768 },
     ],
     [AIProvider.Deepgram]: [
-        { id: 'nova-2', name: 'Nova-2', category: 'transcription' },
         { id: 'nova-3', name: 'Nova-3', category: 'transcription' },
+        { id: 'nova-3-medical', name: 'Nova-3 Medical', category: 'transcription' },
+        { id: 'nova-2', name: 'Nova-2', category: 'transcription' },
     ],
     [AIProvider.Moonshine]: [
         { id: 'moonshine-tiny', name: 'Moonshine Tiny (27M, ~50MB)', category: 'transcription' },
         { id: 'moonshine-base', name: 'Moonshine Base (62M, ~400MB)', category: 'transcription' },
     ],
+    [AIProvider.OpenRouter]: [
+        // Fallback list only — replaced at runtime by fetchLanguageModels() (the live /models catalog).
+        { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', category: 'language', maxTokens: 200000 },
+        { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini', category: 'language', maxTokens: 400000 },
+        { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash', category: 'language', maxTokens: 1000000 },
+    ],
+    [AIProvider.AssemblyAI]: [
+        { id: 'universal-3-pro', name: 'Universal-3 Pro (best accuracy)', category: 'transcription' },
+        { id: 'universal-2', name: 'Universal-2', category: 'transcription' },
+    ],
 };
 
+/**
+ * Runtime cache of models fetched from provider /models endpoints, keyed by provider.
+ * Populated by AIAdapter.fetchLanguageModels(); consulted by getModelInfo() so token
+ * limits resolve for dynamically-discovered model ids too.
+ */
+const dynamicModels: Partial<Record<AIProvider, AIModel[]>> = {};
+
+export function getDynamicModels(provider: AIProvider): AIModel[] | undefined {
+    return dynamicModels[provider];
+}
+
 export function getModelInfo(modelId: string): AIModel | undefined {
-    for (const models of Object.values(AIModels)) {
-        const model = models.find(m => m.id === modelId);
-        if (model) return model;
+    let dynamic: AIModel | undefined;
+    for (const models of Object.values(dynamicModels)) {
+        const found = models?.find(m => m.id === modelId);
+        if (found) { dynamic = found; break; }
     }
-    return undefined;
+
+    let staticModel: AIModel | undefined;
+    for (const models of Object.values(AIModels)) {
+        const found = models.find(m => m.id === modelId);
+        if (found) { staticModel = found; break; }
+    }
+
+    // Prefer the dynamic entry but backfill maxTokens from the static catalog when the
+    // /models endpoint didn't report a context length (e.g. OpenAI/Groq).
+    if (dynamic) {
+        return { ...dynamic, maxTokens: dynamic.maxTokens ?? staticModel?.maxTokens };
+    }
+    return staticModel;
 }
 
 interface RequestOptions {
@@ -89,8 +128,64 @@ export abstract class AIAdapter {
     protected abstract validateApiKeyImpl(): Promise<boolean>;
     protected abstract parseTextGenerationResponse(response: ChatCompletionResponse): string;
     protected abstract parseTranscriptionResponse(
-        response: TranscriptionResponse | DeepgramTranscriptionResponse | MoonshineTranscriptionResponse | string
+        response: TranscriptionResponse | DeepgramTranscriptionResponse | MoonshineTranscriptionResponse | AssemblyAITranscriptionResponse | string
     ): string;
+
+    /**
+     * Endpoint (relative to the API base URL) that returns the provider's model catalog in
+     * the OpenAI-compatible `{ data: [...] }` shape. Return null for providers without one.
+     */
+    protected getModelListEndpoint(): string | null {
+        return null;
+    }
+
+    /**
+     * Fetches the provider's language/chat models from its /models endpoint and caches them
+     * for the session. Falls back to the static AIModels language entries on any failure.
+     * Providers without a model-list endpoint just return their static language models.
+     */
+    public async fetchLanguageModels(): Promise<AIModel[]> {
+        const staticLanguage = this.models.filter(m => m.category === 'language');
+
+        // Serve the session cache once populated to avoid refetching on every settings render.
+        const cached = dynamicModels[this.provider];
+        if (cached) {
+            return cached;
+        }
+
+        const endpoint = this.getModelListEndpoint();
+        if (!endpoint || !this.getApiKey()) {
+            return staticLanguage;
+        }
+
+        try {
+            const response = await this.makeAPIRequest<ModelListResponse>(
+                `${this.getApiBaseUrl()}${endpoint}`,
+                'GET',
+                {},
+                null
+            );
+            const parsed = this.parseModelList(response);
+            if (parsed.length > 0) {
+                dynamicModels[this.provider] = parsed;
+                return parsed;
+            }
+        } catch {
+            // Fall through to static list on network / parse errors.
+        }
+        return staticLanguage;
+    }
+
+    /**
+     * Maps an OpenAI-compatible model list into language AIModels. Providers with richer
+     * metadata (e.g. OpenRouter) may override this to filter by modality / context length.
+     */
+    protected parseModelList(response: ModelListResponse): AIModel[] {
+        if (!response?.data) return [];
+        return response.data
+            .map(m => ({ id: m.id, name: m.id, category: 'language' as const }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }
 
     public setApiKey(key: string): void {
         const currentKey = this.getApiKey();

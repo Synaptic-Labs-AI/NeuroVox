@@ -2,25 +2,32 @@
 
 import { BaseAccordion } from "./BaseAccordion";
 import { NeuroVoxSettings } from "../Settings";
-import { Setting, DropdownComponent, TextAreaComponent, SliderComponent } from "obsidian";
-import { AIAdapter, AIProvider, AIModels, getModelInfo } from "../../adapters/AIAdapter";
+import { Setting, TextComponent, TextAreaComponent, SliderComponent } from "obsidian";
+import { AIAdapter, AIModel, AIProvider, AIModels, getModelInfo } from "../../adapters/AIAdapter";
 import NeuroVoxPlugin from "../../main";
 
+// Providers that support post-processing (language) and expose a /models catalog.
+const LANGUAGE_PROVIDERS = [AIProvider.OpenAI, AIProvider.Groq, AIProvider.OpenRouter];
+
 export class PostProcessingAccordion extends BaseAccordion {
-    private modelDropdown: DropdownComponent | null = null;
+    private modelInput: TextComponent | null = null;
+    private datalistEl: HTMLDataListElement | null = null;
     private modelSetting: Setting | null = null;
     private promptArea: TextAreaComponent | null = null;
     private maxTokensSlider: SliderComponent | null = null;
     private temperatureSlider: SliderComponent | null = null;
 
+    // Maps a selectable model id -> its provider, rebuilt whenever the list refreshes.
+    private modelLookup: Map<string, AIProvider> = new Map();
+
     public async refresh(): Promise<void> {
         try {
-            if (!this.modelDropdown) {
+            if (!this.modelInput) {
                 return;
             }
-            
-            await this.setupModelDropdown(this.modelDropdown);
-            
+
+            await this.setupModelSelector();
+
             if (this.settings.postProcessingModel) {
                 await this.updateMaxTokensLimit(this.settings.postProcessingModel)
             }
@@ -72,74 +79,129 @@ export class PostProcessingAccordion extends BaseAccordion {
 
         this.modelSetting = new Setting(this.contentEl)
             .setName("Post-processing model")
-            .setDesc("Select the AI model for post-processing")
-            .addDropdown(dropdown => {
-                this.modelDropdown = dropdown;
-                
-                this.setupModelDropdown(dropdown);
-                
-                dropdown.onChange(async (value: string) => {
-                    this.settings.postProcessingModel = value;
-                    const provider = this.getProviderFromModel(value);
-                    if (provider) {
-                        this.settings.postProcessingProvider = provider;
-                        await this.plugin.saveSettings();
+            .setDesc("Type to search models from your configured providers (OpenAI, Groq, OpenRouter)")
+            .addText(text => {
+                this.modelInput = text;
+
+                // Wire the input to a datalist for native type-to-filter behaviour.
+                const datalistId = "neurovox-postprocessing-models";
+                this.datalistEl = document.createElement("datalist");
+                this.datalistEl.id = datalistId;
+                text.inputEl.setAttribute("list", datalistId);
+                text.inputEl.after(this.datalistEl);
+                text.inputEl.style.width = "100%";
+
+                // A pre-filled value makes the native datalist filter down to just that one
+                // option. Treat the box as a search field: clear it on focus so the whole
+                // catalog is browsable, and restore the committed selection on blur if the
+                // user didn't pick a valid model.
+                text.inputEl.addEventListener("focus", () => {
+                    text.inputEl.value = "";
+                });
+                text.inputEl.addEventListener("blur", () => {
+                    if (!this.modelLookup.has(text.inputEl.value.trim())) {
+                        text.inputEl.value = this.settings.postProcessingModel;
+                    }
+                });
+
+                this.setupModelSelector();
+
+                text.onChange(async (value: string) => {
+                    const modelId = value.trim();
+                    const provider = this.getProviderFromModel(modelId);
+
+                    // Only persist selections we can resolve to a provider, so an
+                    // in-progress search string doesn't clobber a valid choice.
+                    if (!modelId || !provider) {
+                        return;
                     }
 
-                    await this.updateMaxTokensLimit(value);
+                    this.settings.postProcessingModel = modelId;
+                    this.settings.postProcessingProvider = provider;
+                    await this.plugin.saveSettings();
+                    await this.updateMaxTokensLimit(modelId);
+                    this.updateSelectedModelDesc();
                 });
             });
     }
 
-    private async setupModelDropdown(dropdown: DropdownComponent): Promise<void> {
-        dropdown.selectEl.empty();
-        let hasValidProvider = false;
-        
-        for (const provider of [AIProvider.OpenAI, AIProvider.Groq]) {
+    private async setupModelSelector(): Promise<void> {
+        if (!this.modelInput || !this.datalistEl) {
+            return;
+        }
+
+        this.modelLookup.clear();
+        this.datalistEl.empty();
+
+        // Gather models from every configured language provider (live catalog when
+        // available, static fallback otherwise).
+        const fetches = LANGUAGE_PROVIDERS.map(async provider => {
             const apiKey = this.settings[`${provider}ApiKey` as keyof NeuroVoxSettings];
-            if (apiKey) {
-                const models = AIModels[provider].filter(model => model.category === 'language');
-                if (models.length > 0) {
-                    hasValidProvider = true;
-                    const group = document.createElement("optgroup");
-                    group.label = `${provider.toUpperCase()} Models`;
-                    
-                    models.forEach(model => {
-                        const option = document.createElement("option");
-                        option.value = model.id;
-                        option.text = model.name;
-                        group.appendChild(option);
-                    });
-                    
-                    dropdown.selectEl.appendChild(group);
+            if (!apiKey) {
+                return { provider, models: [] as AIModel[] };
+            }
+            const adapter = this.getAdapter(provider);
+            const models = adapter ? await adapter.fetchLanguageModels() : [];
+            return { provider, models };
+        });
+
+        const results = await Promise.all(fetches);
+        let hasValidProvider = false;
+
+        for (const { provider, models } of results) {
+            for (const model of models) {
+                if (this.modelLookup.has(model.id)) {
+                    continue;
                 }
+                hasValidProvider = true;
+                this.modelLookup.set(model.id, provider);
+
+                const option = document.createElement("option");
+                option.value = model.id;
+                option.label = `${provider.toUpperCase()} — ${model.name}`;
+                this.datalistEl.appendChild(option);
             }
         }
 
         if (!hasValidProvider) {
-            dropdown.addOption("none", "No API keys configured");
-            dropdown.setDisabled(true);
+            this.modelInput.setValue("");
+            this.modelInput.setPlaceholder("No API keys configured");
+            this.modelInput.setDisabled(true);
             this.settings.postProcessingModel = '';
         } else {
-            dropdown.setDisabled(false);
-            
-            if (!this.settings.postProcessingModel) {
-                const firstOption = dropdown.selectEl.querySelector('option:not([value="none"])') as HTMLOptionElement;
-                if (firstOption) {
-                    const modelId = firstOption.value;
-                    const provider = this.getProviderFromModel(modelId);
-                    if (provider) {
-                        this.settings.postProcessingProvider = provider;
-                        this.settings.postProcessingModel = modelId;
-                        dropdown.setValue(modelId);
-                    }
+            this.modelInput.setDisabled(false);
+            this.modelInput.setPlaceholder("Search models…");
+
+            const current = this.settings.postProcessingModel;
+            if (!current || !this.modelLookup.has(current)) {
+                // Default to the first available model.
+                const firstId = this.modelLookup.keys().next().value as string | undefined;
+                if (firstId) {
+                    this.settings.postProcessingModel = firstId;
+                    this.settings.postProcessingProvider = this.modelLookup.get(firstId)!;
+                    this.modelInput.setValue(firstId);
                 }
             } else {
-                dropdown.setValue(this.settings.postProcessingModel)
+                this.modelInput.setValue(current);
             }
         }
 
+        this.updateSelectedModelDesc();
         await this.plugin.saveSettings();
+    }
+
+    /**
+     * Reflects the committed model in the setting description so the active choice stays
+     * visible even while the search box is being edited/cleared.
+     */
+    private updateSelectedModelDesc(): void {
+        if (!this.modelSetting) return;
+        const id = this.settings.postProcessingModel;
+        this.modelSetting.setDesc(
+            id
+                ? `Type to search • Selected: ${id}`
+                : "Type to search models from your configured providers (OpenAI, Groq, OpenRouter)"
+        );
     }
 
     private addPromptTemplate(): void {
@@ -212,6 +274,11 @@ export class PostProcessingAccordion extends BaseAccordion {
     }
 
     private getProviderFromModel(modelId: string): AIProvider | null {
+        // Prefer the live fetched lookup, then fall back to the static catalog.
+        const fromLookup = this.modelLookup.get(modelId);
+        if (fromLookup) {
+            return fromLookup;
+        }
         for (const [provider, models] of Object.entries(AIModels)) {
             if (models.some(model => model.id === modelId)) {
                 return provider as AIProvider;
