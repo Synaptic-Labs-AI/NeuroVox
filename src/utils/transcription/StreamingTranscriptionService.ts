@@ -3,6 +3,7 @@ import { ChunkQueue } from '../audio/ChunkQueue';
 import { ResultCompiler } from './ResultCompiler';
 import { TranscriptionService } from './TranscriptionService';
 import { DeviceDetection } from '../DeviceDetection';
+import { Logger } from '../Logger';
 import NeuroVoxPlugin from '../../main';
 
 export class StreamingTranscriptionService {
@@ -37,13 +38,13 @@ export class StreamingTranscriptionService {
     }
 
     async addChunk(chunk: Blob, metadata: ChunkMetadata): Promise<boolean> {
-        console.log('[StreamingTranscription] Adding chunk:', metadata.id, 'size:', chunk.size);
+        Logger.log('[StreamingTranscription] Adding chunk:', metadata.id, 'size:', chunk.size);
 
         // Try to add to queue
         const added = await this.chunkQueue.enqueue(chunk, metadata);
 
         if (!added) {
-            console.log('[StreamingTranscription] Failed to add chunk to queue');
+            Logger.log('[StreamingTranscription] Failed to add chunk to queue');
             return false;
         }
 
@@ -51,7 +52,7 @@ export class StreamingTranscriptionService {
 
         // Start processing if not already running
         if (!this.isProcessing) {
-            console.log('[StreamingTranscription] Starting processing...');
+            Logger.log('[StreamingTranscription] Starting processing...');
             this.processingPromise = this.startProcessing();
         }
 
@@ -63,7 +64,7 @@ export class StreamingTranscriptionService {
 
         this.isProcessing = true;
         this.abortController = new AbortController();
-        console.log('[StreamingTranscription] Started processing loop');
+        Logger.log('[StreamingTranscription] Started processing loop');
 
         try {
             while (this.isProcessing && !this.abortController.signal.aborted) {
@@ -76,11 +77,11 @@ export class StreamingTranscriptionService {
                     continue;
                 }
 
-                console.log('[StreamingTranscription] Processing chunk:', queueItem.metadata.id);
+                Logger.log('[StreamingTranscription] Processing chunk:', queueItem.metadata.id);
                 try {
                     // Process the chunk
                     await this.processChunk(queueItem.chunk, queueItem.metadata);
-                    console.log('[StreamingTranscription] Chunk processed successfully');
+                    Logger.log('[StreamingTranscription] Chunk processed successfully');
                 } catch (error) {
                     // Remember the failure so an all-failed run can surface the real cause,
                     // then continue with the next chunk.
@@ -91,7 +92,7 @@ export class StreamingTranscriptionService {
         } finally {
             this.isProcessing = false;
             this.abortController = null;
-            console.log('[StreamingTranscription] Processing loop ended');
+            Logger.log('[StreamingTranscription] Processing loop ended');
         }
     }
 
@@ -99,12 +100,12 @@ export class StreamingTranscriptionService {
         try {
             // Convert blob to ArrayBuffer
             const arrayBuffer = await chunk.arrayBuffer();
-            console.log('[StreamingTranscription] Transcribing chunk, size:', arrayBuffer.byteLength);
+            Logger.log('[StreamingTranscription] Transcribing chunk, size:', arrayBuffer.byteLength);
 
             // Transcribe the chunk only. Post-processing is applied once to the assembled
             // transcript after recording stops, not per chunk.
             const transcription = await this.transcriptionService.transcribeAudioOnly(arrayBuffer);
-            console.log('[StreamingTranscription] Chunk transcribed:', transcription?.substring(0, 50));
+            Logger.log('[StreamingTranscription] Chunk transcribed:', transcription?.substring(0, 50));
 
             // Create transcription chunk
             const transcriptionChunk: TranscriptionChunk = {
@@ -157,7 +158,7 @@ export class StreamingTranscriptionService {
     }
 
     async finishProcessing(): Promise<string> {
-        console.log('[StreamingTranscription] Finishing processing, queue size:', this.chunkQueue.size(), 'processed:', this.processedChunks.size);
+        Logger.log('[StreamingTranscription] Finishing processing, queue size:', this.chunkQueue.size(), 'processed:', this.processedChunks.size);
 
         // Stop accepting new chunks
         this.isProcessing = false;
@@ -171,7 +172,7 @@ export class StreamingTranscriptionService {
             attempts++;
         }
 
-        console.log('[StreamingTranscription] Queue drained, attempts:', attempts);
+        Logger.log('[StreamingTranscription] Queue drained, attempts:', attempts);
 
         // Abort if still processing after timeout
         if (this.abortController) {
@@ -198,7 +199,7 @@ export class StreamingTranscriptionService {
             this.plugin.settings.includeTimestamps || false,
             true // Include metadata
         );
-        console.log('[StreamingTranscription] Final result length:', result.length, 'segments:', this.resultCompiler.getSegmentCount());
+        Logger.log('[StreamingTranscription] Final result length:', result.length, 'segments:', this.resultCompiler.getSegmentCount());
 
         return result;
     }
@@ -244,7 +245,7 @@ export class StreamingTranscriptionService {
     }
 
     private sleep(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise(resolve => window.setTimeout(resolve, ms));
     }
 
     isQueuePaused(): boolean {

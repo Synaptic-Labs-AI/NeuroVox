@@ -1,6 +1,6 @@
 // src/utils/ButtonPositionManager.ts
 
-import { PluginData, Position } from '../types';
+import { Position } from '../types';
 
 interface BoundHandlers {
     move: (e: MouseEvent) => void;
@@ -34,11 +34,14 @@ export class ButtonPositionManager {
         public onClick: () => void
     ) {
         // Bind event handlers once and store their references
+        // The handlers are arrow-function properties, so they are already bound
+        // to `this`; storing the references directly keeps add/removeEventListener
+        // symmetric.
         this._boundHandlers = {
-            move: this.handleDragMove.bind(this),
-            end: this.handleDragEnd.bind(this),
-            touchMove: this.handleTouchMove.bind(this),
-            touchEnd: this.handleTouchEnd.bind(this)
+            move: this.handleDragMove,
+            end: this.handleDragEnd,
+            touchMove: this.handleTouchMove,
+            touchEnd: this.handleTouchEnd
         };
         this.setupEventListeners();
     }
@@ -106,11 +109,11 @@ export class ButtonPositionManager {
     }
 
     public setupEventListeners(): void {
-        this.buttonEl.addEventListener('mousedown', this.handleDragStart.bind(this));
+        this.buttonEl.addEventListener('mousedown', this.handleDragStart);
         document.addEventListener('mousemove', this._boundHandlers.move);
         document.addEventListener('mouseup', this._boundHandlers.end);
 
-        this.buttonEl.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
+        this.buttonEl.addEventListener('touchstart', this.handleTouchStart, { passive: false });
         document.addEventListener('touchmove', this._boundHandlers.touchMove);
         document.addEventListener('touchend', this._boundHandlers.touchEnd);
     }
@@ -150,7 +153,7 @@ export class ButtonPositionManager {
         }
     
         // Reset hasMoved after a short delay
-        setTimeout(() => {
+        window.setTimeout(() => {
             this.hasMoved = false;
         }, 100);
     };

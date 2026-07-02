@@ -17,7 +17,7 @@ interface TouchableButtonOptions {
 export class TouchableButton extends ButtonComponent {
     private isProcessingAction = false;
     private readonly DEBOUNCE_TIME = 1000;
-    private actionTimeout: NodeJS.Timeout | null = null;
+    private actionTimeout: number | null = null;
 
     constructor(options: TouchableButtonOptions) {
         super(options.container);
@@ -71,7 +71,7 @@ export class TouchableButton extends ButtonComponent {
             this.buttonEl.addClass('is-touching');
             
             // Detect long press
-            setTimeout(() => {
+            window.setTimeout(() => {
                 if (this.buttonEl.matches(':active')) {
                     isLongPress = true;
                     this.buttonEl.addClass('is-long-press');
@@ -80,7 +80,7 @@ export class TouchableButton extends ButtonComponent {
         };
         
         // Handle touch end
-        const handleTouchEnd = async (e: TouchEvent) => {
+        const handleTouchEnd = (e: TouchEvent) => {
             e.preventDefault();
             e.stopPropagation();
             
@@ -93,7 +93,7 @@ export class TouchableButton extends ButtonComponent {
             if (touchDuration > 1000) return; // Ignore long touches
             
             // Process the action
-            await this.processButtonAction(onClick);
+            void this.processButtonAction(onClick);
         };
         
         // Handle touch cancel
@@ -131,27 +131,27 @@ export class TouchableButton extends ButtonComponent {
         try {
             // Clear any existing timeout
             if (this.actionTimeout) {
-                clearTimeout(this.actionTimeout);
+                window.clearTimeout(this.actionTimeout);
             }
 
             // Execute the action
-            await onClick();
+            onClick();
 
             // Set debounce timeout
-            this.actionTimeout = setTimeout(() => {
+            this.actionTimeout = window.setTimeout(() => {
                 this.isProcessingAction = false;
                 this.buttonEl.setAttribute('data-state', 'ready');
                 this.buttonEl.removeClass('is-processing');
             }, this.DEBOUNCE_TIME);
 
-        } catch (error) {
+        } catch {
             // Reset state on error
             this.isProcessingAction = false;
             this.buttonEl.setAttribute('data-state', 'error');
             this.buttonEl.addClass('has-error');
             
             // Clear error state after delay
-            setTimeout(() => {
+            window.setTimeout(() => {
                 this.buttonEl.setAttribute('data-state', 'ready');
                 this.buttonEl.removeClass('has-error');
             }, 2000);
@@ -163,7 +163,7 @@ export class TouchableButton extends ButtonComponent {
      */
     public cleanup(): void {
         if (this.actionTimeout) {
-            clearTimeout(this.actionTimeout);
+            window.clearTimeout(this.actionTimeout);
             this.actionTimeout = null;
         }
         this.buttonEl.remove();

@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Platform } from 'obsidian';
+import { Modal, Notice, Platform } from 'obsidian';
 import { AudioRecordingManager } from '../utils/RecordingManager';
 import { RecordingUI, RecordingState } from '../ui/RecordingUI';
 import NeuroVoxPlugin from '../main';
@@ -50,7 +50,7 @@ export class TimerModal extends Modal {
 
     private readonly CONFIG: TimerConfig;
 
-    public onStop: (result: Blob | string) => void;
+    public onStop: (result: Blob | string) => void | Promise<void>;
 
     constructor(private plugin: NeuroVoxPlugin) {
         super(plugin.app);
@@ -150,7 +150,7 @@ export class TimerModal extends Modal {
             // Set viewport meta for mobile
             const viewport = document.querySelector('meta[name="viewport"]');
             if (!viewport) {
-                const meta = document.createElement('meta');
+                const meta = createEl('meta');
                 meta.name = 'viewport';
                 meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
                 document.head.appendChild(meta);
@@ -171,7 +171,7 @@ export class TimerModal extends Modal {
 
             this.ui = new RecordingUI(container, {
                 onPause: () => this.handlePauseToggle(),
-                onStop: () => this.handleStop()
+                onStop: () => { void this.handleStop(); }
             });
 
             // Initialize recording with mobile-specific settings
@@ -209,7 +209,7 @@ export class TimerModal extends Modal {
      * Detects if current device is iOS using Obsidian's Platform API
      */
     private isIOSDevice(): boolean {
-        return Platform.isIosApp || (Platform.isMobile && /iPhone|iPad|iPod/i.test(navigator.userAgent));
+        return Platform.isIosApp;
     }
 
     /**
@@ -387,7 +387,7 @@ export class TimerModal extends Modal {
 
             // Let any in-flight rotation finish so it doesn't race the final stop().
             for (let waited = 0; this.isRotating && waited < 100; waited++) {
-                await new Promise(resolve => setTimeout(resolve, 20));
+                await new Promise(resolve => window.setTimeout(resolve, 20));
             }
 
             const tailStart = this.segmentStartSeconds;
@@ -531,7 +531,8 @@ export class TimerModal extends Modal {
                 this.streamingService.abort();
                 this.streamingService = null;
             }
-        } catch (error) {
+        } catch {
+            // Cleanup failures here are non-fatal; proceed to reset state below.
         } finally {
             // Reset states
             this.currentState = 'inactive';

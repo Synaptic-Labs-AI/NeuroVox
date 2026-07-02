@@ -47,7 +47,7 @@ export class ModelHookupAccordion extends BaseAccordion {
 
     render(): void {
         const openaiSetting = new Setting(this.contentEl)
-            .setName("OpenAI API Key")
+            .setName("OpenAI API key")
             .setDesc("Enter your OpenAI API key")
             .addText(text => {
                 text
@@ -71,7 +71,7 @@ export class ModelHookupAccordion extends BaseAccordion {
                             openaiSetting.setDesc("✅ API key validated successfully");
                             try {
                                 await this.refreshAccordions();
-                            } catch (error) {
+                            } catch {
                                 openaiSetting.setDesc("✅ API key valid, but failed to update model lists");
                             }
                         } else {
@@ -81,7 +81,7 @@ export class ModelHookupAccordion extends BaseAccordion {
             });
 
         const groqSetting = new Setting(this.contentEl)
-            .setName("Groq API Key")
+            .setName("Groq API key")
             .setDesc("Enter your Groq API key")
             .addText(text => {
                 text
@@ -105,7 +105,7 @@ export class ModelHookupAccordion extends BaseAccordion {
                             groqSetting.setDesc("✅ API key validated successfully");
                             try {
                                 await this.refreshAccordions();
-                            } catch (error) {
+                            } catch {
                                 groqSetting.setDesc("✅ API key valid, but failed to update model lists");
                             }
                         } else {
@@ -115,7 +115,7 @@ export class ModelHookupAccordion extends BaseAccordion {
             });
 
         const deepgramSetting = new Setting(this.contentEl)
-            .setName("Deepgram API Key")
+            .setName("Deepgram API key")
             .setDesc("Enter your Deepgram API key")
             .addText(text => {
                 text
@@ -139,7 +139,7 @@ export class ModelHookupAccordion extends BaseAccordion {
                             deepgramSetting.setDesc("✅ API key validated successfully");
                             try {
                                 await this.refreshAccordions();
-                            } catch (error) {
+                            } catch {
                                 deepgramSetting.setDesc("✅ API key valid, but failed to update model lists");
                             }
                         } else {
@@ -149,7 +149,7 @@ export class ModelHookupAccordion extends BaseAccordion {
             });
 
         const openrouterSetting = new Setting(this.contentEl)
-            .setName("OpenRouter API Key")
+            .setName("OpenRouter API key")
             .setDesc("Enter your OpenRouter API key (used for post-processing)")
             .addText(text => {
                 text
@@ -173,7 +173,7 @@ export class ModelHookupAccordion extends BaseAccordion {
                             openrouterSetting.setDesc("✅ API key validated successfully");
                             try {
                                 await this.refreshAccordions();
-                            } catch (error) {
+                            } catch {
                                 openrouterSetting.setDesc("✅ API key valid, but failed to update model lists");
                             }
                         } else {
@@ -183,7 +183,7 @@ export class ModelHookupAccordion extends BaseAccordion {
             });
 
         const assemblyaiSetting = new Setting(this.contentEl)
-            .setName("AssemblyAI API Key")
+            .setName("AssemblyAI API key")
             .setDesc("Enter your AssemblyAI API key (used for transcription)")
             .addText(text => {
                 text
@@ -207,7 +207,7 @@ export class ModelHookupAccordion extends BaseAccordion {
                             assemblyaiSetting.setDesc("✅ API key validated successfully");
                             try {
                                 await this.refreshAccordions();
-                            } catch (error) {
+                            } catch {
                                 assemblyaiSetting.setDesc("✅ API key valid, but failed to update model lists");
                             }
                         } else {
@@ -226,16 +226,16 @@ export class ModelHookupAccordion extends BaseAccordion {
 
         // Section header
         const headerEl = this.contentEl.createDiv({ cls: 'neurovox-local-model-header' });
-        headerEl.createEl('h4', { text: '🖥️ Local Model (No API Key Required)' });
+        headerEl.createEl('h4', { text: '🖥️ Local model (no API key required)' });
 
         // Model selection
         new Setting(this.contentEl)
-            .setName("Moonshine Model")
-            .setDesc("Select model size. Tiny is faster (~50MB), Base is more accurate (~400MB).")
+            .setName("Moonshine model")
+            .setDesc("Select model size. Tiny is faster (~50 MB), base is more accurate (~400 MB).")
             .addDropdown(dropdown => {
                 dropdown
-                    .addOption("moonshine-tiny", "Moonshine Tiny (27M params)")
-                    .addOption("moonshine-base", "Moonshine Base (62M params)")
+                    .addOption("moonshine-tiny", "Moonshine tiny (27m params)")
+                    .addOption("moonshine-base", "Moonshine base (62m params)")
                     .setValue(this.settings.moonshineModel)
                     .onChange(async (value) => {
                         this.settings.moonshineModel = value;
@@ -246,13 +246,12 @@ export class ModelHookupAccordion extends BaseAccordion {
 
         // Status and button
         const moonshineSetting = new Setting(this.contentEl)
-            .setName("Model Status");
+            .setName("Model status");
 
         this.moonshineStatusEl = moonshineSetting.descEl;
 
         // Progress bar
-        this.moonshineProgressEl = this.contentEl.createDiv({ cls: 'neurovox-progress-container' });
-        this.moonshineProgressEl.style.display = 'none';
+        this.moonshineProgressEl = this.contentEl.createDiv({ cls: 'neurovox-progress-container neurovox-hidden' });
         const progressBar = this.moonshineProgressEl.createDiv({ cls: 'neurovox-progress-bar' });
         progressBar.createDiv({ cls: 'neurovox-progress-fill' });
         this.moonshineProgressEl.createDiv({ cls: 'neurovox-progress-text', text: 'Downloading...' });
@@ -331,7 +330,7 @@ export class ModelHookupAccordion extends BaseAccordion {
                 this.updateMoonshineUI();
 
                 // Poll for progress updates
-                const progressInterval = setInterval(() => {
+                const progressInterval = window.setInterval(() => {
                     if (adapter.isDownloading()) {
                         this.showProgress(adapter.getDownloadProgress());
                     }
@@ -339,7 +338,7 @@ export class ModelHookupAccordion extends BaseAccordion {
 
                 await adapter.ensureModelLoaded(this.settings.moonshineModel);
 
-                clearInterval(progressInterval);
+                window.clearInterval(progressInterval);
                 this.updateMoonshineUI();
                 await this.refreshAccordions();
 
@@ -354,7 +353,7 @@ export class ModelHookupAccordion extends BaseAccordion {
 
     private showProgress(percent: number): void {
         if (!this.moonshineProgressEl) return;
-        this.moonshineProgressEl.style.display = 'block';
+        this.moonshineProgressEl.removeClass('neurovox-hidden');
 
         const fill = this.moonshineProgressEl.querySelector('.neurovox-progress-fill') as HTMLElement;
         const text = this.moonshineProgressEl.querySelector('.neurovox-progress-text') as HTMLElement;
@@ -365,13 +364,13 @@ export class ModelHookupAccordion extends BaseAccordion {
 
     private hideProgress(): void {
         if (!this.moonshineProgressEl) return;
-        this.moonshineProgressEl.style.display = 'none';
+        this.moonshineProgressEl.addClass('neurovox-hidden');
     }
 
     private addMoonshineStyles(): void {
         if (document.getElementById('neurovox-moonshine-styles')) return;
 
-        const style = document.createElement('style');
+        const style = createEl('style');
         style.id = 'neurovox-moonshine-styles';
         style.textContent = `
             .neurovox-separator {

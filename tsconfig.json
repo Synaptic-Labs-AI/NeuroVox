@@ -12,6 +12,7 @@
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
     "strictNullChecks": true,
+    "strictBindCallApply": true,
     "lib": [
       "DOM",
       "DOM.Iterable",

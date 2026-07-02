@@ -661,3 +661,22 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
 }
+
+/* Utility classes (replace inline style assignments per Obsidian guidelines) */
+.neurovox-hidden {
+    display: none !important;
+}
+
+.neurovox-full-width {
+    width: 100%;
+}
+
+/* Floating button container fade in/out */
+.neurovox-button-container {
+    opacity: 0;
+    transition: opacity var(--neurovox-transition-quick) ease;
+}
+
+.neurovox-button-container.is-visible {
+    opacity: 1;
+}

@@ -104,7 +104,6 @@ export class MemoryMonitor {
     }
 
     getAdaptiveSettings(): AdaptiveSettings {
-        const usage = this.getMemoryUsagePercent();
         const isMobile = this.deviceDetection.isMobile();
         const isHighPressure = this.isMemoryPressureHigh();
         const isCritical = this.isMemoryPressureCritical();

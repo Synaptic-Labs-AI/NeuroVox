@@ -28,7 +28,8 @@ export abstract class BaseAccordion {
         }
 
         this.contentEl = this.accordionEl.createDiv({ cls: "neurovox-accordion-content" });
-        this.contentEl.style.display = "none"; // Start closed
+        // Closed by default; the .neurovox-accordion-open class (toggled below)
+        // drives visibility via CSS (max-height/opacity animation).
 
         this.headerEl.addEventListener("click", () => this.toggleAccordion());
     }
@@ -37,7 +38,6 @@ export abstract class BaseAccordion {
 
     public toggleAccordion(): void {
         this.isOpen = !this.isOpen;
-        this.contentEl.style.display = this.isOpen ? "block" : "none";
         this.updateToggleIcon();
         this.accordionEl.classList.toggle("neurovox-accordion-open", this.isOpen);
     }

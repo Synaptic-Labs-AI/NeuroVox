@@ -92,7 +92,7 @@ export class RecordingAccordion extends BaseAccordion {
     }
 
     public createFloatingButtonSetting(): void {
-        const floatingBtnSetting = new Setting(this.contentEl)
+        new Setting(this.contentEl)
             .setName("Show floating button")
             .setDesc("Show a floating microphone button for quick recording")
             .addToggle(toggle => {
@@ -106,21 +106,17 @@ export class RecordingAccordion extends BaseAccordion {
                         this.plugin.events.trigger('floating-button-setting-changed', value);
                         
                         // Refresh the settings display to show/hide modal toggle
-                        this.refresh();
+                        void this.refresh();
                     });
             });
     }
 
     public async refresh(): Promise<void> {
-        try {
-            if (!this.modelDropdown) {
-                return;
-            }
-            
-            await this.setupModelDropdown(this.modelDropdown);
-        } catch (error) {
-            throw error;
+        if (!this.modelDropdown) {
+            return;
         }
+
+        await this.setupModelDropdown(this.modelDropdown);
     }
 
     public createToolbarButtonSetting(): void {
@@ -177,7 +173,7 @@ export class RecordingAccordion extends BaseAccordion {
                         await this.plugin.saveSettings();
                     });
                 text.inputEl.rows = 4;
-                text.inputEl.style.width = "100%";
+                text.inputEl.addClass("neurovox-full-width");
             });
     }
 
@@ -191,7 +187,7 @@ export class RecordingAccordion extends BaseAccordion {
             .setDesc("Select the AI model for transcription")
             .addDropdown(dropdown => {
                 this.modelDropdown = dropdown;
-                this.setupModelDropdown(dropdown);
+                void this.setupModelDropdown(dropdown);
                 
                 dropdown.onChange(async (value) => {
                     this.settings.transcriptionModel = value;
@@ -215,11 +211,11 @@ export class RecordingAccordion extends BaseAccordion {
                     const models = adapter.getAvailableModels('transcription');
                     if (models.length > 0) {
                         hasValidProvider = true;
-                        const group = document.createElement("optgroup");
+                        const group = createEl("optgroup");
                         group.label = `${provider.toUpperCase()} Models`;
 
                         models.forEach(model => {
-                            const option = document.createElement("option");
+                            const option = createEl("option");
                             option.value = model.id;
                             option.text = `${model.name}`;
                             group.appendChild(option);
@@ -241,11 +237,11 @@ export class RecordingAccordion extends BaseAccordion {
 
             if (downloadedModels.length > 0) {
                 hasValidProvider = true;
-                const group = document.createElement("optgroup");
+                const group = createEl("optgroup");
                 group.label = "LOCAL Models (No API)";
 
                 downloadedModels.forEach(model => {
-                    const option = document.createElement("option");
+                    const option = createEl("option");
                     option.value = model.id;
                     option.text = `${model.name}`;
                     group.appendChild(option);

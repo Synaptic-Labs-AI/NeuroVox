@@ -1,3 +1,4 @@
+import { Platform } from 'obsidian';
 import { StreamingOptions } from '../types';
 
 export class DeviceDetection {
@@ -18,11 +19,9 @@ export class DeviceDetection {
     }
 
     private detectMobile(): boolean {
-        // Check for mobile/tablet devices
-        const userAgent = navigator.userAgent.toLowerCase();
-        const mobileKeywords = ['mobile', 'tablet', 'android', 'iphone', 'ipad', 'ipod'];
-        const isMobileUA = mobileKeywords.some(keyword => userAgent.includes(keyword));
-        
+        // Obsidian's Platform API is the authoritative signal for the app environment.
+        const isMobileUA = Platform.isMobile;
+
         // Check screen size
         const isSmallScreen = window.innerWidth <= 768 || window.innerHeight <= 768;
         

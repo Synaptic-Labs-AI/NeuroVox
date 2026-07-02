@@ -2,11 +2,11 @@ import { Notice } from 'obsidian';
 import { AIAdapter, AIProvider } from './AIAdapter';
 import { NeuroVoxSettings } from '../settings/Settings';
 import {
-    ChatCompletionResponse,
     MoonshineTranscriptionResponse,
     TransformersProgressData
 } from '../types';
 import { ASRPipeline, createASRPipeline, isTransformersLoaded } from '../utils/TransformersLoader';
+import { Logger } from '../utils/Logger';
 
 /**
  * Model status for tracking download state
@@ -138,7 +138,7 @@ export class MoonshineAdapter extends AIAdapter {
      * Transcribe audio using local Moonshine model
      */
     public async transcribeAudio(audioArrayBuffer: ArrayBuffer, model: string): Promise<string> {
-        console.log('[Moonshine] Starting transcription, audio size:', audioArrayBuffer.byteLength, 'model:', model);
+        Logger.log('[Moonshine] Starting transcription, audio size:', audioArrayBuffer.byteLength, 'model:', model);
         try {
             // Ensure the model is loaded
             await this.ensureModelLoaded(model);
@@ -149,11 +149,11 @@ export class MoonshineAdapter extends AIAdapter {
 
             // Convert ArrayBuffer to the format Moonshine expects
             const audioBlob = new Blob([audioArrayBuffer], { type: 'audio/wav' });
-            console.log('[Moonshine] Created audio blob, size:', audioBlob.size);
+            Logger.log('[Moonshine] Created audio blob, size:', audioBlob.size);
 
             // Use the transcriber to process the audio
             const result = await this.transcribeBlob(audioBlob);
-            console.log('[Moonshine] Transcription result:', result);
+            Logger.log('[Moonshine] Transcription result:', result);
 
             return this.parseTranscriptionResponse(result);
         } catch (error) {
@@ -232,7 +232,7 @@ export class MoonshineAdapter extends AIAdapter {
                         }
                         // Log progress for debugging
                         if (progress.status === 'download') {
-                            console.log(`Downloading: ${progress.file}`);
+                            Logger.log(`Downloading: ${progress.file}`);
                         }
                     }
                 }
@@ -272,18 +272,18 @@ export class MoonshineAdapter extends AIAdapter {
         }
 
         // Convert Blob to ArrayBuffer then to Float32Array for audio processing
-        console.log('[Moonshine] Decoding audio blob...');
+        Logger.log('[Moonshine] Decoding audio blob...');
         const arrayBuffer = await audioBlob.arrayBuffer();
         const audioData = await this.decodeAudioData(arrayBuffer);
-        console.log('[Moonshine] Decoded audio, samples:', audioData.length, 'duration:', audioData.length / 16000, 'seconds');
+        Logger.log('[Moonshine] Decoded audio, samples:', audioData.length, 'duration:', audioData.length / 16000, 'seconds');
 
         // Run transcription
-        console.log('[Moonshine] Calling transcriber pipeline...');
+        Logger.log('[Moonshine] Calling transcriber pipeline...');
         const result = await this.transcriber(audioData, {
             language: 'en',
             return_timestamps: false
         });
-        console.log('[Moonshine] Pipeline returned:', result);
+        Logger.log('[Moonshine] Pipeline returned:', result);
 
         return result.text || '';
     }
@@ -347,7 +347,7 @@ export class MoonshineAdapter extends AIAdapter {
         let waited = 0;
 
         while (this.isInitializing && waited < maxWaitTime) {
-            await new Promise(resolve => setTimeout(resolve, checkInterval));
+            await new Promise(resolve => window.setTimeout(resolve, checkInterval));
             waited += checkInterval;
         }
 

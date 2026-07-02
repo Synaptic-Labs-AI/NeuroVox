@@ -5,7 +5,6 @@ import { ButtonPositionManager } from '../utils/ButtonPositionManager';
 import { PluginData, Position } from '../types';
 import NeuroVoxPlugin from '../main'; // Import the actual class instead of interface
 import { AudioRecordingManager } from '../utils/RecordingManager';
-import { RecordingProcessor } from '../utils/RecordingProcessor';
 
 export class FloatingButton {
     private static instance: FloatingButton | null = null;
@@ -14,7 +13,7 @@ export class FloatingButton {
     public activeLeafContainer: HTMLElement | null = null;
     public resizeObserver: ResizeObserver | null = null;
     public positionManager: ButtonPositionManager | null = null;
-    public resizeTimeout: NodeJS.Timeout | null = null;
+    public resizeTimeout: number | null = null;
     public audioManager: AudioRecordingManager | null = null;
     public isRecording: boolean = false;
     public isProcessing: boolean = false;
@@ -75,7 +74,7 @@ export class FloatingButton {
     public setupResizeObserver(): void {
         this.resizeObserver = new ResizeObserver(() => {
             if (this.activeLeafContainer && this.pluginData.showFloatingButton) {
-                requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
                     if (this.positionManager) {
                         this.positionManager.constrainPosition();
                     }
@@ -93,7 +92,7 @@ export class FloatingButton {
     }
 
     public createContainer(): void {
-        this.containerEl = document.createElement('div');
+        this.containerEl = createDiv();
         this.containerEl.classList.add('neurovox-button-container');
     }
 
@@ -103,7 +102,7 @@ export class FloatingButton {
     public createButton(): void {
         if (!this.containerEl) return;
         
-        this.buttonEl = document.createElement('button');
+        this.buttonEl = createEl('button');
         this.buttonEl.classList.add('neurovox-button', 'floating');
         this.buttonEl.setAttribute('aria-label', 'Start recording (drag to move)');
         setIcon(this.buttonEl, 'mic');
@@ -116,7 +115,7 @@ export class FloatingButton {
                 event.stopPropagation();
                 return;
             }
-            this.handleClick();
+            void this.handleClick(event);
         });
         
         this.updateButtonColor();
@@ -133,20 +132,20 @@ export class FloatingButton {
             this.getComputedSize(),
             this.getComputedMargin(),
             this.handlePositionChange.bind(this),
-            this.handleDragEnd.bind(this),
+            (position: Position) => { void this.handleDragEnd(position); },
             this.onClickCallback
         );
 
         // Use a short timeout to ensure the container is rendered
-        setTimeout(async () => {
-            await this.setInitialPosition();
+        window.setTimeout(() => {
+            void this.setInitialPosition();
         }, 0);
     }
 
     public handlePositionChange(x: number, y: number): void {
         if (!this.containerEl) return;
         
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
             if (this.containerEl) {
                 this.containerEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
             }
@@ -174,7 +173,7 @@ export class FloatingButton {
                 containerRect.height - this.getComputedSize() - this.getComputedMargin()
             );
 
-            requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
                 if (this.positionManager) {
                     this.positionManager.setPosition(x, y, true);
                 }
@@ -193,12 +192,12 @@ export class FloatingButton {
         const x = containerRect.width - this.getComputedSize() - this.getComputedMargin();
         const y = containerRect.height - this.getComputedSize() - this.getComputedMargin();
 
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
             if (this.positionManager) {
                 this.positionManager.setPosition(x, y, true);
                 // Save default position to pluginData
                 this.pluginData.buttonPosition = { x, y };
-                this.plugin.saveSettings();
+                void this.plugin.saveSettings();
             }
         });
     }
@@ -212,7 +211,7 @@ export class FloatingButton {
     public registerActiveLeafChangeEvent(): void {
         this.plugin.registerEvent(
             this.plugin.app.workspace.on('active-leaf-change', () => {
-                requestAnimationFrame(() => this.attachToActiveLeaf());
+                window.requestAnimationFrame(() => this.attachToActiveLeaf());
             })
         );
     }
@@ -220,7 +219,7 @@ export class FloatingButton {
     public registerLayoutChangeEvent(): void {
         this.plugin.registerEvent(
             this.plugin.app.workspace.on('layout-change', () => {
-                requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
                     if (this.positionManager && this.activeLeafContainer) {
                         this.positionManager.updateContainer(this.activeLeafContainer);
                     }
@@ -233,11 +232,11 @@ export class FloatingButton {
         this.plugin.registerEvent(
             this.plugin.app.workspace.on('resize', () => {
                 if (this.resizeTimeout) {
-                    clearTimeout(this.resizeTimeout);
+                    window.clearTimeout(this.resizeTimeout);
                 }
-                this.resizeTimeout = setTimeout(() => {
+                this.resizeTimeout = window.setTimeout(() => {
                     if (this.activeLeafContainer && this.positionManager) {
-                        requestAnimationFrame(() => {
+                        window.requestAnimationFrame(() => {
                             if (this.positionManager && this.activeLeafContainer) {
                                 this.positionManager.updateContainer(this.activeLeafContainer);
                             }
@@ -286,7 +285,7 @@ export class FloatingButton {
 
         // Initialize position manager
         this.activeLeafContainer = viewContent;
-        this.initializePositionManager();
+        void this.initializePositionManager();
 
         // Only show the button if the setting is enabled
         if (this.plugin.settings.showFloatingButton) {
@@ -312,7 +311,7 @@ export class FloatingButton {
         this.resizeObserver?.observe(newContainer);
 
         // Always initialize position manager
-        this.initializePositionManager();
+        void this.initializePositionManager();
         
         // Only show the button if the setting is enabled
         if (this.plugin.settings.showFloatingButton) {
@@ -338,10 +337,10 @@ export class FloatingButton {
     public show(): void {
         if (!this.containerEl) return;
         
-        this.containerEl.style.display = 'block';
-        requestAnimationFrame(() => {
+        this.containerEl.removeClass('neurovox-hidden');
+        window.requestAnimationFrame(() => {
             if (this.containerEl) {
-                this.containerEl.style.opacity = '1';
+                this.containerEl.addClass('is-visible');
                 if (this.positionManager) {
                     this.positionManager.constrainPosition();
                 }
@@ -351,14 +350,14 @@ export class FloatingButton {
 
     public hide(): void {
         if (!this.containerEl) return;
-        this.containerEl.style.display = 'none';
-        this.containerEl.style.opacity = '0';
+        this.containerEl.addClass('neurovox-hidden');
+        this.containerEl.removeClass('is-visible');
     }
 
     public remove(): void {
         // Clear any active timers
         if (this.resizeTimeout) {
-            clearTimeout(this.resizeTimeout);
+            window.clearTimeout(this.resizeTimeout);
             this.resizeTimeout = null;
         }
         
@@ -398,9 +397,9 @@ export class FloatingButton {
     /**
      * Handles click based on current recording mode
      */
-    public async handleClick() {
+    public async handleClick(event?: MouseEvent) {
         if (this.isProcessing) return;
-        
+
         if (this.pluginData.useRecordingModal) {
             // Stop event propagation
             event?.stopPropagation();
@@ -429,7 +428,7 @@ export class FloatingButton {
             this.isRecording = true;
             this.updateRecordingState(true);
             new Notice('Recording started');
-        } catch (error) {
+        } catch {
             new Notice('Failed to start recording');
             this.cleanup();
         }
@@ -464,7 +463,7 @@ export class FloatingButton {
                 activeView.file,
                 activeView.editor.getCursor()
             );
-        } catch (error) {
+        } catch {
             new Notice('Failed to stop recording');
         } finally {
             this.cleanup();

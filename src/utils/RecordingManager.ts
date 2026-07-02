@@ -83,7 +83,7 @@ export class AudioRecordingManager {
             type: 'audio',
             mimeType: "audio/webm",  // Use WebM container for better compression
             recorderType: RecordRTC.StereoAudioRecorder,
-            numberOfAudioChannels: 1 as AudioChannels,
+            numberOfAudioChannels: 1,
             desiredSampRate: sampleRates[quality] || sampleRates[AudioQuality.Medium],
             // Add bitrate control for better compression
             bitsPerSecond: bitRates[quality] || bitRates[AudioQuality.Medium]
@@ -102,7 +102,7 @@ export class AudioRecordingManager {
                     autoGainControl: true
                 }
             });
-        } catch (error) {
+        } catch {
             throw new Error('Failed to access microphone');
         }
     }
@@ -141,7 +141,7 @@ export class AudioRecordingManager {
         const blob = await this.stopRecorder(previous);
         try {
             previous.destroy();
-        } catch (error) {
+        } catch {
             // ignore — buffers are released regardless
         }
         return blob;
@@ -193,7 +193,8 @@ export class AudioRecordingManager {
         if (this.recorder) {
             try {
                 this.recorder.destroy();
-            } catch (error) {
+            } catch {
+                // Destroying an already-torn-down recorder can throw; ignore.
             }
             this.recorder = null;
         }
@@ -201,7 +202,8 @@ export class AudioRecordingManager {
         if (this.stream) {
             try {
                 this.stream.getTracks().forEach(track => track.stop());
-            } catch (error) {
+            } catch {
+                // Stopping already-ended tracks can throw; ignore.
             }
             this.stream = null;
         }

@@ -1,4 +1,4 @@
-import { TranscriptionChunk, ChunkMetadata } from '../../types';
+import { TranscriptionChunk } from '../../types';
 
 interface CompiledSegment {
     startTime: number;

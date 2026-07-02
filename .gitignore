@@ -27,3 +27,7 @@ codeSummary.js
 codeSummaryLogs/
 .history
 chats.db
+
+# Claude Code local artifacts
+.worktrees/
+.CLAUDE.md.lock
