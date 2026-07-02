@@ -17,6 +17,7 @@
  */
 
 import type { TransformersProgressData } from '../types';
+import { Logger } from './Logger';
 
 // Message types for iframe communication
 interface IframeMessage {
@@ -151,8 +152,8 @@ function createIframe(): Promise<void> {
 
     iframeReadyPromise = new Promise((resolve, reject) => {
         // Create hidden iframe
-        iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
+        iframe = createEl('iframe');
+        iframe.addClass('neurovox-hidden');
         // allow-scripts: needed to run JavaScript
         // allow-same-origin: needed for Cache API (model caching)
         // Note: This combination can escape sandbox, but we control the content
@@ -205,7 +206,7 @@ function createIframe(): Promise<void> {
         iframe.srcdoc = getIframeHtml();
 
         // Timeout for iframe initialization
-        const timeout = setTimeout(() => {
+        const timeout = window.setTimeout(() => {
             if (!iframeReady) {
                 reject(new Error('Iframe initialization timed out'));
             }
@@ -213,16 +214,16 @@ function createIframe(): Promise<void> {
 
         iframe.onload = () => {
             // Wait a bit for the script to initialize
-            setTimeout(() => {
+            window.setTimeout(() => {
                 if (!iframeReady) {
                     // If still not ready, try to resolve anyway
-                    console.log('Iframe loaded but not yet signaled ready');
+                    Logger.log('Iframe loaded but not yet signaled ready');
                 }
             }, 1000);
         };
 
         iframe.onerror = () => {
-            clearTimeout(timeout);
+            window.clearTimeout(timeout);
             reject(new Error('Failed to load iframe'));
         };
 
@@ -245,12 +246,12 @@ async function sendMessage<T>(message: TranscribeRequest | LoadModelRequest): Pr
 
     return new Promise((resolve, reject) => {
         pendingRequests.set(message.id, {
-            resolve: resolve as (value: unknown) => void,
+            resolve,
             reject
         });
 
         // Set timeout for request
-        const timeout = setTimeout(() => {
+        const timeout = window.setTimeout(() => {
             if (pendingRequests.has(message.id)) {
                 pendingRequests.delete(message.id);
                 reject(new Error('Request timed out'));
@@ -260,7 +261,7 @@ async function sendMessage<T>(message: TranscribeRequest | LoadModelRequest): Pr
         // Store timeout reference for cleanup
         const originalResolve = pendingRequests.get(message.id)!.resolve;
         pendingRequests.get(message.id)!.resolve = (value) => {
-            clearTimeout(timeout);
+            window.clearTimeout(timeout);
             originalResolve(value);
         };
 
@@ -303,11 +304,11 @@ export async function transcribeAudio(
     options?: Record<string, unknown>
 ): Promise<string> {
     const id = generateRequestId();
-    console.log('[TransformersLoader] Transcribing audio, samples:', audioData.length, 'model:', modelPath);
+    Logger.log('[TransformersLoader] Transcribing audio, samples:', audioData.length, 'model:', modelPath);
 
     // Convert Float32Array to regular array for postMessage
     const audioArray = Array.from(audioData);
-    console.log('[TransformersLoader] Converted to array, sending to iframe...');
+    Logger.log('[TransformersLoader] Converted to array, sending to iframe...');
 
     const result = await sendMessage<{ text: string }>({
         type: 'transcribe',
@@ -317,7 +318,7 @@ export async function transcribeAudio(
         options
     });
 
-    console.log('[TransformersLoader] Received result from iframe:', result);
+    Logger.log('[TransformersLoader] Received result from iframe:', result);
     return result.text || '';
 }
 

@@ -209,7 +209,7 @@ export class RecordingProcessor {
             return await operation();
         } catch (error) {
             if (retryCount < this.config.maxRetries) {
-                await new Promise(resolve => setTimeout(resolve, this.config.retryDelay));
+                await new Promise(resolve => window.setTimeout(resolve, this.config.retryDelay));
                 return this.executeWithRetry(operation, retryCount + 1);
             }
             throw error;

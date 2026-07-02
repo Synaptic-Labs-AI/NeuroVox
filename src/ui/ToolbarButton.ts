@@ -1,6 +1,6 @@
 // src/ui/ToolbarButton.ts
 
-import { MarkdownView, Notice, setIcon } from 'obsidian';
+import { MarkdownView, Notice } from 'obsidian';
 import NeuroVoxPlugin from '../main';
 import { TimerModal } from '../modals/TimerModal';
 import { PluginData } from '../types';

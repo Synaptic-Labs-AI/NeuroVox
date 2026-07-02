@@ -21,18 +21,14 @@ export class PostProcessingAccordion extends BaseAccordion {
     private modelLookup: Map<string, AIProvider> = new Map();
 
     public async refresh(): Promise<void> {
-        try {
-            if (!this.modelInput) {
-                return;
-            }
+        if (!this.modelInput) {
+            return;
+        }
 
-            await this.setupModelSelector();
+        await this.setupModelSelector();
 
-            if (this.settings.postProcessingModel) {
-                await this.updateMaxTokensLimit(this.settings.postProcessingModel)
-            }
-        } catch (error) {
-            throw error;
+        if (this.settings.postProcessingModel) {
+            await this.updateMaxTokensLimit(this.settings.postProcessingModel)
         }
     }
 
@@ -60,7 +56,7 @@ export class PostProcessingAccordion extends BaseAccordion {
 
     private addEnableToggle(): void {
         new Setting(this.contentEl)
-            .setName("Enable AI Post-Processing")
+            .setName("Enable AI post-processing")
             .setDesc("Automatically generate AI post-processing after transcription")
             .addToggle(toggle => {
                 toggle
@@ -85,11 +81,11 @@ export class PostProcessingAccordion extends BaseAccordion {
 
                 // Wire the input to a datalist for native type-to-filter behaviour.
                 const datalistId = "neurovox-postprocessing-models";
-                this.datalistEl = document.createElement("datalist");
+                this.datalistEl = createEl("datalist");
                 this.datalistEl.id = datalistId;
                 text.inputEl.setAttribute("list", datalistId);
                 text.inputEl.after(this.datalistEl);
-                text.inputEl.style.width = "100%";
+                text.inputEl.addClass("neurovox-full-width");
 
                 // A pre-filled value makes the native datalist filter down to just that one
                 // option. Treat the box as a search field: clear it on focus so the whole
@@ -104,7 +100,7 @@ export class PostProcessingAccordion extends BaseAccordion {
                     }
                 });
 
-                this.setupModelSelector();
+                void this.setupModelSelector();
 
                 text.onChange(async (value: string) => {
                     const modelId = value.trim();
@@ -156,7 +152,7 @@ export class PostProcessingAccordion extends BaseAccordion {
                 hasValidProvider = true;
                 this.modelLookup.set(model.id, provider);
 
-                const option = document.createElement("option");
+                const option = createEl("option");
                 option.value = model.id;
                 option.label = `${provider.toUpperCase()} — ${model.name}`;
                 this.datalistEl.appendChild(option);
@@ -219,7 +215,7 @@ export class PostProcessingAccordion extends BaseAccordion {
                     });
                 
                 text.inputEl.rows = 4;
-                text.inputEl.style.width = "100%";
+                text.inputEl.addClass("neurovox-full-width");
             });
     }
 
@@ -235,7 +231,7 @@ export class PostProcessingAccordion extends BaseAccordion {
                         await this.plugin.saveSettings();
                     });
                 text.inputEl.rows = 4;
-                text.inputEl.style.width = "100%";
+                text.inputEl.addClass("neurovox-full-width");
             });
     }
 

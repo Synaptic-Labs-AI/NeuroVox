@@ -6,9 +6,6 @@ import {
     TAbstractFile,
     WorkspaceLeaf,
     normalizePath,
-    FuzzySuggestModal,
-    App,
-    FuzzyMatch,
     Events
 } from 'obsidian';
 import { VideoProcessor } from './utils/VideoProcessor';
@@ -24,81 +21,7 @@ import { MoonshineAdapter } from './adapters/MoonshineAdapter';
 import { OpenRouterAdapter } from './adapters/OpenRouterAdapter';
 import { AssemblyAIAdapter } from './adapters/AssemblyAIAdapter';
 import { AIProvider, AIAdapter } from './adapters/AIAdapter';
-import { PluginData } from './types';
 import { RecordingProcessor } from './utils/RecordingProcessor';
-
-/**
- * Modal for selecting audio files with fuzzy search
- */
-class AudioFileSuggestModal extends FuzzySuggestModal<TFile> {
-    private files: TFile[] = [];
-    private resolvePromise: ((file: TFile | null) => void) | null = null;
-
-    constructor(app: App) {
-        super(app);
-        this.setPlaceholder('🔍 Search audio files...');
-    }
-
-    setFiles(files: TFile[]): void {
-        this.files = files;
-    }
-
-    getItems(): TFile[] {
-        return this.files.sort((a, b) => b.stat.mtime - a.stat.mtime);
-    }
-
-    getItemText(file: TFile): string {
-        return file.path;
-    }
-
-    onChooseItem(file: TFile, evt: MouseEvent | KeyboardEvent): void {
-        if (!file) {
-            return;
-        }
-
-        const resolve = this.resolvePromise;
-        const selectedFile = file;
-        
-        this.resolvePromise = null;
-        this.close();
-        
-        if (resolve) {
-            setTimeout(() => resolve(selectedFile), 50);
-        }
-    }
-
-    renderSuggestion(match: FuzzyMatch<TFile>, el: HTMLElement): void {
-        const file = match.item;
-        
-        const container = el.createDiv({ cls: 'neurovox-suggestion' });
-        
-        container.createEl('div', {
-            text: `📄 ${file.path}`,
-            cls: 'neurovox-suggestion-path'
-        });
-        
-        container.createEl('div', {
-            text: `Modified: ${new Date(file.stat.mtime).toLocaleString()} • Size: ${(file.stat.size / (1024 * 1024)).toFixed(2)}MB`,
-            cls: 'neurovox-suggestion-info'
-        });
-    }
-
-    async awaitSelection(): Promise<TFile | null> {
-        return new Promise<TFile | null>((resolve) => {
-            this.resolvePromise = resolve;
-            this.open();
-        });
-    }
-
-    onClose(): void {
-        if (this.resolvePromise) {
-            const resolve = this.resolvePromise;
-            this.resolvePromise = null;
-            setTimeout(() => resolve(null), 50);
-        }
-        super.onClose();
-    }
-}
 
 export default class NeuroVoxPlugin extends Plugin {
     settings: NeuroVoxSettings;
@@ -134,7 +57,7 @@ export default class NeuroVoxPlugin extends Plugin {
             
             // Trigger initial state
             this.events.trigger('floating-button-setting-changed', this.settings.showFloatingButton);
-        } catch (error) {
+        } catch {
             new Notice("Failed to initialize NeuroVox plugin");
         }
     }
@@ -190,7 +113,7 @@ export default class NeuroVoxPlugin extends Plugin {
             // Trigger the floating button setting changed event to ensure UI is in sync
             this.events.trigger('floating-button-setting-changed', this.settings.showFloatingButton);
             
-        } catch (error) {
+        } catch {
             new Notice("Failed to save NeuroVox settings");
         }
     }    private async validateApiKeys(): Promise<void> {
@@ -243,7 +166,7 @@ export default class NeuroVoxPlugin extends Plugin {
             if (assemblyaiAdapter && !assemblyaiAdapter.isReady() && this.settings.assemblyaiApiKey) {
                 new Notice('❌ AssemblyAI API key validation failed');
             }
-        } catch (error) {
+        } catch {
             // Silent fail for API key validation
         }
     }public initializeAIAdapters(): void {
@@ -258,7 +181,7 @@ export default class NeuroVoxPlugin extends Plugin {
             ];
 
             this.aiAdapters = new Map<AIProvider, AIAdapter>(adapters);
-        } catch (error) {
+        } catch {
             throw new Error("Failed to initialize AI adapters");
         }
     }
@@ -561,12 +484,11 @@ export default class NeuroVoxPlugin extends Plugin {
             };
             
             const originalOnClose = this.modalInstance.onClose?.bind(this.modalInstance);
-            this.modalInstance.onClose = async () => {
+            this.modalInstance.onClose = () => {
                 if (originalOnClose) {
-                    await originalOnClose();
+                    originalOnClose();
                 }
                 this.modalInstance = null;
-                return Promise.resolve();
             };
             
             this.modalInstance.open();

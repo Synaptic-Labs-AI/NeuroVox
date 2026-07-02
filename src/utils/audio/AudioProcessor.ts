@@ -1,4 +1,3 @@
-import { Notice } from 'obsidian';
 import NeuroVoxPlugin from '../../main';
 import { AudioFileManager } from './AudioFileManager';
 import { AudioQuality } from '../../settings/Settings';

@@ -49,7 +49,7 @@ export class GroqAdapter extends AIAdapter {
                 })
             );
             return true;
-        } catch (error) {
+        } catch {
             return false;
         }
     }

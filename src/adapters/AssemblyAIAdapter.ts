@@ -144,7 +144,7 @@ export class AssemblyAIAdapter extends AIAdapter {
     }
 
     private sleep(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise(resolve => window.setTimeout(resolve, ms));
     }
 
     // AssemblyAI uses a bare `Authorization: <key>` header (no `Bearer` prefix).

@@ -1,10 +1,9 @@
-import { Notice, requestUrl } from 'obsidian';
+import { requestUrl } from 'obsidian';
 import { NeuroVoxSettings } from '../settings/Settings';
 import {
     ChatCompletionResponse,
     TranscriptionResponse,
     DeepgramTranscriptionResponse,
-    DeepgramProjectsResponse,
     MoonshineTranscriptionResponse,
     AssemblyAITranscriptionResponse,
     ModelListResponse
@@ -100,11 +99,6 @@ export function getModelInfo(modelId: string): AIModel | undefined {
         return { ...dynamic, maxTokens: dynamic.maxTokens ?? staticModel?.maxTokens };
     }
     return staticModel;
-}
-
-interface RequestOptions {
-    maxTokens?: number;
-    temperature?: number;
 }
 
 export abstract class AIAdapter {
@@ -276,7 +270,7 @@ export abstract class AIAdapter {
             }
 
             return isValid;
-        } catch (error) {
+        } catch {
             this.keyValidated = false;
             this.lastValidatedKey = '';
             return false;

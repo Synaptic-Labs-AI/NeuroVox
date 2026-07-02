@@ -1,4 +1,3 @@
-import { TFile } from 'obsidian';
 import NeuroVoxPlugin from '../../main';
 import { saveAudioFile, ensureDirectoryExists } from '../FileUtils';
 
@@ -61,7 +60,7 @@ export class AudioFileManager {
         for (const path of paths) {
             try {
                 await this.plugin.app.vault.adapter.remove(path);
-            } catch (error) {
+            } catch {
                 // Silent fail for cleanup
             }
         }

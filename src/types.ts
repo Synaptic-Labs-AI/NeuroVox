@@ -1,11 +1,10 @@
 // src/types.ts
 
-import { App, Events, Plugin, TFile, WorkspaceLeaf } from 'obsidian';
+import { Events, Plugin, WorkspaceLeaf } from 'obsidian';
 import { NeuroVoxSettings } from './settings/Settings';
 import { AIAdapter, AIProvider } from './adapters/AIAdapter';
 import { RecordingProcessor } from './utils/RecordingProcessor';
 import { ToolbarButton } from './ui/ToolbarButton';
-import { FloatingButton } from './ui/FloatingButton';
 
 // =============================================================================
 // API Response Types
