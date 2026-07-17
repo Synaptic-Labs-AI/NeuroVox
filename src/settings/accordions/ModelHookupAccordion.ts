@@ -370,42 +370,9 @@ export class ModelHookupAccordion extends BaseAccordion {
     }
 
     private addMoonshineStyles(): void {
-        if (document.getElementById('neurovox-moonshine-styles')) return;
-
-        const style = createEl('style');
-        style.id = 'neurovox-moonshine-styles';
-        style.textContent = `
-            .neurovox-separator {
-                margin: 1.5em 0;
-                border: none;
-                border-top: 1px solid var(--background-modifier-border);
-            }
-            .neurovox-local-model-header h4 {
-                margin: 0 0 0.5em 0;
-                color: var(--text-normal);
-            }
-            .neurovox-progress-container {
-                margin: 0.5em 0 1em 0;
-                padding: 0.5em;
-            }
-            .neurovox-progress-bar {
-                height: 6px;
-                background: var(--background-modifier-border);
-                border-radius: 3px;
-                overflow: hidden;
-            }
-            .neurovox-progress-fill {
-                height: 100%;
-                width: 0%;
-                background: var(--interactive-accent);
-                transition: width 0.3s ease;
-            }
-            .neurovox-progress-text {
-                margin-top: 0.25em;
-                font-size: 0.8em;
-                color: var(--text-muted);
-            }
-        `;
-        document.head.appendChild(style);
+        // No-op: the local-model styles now live in styles.css (Obsidian review
+        // guidelines discourage runtime <style> injection). Kept as a stub so the
+        // disabled createMoonshineSection() path still compiles for when the
+        // local-model feature is re-enabled.
     }
 }

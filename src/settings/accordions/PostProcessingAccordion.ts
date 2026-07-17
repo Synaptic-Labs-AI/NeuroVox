@@ -171,7 +171,7 @@ export class PostProcessingAccordion extends BaseAccordion {
             const current = this.settings.postProcessingModel;
             if (!current || !this.modelLookup.has(current)) {
                 // Default to the first available model.
-                const firstId = this.modelLookup.keys().next().value as string | undefined;
+                const firstId = Array.from(this.modelLookup.keys())[0];
                 if (firstId) {
                     this.settings.postProcessingModel = firstId;
                     this.settings.postProcessingProvider = this.modelLookup.get(firstId)!;
@@ -244,7 +244,6 @@ export class PostProcessingAccordion extends BaseAccordion {
                 slider
                     .setLimits(100, 4096, 100)
                     .setValue(this.settings.postProcessingMaxTokens)
-                    .setDynamicTooltip()
                     .onChange(async (value) => {
                         this.settings.postProcessingMaxTokens = value;
                         await this.plugin.saveSettings();
@@ -261,7 +260,6 @@ export class PostProcessingAccordion extends BaseAccordion {
                 slider
                     .setLimits(0, 1, 0.1)
                     .setValue(this.settings.postProcessingTemperature)
-                    .setDynamicTooltip()
                     .onChange(async (value) => {
                         this.settings.postProcessingTemperature = value;
                         await this.plugin.saveSettings();
