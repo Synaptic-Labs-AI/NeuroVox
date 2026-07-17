@@ -24,8 +24,8 @@ export class ModelHookupAccordion extends BaseAccordion {
     ) {
         super(
             containerEl,
-            "🔑 API Keys & Local Models",
-            "Configure API keys for cloud providers or download local models."
+            "🔑 API Keys",
+            "Configure API keys for cloud providers."
         );
     }
 
@@ -217,7 +217,9 @@ export class ModelHookupAccordion extends BaseAccordion {
             });
 
         // Moonshine Local Model Section
-        this.createMoonshineSection();
+        // TEMPORARILY HIDDEN: local model feature is still in development and
+        // hidden from the UI for release. Re-enable by uncommenting the call below.
+        // this.createMoonshineSection();
     }
 
     private createMoonshineSection(): void {

@@ -4,7 +4,9 @@ import { BaseAccordion } from "./BaseAccordion";
 import { NeuroVoxSettings, AudioQuality } from "../Settings";
 import { Setting, DropdownComponent } from "obsidian";
 import { AIAdapter, AIProvider, AIModels } from "../../adapters/AIAdapter";
-import { MoonshineAdapter, MoonshineModelStatus } from "../../adapters/MoonshineAdapter";
+// TEMPORARILY HIDDEN: local model feature is still in development. Re-enable
+// together with the Moonshine optgroup block in setupModelDropdown() below.
+// import { MoonshineAdapter, MoonshineModelStatus } from "../../adapters/MoonshineAdapter";
 import NeuroVoxPlugin from "../../main";
 
 export class RecordingAccordion extends BaseAccordion {
@@ -228,31 +230,34 @@ export class RecordingAccordion extends BaseAccordion {
         }
 
         // Moonshine local models (require download, not API key)
-        const moonshineAdapter = this.getAdapter(AIProvider.Moonshine) as MoonshineAdapter | undefined;
-        if (moonshineAdapter) {
-            const downloadedModels = AIModels[AIProvider.Moonshine].filter(model => {
-                const status = moonshineAdapter.getModelStatus(model.id);
-                return status === MoonshineModelStatus.Ready;
-            });
-
-            if (downloadedModels.length > 0) {
-                hasValidProvider = true;
-                const group = createEl("optgroup");
-                group.label = "LOCAL Models (No API)";
-
-                downloadedModels.forEach(model => {
-                    const option = createEl("option");
-                    option.value = model.id;
-                    option.text = `${model.name}`;
-                    group.appendChild(option);
-                });
-
-                dropdown.selectEl.appendChild(group);
-            }
-        }
+        // TEMPORARILY HIDDEN: local model feature is still in development and
+        // hidden from the transcription-model dropdown for release. Re-enable by
+        // uncommenting the block below.
+        // const moonshineAdapter = this.getAdapter(AIProvider.Moonshine) as MoonshineAdapter | undefined;
+        // if (moonshineAdapter) {
+        //     const downloadedModels = AIModels[AIProvider.Moonshine].filter(model => {
+        //         const status = moonshineAdapter.getModelStatus(model.id);
+        //         return status === MoonshineModelStatus.Ready;
+        //     });
+        //
+        //     if (downloadedModels.length > 0) {
+        //         hasValidProvider = true;
+        //         const group = createEl("optgroup");
+        //         group.label = "LOCAL Models (No API)";
+        //
+        //         downloadedModels.forEach(model => {
+        //             const option = createEl("option");
+        //             option.value = model.id;
+        //             option.text = `${model.name}`;
+        //             group.appendChild(option);
+        //         });
+        //
+        //         dropdown.selectEl.appendChild(group);
+        //     }
+        // }
 
         if (!hasValidProvider) {
-            dropdown.addOption("none", "No models available - add API key or download local model");
+            dropdown.addOption("none", "No models available - add an API key");
             dropdown.setDisabled(true);
             this.settings.transcriptionModel = '';
         } else {

@@ -662,7 +662,61 @@
     50% { opacity: 0.6; }
 }
 
-/* Utility classes (replace inline style assignments per Obsidian guidelines) */
+/************************************
+ * LOCAL MODEL SETTINGS
+ * (moved from the runtime-injected style block in
+ *  ModelHookupAccordion.ts per Obsidian review guidelines)
+ ************************************/
+.neurovox-separator {
+    margin: 1.5em 0;
+    border: none;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.neurovox-local-model-header h4 {
+    margin: 0 0 0.5em 0;
+    color: var(--text-normal);
+}
+
+.neurovox-local-model-note {
+    margin: 0.25em 0 0.75em 0;
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+.neurovox-local-runtime-line {
+    margin: 0.25em 0 0.5em 0;
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+.neurovox-progress-container {
+    margin: 0.5em 0 1em 0;
+    padding: 0.5em;
+}
+
+.neurovox-progress-bar {
+    height: 6px;
+    background: var(--background-modifier-border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.neurovox-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--interactive-accent);
+    transition: width 0.3s ease;
+}
+
+.neurovox-progress-text {
+    margin-top: 0.25em;
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+/* Utility classes (replace inline style assignments per Obsidian guidelines).
+ * Also used as the show/hide helper for the local-model settings section. */
 .neurovox-hidden {
     display: none !important;
 }
