@@ -1,6 +1,29 @@
 import esbuild from "esbuild";
 import process from "process";
+import { readFile } from "node:fs/promises";
 import { builtinModules as builtins } from "node:module";
+
+/**
+ * RecordRTC bundles a GifRecorder that dynamically injects an external
+ * <script src="https://www.webrtc-experiment.com/gif-recorder.js">. NeuroVox
+ * only uses RecordRTC for audio and never records GIFs, but the injection code
+ * still ends up in the bundle and trips the Obsidian review guideline against
+ * dynamic <script> element creation / loading external code. This plugin
+ * neutralizes that dead code path at build time.
+ */
+const stripRecordRtcGifScript = {
+	name: "strip-recordrtc-gif-script",
+	setup(build) {
+		build.onLoad({ filter: /recordrtc[\\/]RecordRTC\.js$/ }, async (args) => {
+			let contents = await readFile(args.path, "utf8");
+			contents = contents.replace(
+				/var script = document\.createElement\((['"])script\1\);[\s\S]{0,200}?appendChild\(script\);/g,
+				"/* gif-recorder external <script> injection removed for Obsidian review compliance */"
+			);
+			return { contents, loader: "js" };
+		});
+	},
+};
 
 const banner =
 `/*
@@ -38,6 +61,7 @@ const context = await esbuild.context({
 	sourcemap: prod ? false : "inline",
 	treeShaking: true,
 	outfile: "main.js",
+	plugins: [stripRecordRtcGifScript],
 });
 
 if (prod) {
