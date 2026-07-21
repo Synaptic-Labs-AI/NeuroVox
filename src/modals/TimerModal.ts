@@ -25,6 +25,7 @@ export class TimerModal extends Modal {
     private intervalId: number | null = null;
     private seconds: number = 0;
     private isClosing: boolean = false;
+    private isStopping: boolean = false;
     private currentState: RecordingState = 'inactive';
     private streamingService: StreamingTranscriptionService | null = null;
     private deviceDetection: DeviceDetection;
@@ -122,7 +123,7 @@ export class TimerModal extends Modal {
      * Handles all close attempts, ensuring proper cleanup and save prompts
      */
     private async requestClose(): Promise<void> {
-        if (this.isClosing) return;
+        if (this.isClosing || this.isStopping) return;
         this.isClosing = true;
 
         if (this.currentState === 'recording' || this.currentState === 'paused') {
@@ -158,6 +159,7 @@ export class TimerModal extends Modal {
 
             const { contentEl } = this;
             contentEl.empty();
+            this.modalEl.addClass('neurovox-timer-modal-shell');
             contentEl.addClass('neurovox-timer-modal');
 
             // Add mobile-specific class
@@ -382,6 +384,13 @@ export class TimerModal extends Modal {
      * Handles stop button click
      */
     private async handleStop(): Promise<void> {
+        if (this.isStopping) return;
+
+        this.isStopping = true;
+        this.pauseTimer();
+        this.currentState = 'stopped';
+        this.ui.showProcessing('transcribing');
+
         try {
             this.stopRotationMonitor();
 
@@ -397,8 +406,6 @@ export class TimerModal extends Modal {
             if (!this.streamingService) {
                 throw new Error('Streaming service not initialized');
             }
-
-            new Notice('Finishing transcription...');
 
             if (finalBlob && finalBlob.size > 0) {
                 if (this.streamingService.hasReceivedChunks()) {
@@ -418,16 +425,19 @@ export class TimerModal extends Modal {
                 throw new Error('No transcription result received');
             }
 
-            // Close recording modal first
-            this.cleanup();
-            super.close();
-
-            // Always save the recording
+            // Keep the modal visible while post-processing and note insertion complete.
+            this.ui.showProcessing('processing');
             if (this.onStop) {
                 await this.onStop(result);
             }
+
+            this.ui.showComplete();
+            await new Promise(resolve => window.setTimeout(resolve, 450));
+
+            this.cleanup();
+            super.close();
         } catch (error) {
-            this.handleError('Failed to stop recording', error);
+            this.handleError('Failed to finish recording', error);
         }
     }
 
@@ -536,6 +546,7 @@ export class TimerModal extends Modal {
         } finally {
             // Reset states
             this.currentState = 'inactive';
+            this.isStopping = false;
             this.seconds = 0;
             this.isClosing = false;
             this.chunkIndex = 0;

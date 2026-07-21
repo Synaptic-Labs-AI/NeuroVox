@@ -451,35 +451,30 @@ export default class NeuroVoxPlugin extends Plugin {
             
             this.modalInstance = new TimerModal(this);
             this.modalInstance.onStop = async (result: Blob | string) => {
-                try {
-                    if (typeof result === 'string') {
-                        // Streaming mode - transcription already done
-                        await this.recordingProcessor.processStreamingResult(
-                            result,
-                            activeFile,
-                            activeView.editor.getCursor()
-                        );
-                    } else {
-                        // Legacy mode - need to transcribe
-                        const adapter = this.aiAdapters.get(this.settings.transcriptionProvider);
-                        if (!adapter) {
-                            throw new Error(`Transcription provider ${this.settings.transcriptionProvider} not found`);
-                        }
-
-                        // Moonshine doesn't require an API key (local model)
-                        if (this.settings.transcriptionProvider !== AIProvider.Moonshine && !adapter.getApiKey()) {
-                            throw new Error(`API key not set for ${this.settings.transcriptionProvider}`);
-                        }
-
-                        await this.recordingProcessor.processRecording(
-                            result,
-                            activeFile,
-                            activeView.editor.getCursor()
-                        );
+                if (typeof result === 'string') {
+                    // Streaming mode - transcription already done
+                    await this.recordingProcessor.processStreamingResult(
+                        result,
+                        activeFile,
+                        activeView.editor.getCursor()
+                    );
+                } else {
+                    // Legacy mode - need to transcribe
+                    const adapter = this.aiAdapters.get(this.settings.transcriptionProvider);
+                    if (!adapter) {
+                        throw new Error(`Transcription provider ${this.settings.transcriptionProvider} not found`);
                     }
-                } catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                    new Notice(`❌ Failed to process recording: ${errorMessage}`);
+
+                    // Moonshine doesn't require an API key (local model)
+                    if (this.settings.transcriptionProvider !== AIProvider.Moonshine && !adapter.getApiKey()) {
+                        throw new Error(`API key not set for ${this.settings.transcriptionProvider}`);
+                    }
+
+                    await this.recordingProcessor.processRecording(
+                        result,
+                        activeFile,
+                        activeView.editor.getCursor()
+                    );
                 }
             };
             
