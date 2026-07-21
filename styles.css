@@ -44,28 +44,77 @@
 /************************************
  * MODAL STYLES
  ************************************/
-.neurovox-timer-modal {
-    background-color: var(--background-primary);
+.modal.neurovox-timer-modal-shell {
+    padding: 0;
+    border: 1px solid var(--background-modifier-border);
     border-radius: var(--neurovox-border-radius-lg);
+    background:
+        radial-gradient(
+            circle at 50% 0%,
+            color-mix(in srgb, var(--interactive-accent) 10%, transparent),
+            transparent 42%
+        ),
+        var(--background-primary);
     box-shadow: var(--shadow-l);
     overflow: hidden;
 }
 
+.neurovox-timer-modal {
+    padding: 0;
+    background: transparent;
+    border-radius: inherit;
+    box-shadow: none;
+    overflow: hidden;
+}
+
 .neurovox-timer-content {
+    position: relative;
+    min-height: 390px;
+    padding: 0;
+    margin: 0 auto;
+    width: min(390px, 100%);
+    max-width: 400px;
+    overflow: hidden;
+}
+
+.neurovox-recording-view,
+.neurovox-processing-view {
+    position: absolute;
+    inset: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--neurovox-spacing-lg);
-    padding: var(--neurovox-spacing-lg);
-    margin: 0 auto;
-    width: 100%;
-    max-width: 400px;
+    justify-content: center;
+    padding: 40px 34px 34px;
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+    pointer-events: none;
+    transition:
+        opacity 0.28s ease,
+        transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.neurovox-timer-content.is-recording-view .neurovox-recording-view,
+.neurovox-timer-content.is-processing-view .neurovox-processing-view,
+.neurovox-timer-content.is-complete-view .neurovox-processing-view {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.neurovox-recording-label {
+    margin-bottom: 18px;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
 }
 
 /* Mobile-specific modal adjustments */
 .neurovox-timer-modal.is-mobile .neurovox-timer-content {
-    padding: var(--neurovox-spacing-md);
-    gap: var(--neurovox-spacing-md);
+    min-height: 380px;
+    padding: 0;
     max-width: 100%;
 }
 
@@ -77,7 +126,7 @@
     line-height: 1;
     letter-spacing: 0.1em;
     text-align: center;
-    margin: 0;
+    margin: 0 0 30px;
     white-space: nowrap;
     transition: color var(--neurovox-transition-normal) ease;
 }
@@ -256,7 +305,7 @@
     justify-content: center;
     gap: var(--neurovox-spacing-xs);
     height: calc(var(--neurovox-wave-height) + var(--neurovox-spacing-md));
-    margin: 0;
+    margin: 0 0 28px;
     padding: var(--neurovox-spacing-sm);
     touch-action: none;
     pointer-events: none;
@@ -299,6 +348,263 @@
 .neurovox-audio-wave.is-stopped .neurovox-wave-bar {
     animation: none;
     transform: scaleY(0.3);
+}
+
+/************************************
+ * RECORDING PROCESSING STATES
+ ************************************/
+.neurovox-processing-spinner-wrap {
+    position: relative;
+    display: grid;
+    width: 112px;
+    height: 112px;
+    margin-bottom: 27px;
+    place-items: center;
+}
+
+.neurovox-processing-spinner-glow {
+    position: absolute;
+    inset: 20px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+    filter: blur(13px);
+    animation: neurovox-processing-breathe 1.8s ease-in-out infinite;
+}
+
+.neurovox-processing-spinner,
+.neurovox-processing-spinner-inner {
+    position: absolute;
+    border-radius: 50%;
+}
+
+.neurovox-processing-spinner {
+    inset: 7px;
+    border: 2px solid var(--background-modifier-border);
+    border-top-color: var(--interactive-accent);
+    border-right-color: color-mix(in srgb, var(--interactive-accent) 48%, transparent);
+    animation: neurovox-processing-spin 1.05s linear infinite;
+}
+
+.neurovox-processing-spinner-inner {
+    inset: 19px;
+    border: 1px solid var(--background-modifier-border);
+    border-bottom-color: var(--interactive-accent-hover);
+    animation: neurovox-processing-spin-reverse 1.6s linear infinite;
+}
+
+.neurovox-processing-aperture {
+    position: relative;
+    display: grid;
+    width: 58px;
+    height: 58px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--background-primary);
+    box-shadow: 0 0 18px 9px var(--background-primary);
+    transition:
+        width 0.28s ease,
+        height 0.28s ease,
+        color 0.28s ease,
+        background-color 0.28s ease;
+}
+
+.neurovox-processing-mini-wave {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 22px;
+}
+
+.neurovox-processing-mini-wave span {
+    width: 3px;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--interactive-accent);
+    animation: neurovox-processing-mini-wave 0.76s ease-in-out infinite alternate;
+}
+
+.neurovox-processing-mini-wave span:nth-child(2) {
+    animation-delay: -0.24s;
+}
+
+.neurovox-processing-mini-wave span:nth-child(3) {
+    animation-delay: -0.48s;
+}
+
+.neurovox-processing-stage-icon,
+.neurovox-processing-complete-icon {
+    display: none;
+    color: var(--interactive-accent);
+}
+
+.neurovox-processing-stage-icon svg {
+    width: 25px;
+    height: 25px;
+    animation: neurovox-processing-mark-pulse 1.3s ease-in-out infinite;
+}
+
+.neurovox-processing-complete-icon svg {
+    width: 32px;
+    height: 32px;
+    stroke-width: 2.4;
+}
+
+.neurovox-timer-content[data-processing-stage="processing"] .neurovox-processing-mini-wave {
+    display: none;
+}
+
+.neurovox-timer-content[data-processing-stage="processing"] .neurovox-processing-stage-icon {
+    display: flex;
+}
+
+.neurovox-processing-title {
+    margin: 0 0 8px;
+    color: var(--text-normal);
+    font-size: 1.5rem;
+    font-weight: 650;
+    letter-spacing: -0.025em;
+}
+
+.neurovox-processing-description {
+    min-height: 40px;
+    max-width: 285px;
+    margin: 0 0 30px;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    line-height: 1.55;
+    text-align: center;
+}
+
+.neurovox-processing-stages {
+    display: grid;
+    grid-template-columns: 1fr 44px 1fr;
+    align-items: center;
+    width: 100%;
+    padding: 0 8px;
+    transition: opacity 0.22s ease;
+}
+
+.neurovox-processing-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-faint);
+    font-size: 0.7rem;
+    font-weight: 650;
+    transition: color 0.24s ease;
+}
+
+.neurovox-processing-step:last-child {
+    justify-content: flex-end;
+}
+
+.neurovox-processing-step-dot {
+    display: grid;
+    flex: 0 0 auto;
+    width: 21px;
+    height: 21px;
+    place-items: center;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 50%;
+    font-size: 0.62rem;
+    transition:
+        color 0.24s ease,
+        background-color 0.24s ease,
+        border-color 0.24s ease,
+        box-shadow 0.24s ease;
+}
+
+.neurovox-processing-step.is-active {
+    color: var(--text-normal);
+}
+
+.neurovox-processing-step.is-active .neurovox-processing-step-dot {
+    color: var(--interactive-accent);
+    border-color: var(--interactive-accent);
+    background: color-mix(in srgb, var(--interactive-accent) 13%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 6%, transparent);
+}
+
+.neurovox-processing-step.is-complete {
+    color: var(--color-green);
+}
+
+.neurovox-processing-step.is-complete .neurovox-processing-step-dot {
+    color: var(--background-primary);
+    border-color: var(--color-green);
+    background: var(--color-green);
+}
+
+.neurovox-processing-step-line {
+    position: relative;
+    height: 1px;
+    overflow: hidden;
+    background: var(--background-modifier-border);
+}
+
+.neurovox-processing-step-line::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent);
+    transform: translateX(-100%);
+    animation: neurovox-processing-line-travel 1.45s ease-in-out infinite;
+}
+
+.neurovox-timer-content.is-complete-view .neurovox-processing-spinner,
+.neurovox-timer-content.is-complete-view .neurovox-processing-spinner-inner {
+    opacity: 0;
+    animation: none;
+}
+
+.neurovox-timer-content.is-complete-view .neurovox-processing-spinner-glow {
+    background: color-mix(in srgb, var(--color-green) 18%, transparent);
+}
+
+.neurovox-timer-content.is-complete-view .neurovox-processing-aperture {
+    width: 76px;
+    height: 76px;
+    color: var(--color-green);
+    background: color-mix(in srgb, var(--color-green) 10%, transparent);
+    box-shadow: 0 0 0 12px color-mix(in srgb, var(--color-green) 4%, transparent);
+}
+
+.neurovox-timer-content.is-complete-view .neurovox-processing-mini-wave,
+.neurovox-timer-content.is-complete-view .neurovox-processing-stage-icon {
+    display: none;
+}
+
+.neurovox-timer-content.is-complete-view .neurovox-processing-complete-icon {
+    display: flex;
+    color: var(--color-green);
+}
+
+.neurovox-timer-content.is-complete-view .neurovox-processing-stages {
+    opacity: 0;
+}
+
+@keyframes neurovox-processing-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes neurovox-processing-spin-reverse {
+    to { transform: rotate(-360deg); }
+}
+
+@keyframes neurovox-processing-breathe {
+    50% { opacity: 0.55; transform: scale(1.18); }
+}
+
+@keyframes neurovox-processing-mini-wave {
+    to { height: 21px; }
+}
+
+@keyframes neurovox-processing-mark-pulse {
+    50% { opacity: 0.55; transform: scale(0.9) rotate(8deg); }
+}
+
+@keyframes neurovox-processing-line-travel {
+    to { transform: translateX(100%); }
 }
 
 /************************************
@@ -654,6 +960,20 @@
     .neurovox-audio-wave.is-recording .neurovox-wave-bar {
         animation: none;
         transform: scaleY(0.5);
+    }
+
+    .neurovox-processing-spinner,
+    .neurovox-processing-spinner-inner,
+    .neurovox-processing-spinner-glow,
+    .neurovox-processing-mini-wave span,
+    .neurovox-processing-stage-icon svg,
+    .neurovox-processing-step-line::after {
+        animation: none;
+    }
+
+    .neurovox-recording-view,
+    .neurovox-processing-view {
+        transition: none;
     }
 }
 
