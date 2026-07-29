@@ -111,11 +111,28 @@
     text-transform: uppercase;
 }
 
-/* Mobile-specific modal adjustments */
+/* Mobile-specific modal adjustments.
+   On mobile the modal is a full-screen sheet, so the shell/content become flex
+   containers that center the fixed-height card instead of pinning it to the top. */
+.modal.neurovox-timer-modal-shell.is-mobile {
+    display: flex;
+    flex-direction: column;
+}
+
+.neurovox-timer-modal.is-mobile {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+}
+
 .neurovox-timer-modal.is-mobile .neurovox-timer-content {
-    min-height: 380px;
+    min-height: 340px;
     padding: 0;
-    max-width: 100%;
+    width: 100%;
+    max-width: 360px;
+    margin: 0 auto;
 }
 
 .neurovox-timer-display {
@@ -605,6 +622,66 @@
 
 @keyframes neurovox-processing-line-travel {
     to { transform: translateX(100%); }
+}
+
+/* Mobile: the processing card shares the phone's full-screen sheet, so compact
+   the visuals to phone proportions (the desktop sizes read oversized there). */
+.neurovox-timer-modal.is-mobile .neurovox-recording-view,
+.neurovox-timer-modal.is-mobile .neurovox-processing-view {
+    padding: 28px 22px 24px;
+}
+
+.neurovox-timer-modal.is-mobile .neurovox-processing-spinner-wrap {
+    width: 88px;
+    height: 88px;
+    margin-bottom: 20px;
+}
+
+.neurovox-timer-modal.is-mobile .neurovox-processing-spinner {
+    inset: 5px;
+}
+
+.neurovox-timer-modal.is-mobile .neurovox-processing-spinner-inner {
+    inset: 15px;
+}
+
+.neurovox-timer-modal.is-mobile .neurovox-processing-aperture {
+    width: 46px;
+    height: 46px;
+}
+
+.neurovox-timer-modal.is-mobile .neurovox-processing-stage-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.neurovox-timer-modal.is-mobile .neurovox-processing-complete-icon svg {
+    width: 26px;
+    height: 26px;
+}
+
+.neurovox-timer-modal.is-mobile .neurovox-processing-title {
+    font-size: 1.2rem;
+}
+
+.neurovox-timer-modal.is-mobile .neurovox-processing-description {
+    min-height: 0;
+    max-width: 250px;
+    margin-bottom: 22px;
+    font-size: 0.78rem;
+}
+
+.neurovox-timer-modal.is-mobile .neurovox-processing-stages {
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+    padding: 0 4px;
+}
+
+.neurovox-timer-modal.is-mobile .neurovox-timer-content.is-complete-view .neurovox-processing-aperture {
+    width: 62px;
+    height: 62px;
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--color-green) 4%, transparent);
 }
 
 /************************************
