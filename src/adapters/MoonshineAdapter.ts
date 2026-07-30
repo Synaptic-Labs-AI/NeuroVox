@@ -135,13 +135,22 @@ export class MoonshineAdapter extends AIAdapter {
     }
 
     /**
+     * First use may download a model (up to ~400MB), which dwarfs the base HTTP budget;
+     * the streaming drain must wait it out rather than dropping the segment.
+     */
+    public getTranscriptionTimeoutMs(): number {
+        return 600_000;
+    }
+
+    /**
      * Transcribe audio using local Moonshine model
      */
-    public async transcribeAudio(audioArrayBuffer: ArrayBuffer, model: string): Promise<string> {
+    public async transcribeAudio(audioArrayBuffer: ArrayBuffer, model: string, signal?: AbortSignal): Promise<string> {
         Logger.log('[Moonshine] Starting transcription, audio size:', audioArrayBuffer.byteLength, 'model:', model);
         try {
             // Ensure the model is loaded
             await this.ensureModelLoaded(model);
+            this.throwIfAborted(signal);
 
             if (!this.transcriber) {
                 throw new Error('Moonshine transcriber not initialized');

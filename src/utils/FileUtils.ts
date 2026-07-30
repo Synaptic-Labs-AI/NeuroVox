@@ -1,4 +1,4 @@
-import { App, TFile, TFolder } from 'obsidian';
+import { App, TFile, TFolder, normalizePath } from 'obsidian';
 import { NeuroVoxSettings } from '../settings/Settings';
 
 /**
@@ -6,10 +6,11 @@ import { NeuroVoxSettings } from '../settings/Settings';
  * @returns The normalized folder path
  */
 export async function ensureDirectoryExists(app: App, folderPath: string): Promise<string> {
-    // Normalize the path and remove any leading/trailing slashes
-    const normalizedPath = folderPath.replace(/^\/+|\/+$/g, '');
-    
-    if (!normalizedPath) {
+    // normalizePath handles slashes, backslashes, and duplicate separators the way the
+    // rest of Obsidian does.
+    const normalizedPath = normalizePath(folderPath);
+
+    if (!normalizedPath || normalizedPath === '/') {
         return ''; // Root folder
     }
 

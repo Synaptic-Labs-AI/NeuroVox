@@ -22,6 +22,7 @@ import { OpenRouterAdapter } from './adapters/OpenRouterAdapter';
 import { AssemblyAIAdapter } from './adapters/AssemblyAIAdapter';
 import { AIProvider, AIAdapter } from './adapters/AIAdapter';
 import { RecordingProcessor } from './utils/RecordingProcessor';
+import { SegmentStore } from './utils/audio/SegmentStore';
 
 export default class NeuroVoxPlugin extends Plugin {
     settings: NeuroVoxSettings;
@@ -57,6 +58,9 @@ export default class NeuroVoxPlugin extends Plugin {
             
             // Trigger initial state
             this.events.trigger('floating-button-setting-changed', this.settings.showFloatingButton);
+
+            // Clear segment temp files orphaned by a crash or force-quit mid-recording.
+            void new SegmentStore(this.app.vault.adapter, `${this.manifest.dir}/segments-tmp`).sweep();
         } catch {
             new Notice("Failed to initialize NeuroVox plugin");
         }

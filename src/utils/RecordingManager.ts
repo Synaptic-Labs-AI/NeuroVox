@@ -1,7 +1,7 @@
 import RecordRTC from 'recordrtc';
+import { Platform } from 'obsidian';
 import { AudioQuality } from '../settings/Settings';
 import NeuroVoxPlugin from '../main';
-import { DeviceDetection } from './DeviceDetection';
 
 import { Options } from 'recordrtc';
 
@@ -29,7 +29,6 @@ interface AudioRecorderOptions extends Options {
 export class AudioRecordingManager {
     private recorder: RecordRTC | null = null;
     private stream: MediaStream | null = null;
-    private deviceDetection: DeviceDetection;
 
     private currentOptions?: {
         timeSlice?: number;
@@ -43,11 +42,14 @@ export class AudioRecordingManager {
         [AudioQuality.High]: 44100     // CD quality
     };
 
-    // Mobile-optimized sample rates
+    // Mobile always captures at 16 kHz: transcription models (Whisper et al.) downsample
+    // to 16 kHz internally, so higher rates on mobile cost memory and upload size for zero
+    // transcription-quality gain. StereoAudioRecorder produces uncompressed PCM, so sample
+    // rate is the only lever on segment size (~2.9 MB per 90s segment at 16 kHz mono).
     private readonly MOBILE_SAMPLE_RATES = {
-        [AudioQuality.Low]: 16000,     // Mobile voice optimized
-        [AudioQuality.Medium]: 22050,  // Mobile high quality voice
-        [AudioQuality.High]: 32000     // Mobile max quality
+        [AudioQuality.Low]: 16000,
+        [AudioQuality.Medium]: 16000,
+        [AudioQuality.High]: 16000
     };
 
     // Bitrate settings (bits per second)
@@ -64,16 +66,16 @@ export class AudioRecordingManager {
         [AudioQuality.High]: 48000     // Mobile high quality
     };
 
-    constructor(private plugin: NeuroVoxPlugin) {
-        this.deviceDetection = DeviceDetection.getInstance();
-    }
+    constructor(private plugin: NeuroVoxPlugin) {}
 
     /**
      * Gets audio configuration based on current quality settings
      */
     private getAudioConfig(): AudioRecorderOptions {
         const quality = this.plugin.settings.audioQuality;
-        const isMobile = this.deviceDetection.isMobile();
+        // Obsidian's Platform API is the authoritative signal for the app environment —
+        // unlike screen-size/touch heuristics, it can't misclassify a touchscreen laptop.
+        const isMobile = Platform.isMobile;
         
         // Use mobile-optimized settings if on mobile device
         const sampleRates = isMobile ? this.MOBILE_SAMPLE_RATES : this.SAMPLE_RATES;
