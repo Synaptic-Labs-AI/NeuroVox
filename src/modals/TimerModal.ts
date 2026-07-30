@@ -1,4 +1,5 @@
 import { Modal, Notice, Platform } from 'obsidian';
+import { Logger } from '../utils/Logger';
 import { AudioRecordingManager } from '../utils/RecordingManager';
 import { RecordingUI, RecordingState } from '../ui/RecordingUI';
 import NeuroVoxPlugin from '../main';
@@ -45,6 +46,9 @@ export class TimerModal extends Modal {
     private readonly SILENCE_HOLD_MS = 500;
     // Used only as the split size for the whole-blob fallback on very short recordings.
     private readonly SEGMENT_SECONDS = 60;
+    // Tail segments smaller than this (~0.3s of 16 kHz mono WAV) carry no speech and are
+    // rejected by transcription providers as too short.
+    private readonly MIN_TAIL_BYTES = 10_000;
 
     private readonly CONFIG: TimerConfig;
 
@@ -308,6 +312,7 @@ export class TimerModal extends Modal {
             const end = this.seconds;
             const blob = await this.recordingManager.rotate();
             this.segmentStartSeconds = end;
+            Logger.log('[TimerModal] Rotated segment', this.chunkIndex, `${start}s-${end}s`, 'blob bytes:', blob?.size ?? 0);
             if (blob) {
                 await this.feedSegment(blob, start, end);
             }
@@ -407,8 +412,13 @@ export class TimerModal extends Modal {
                 // transcription, the final blob is still only tail audio — splitting it as
                 // if it were the whole recording would interleave mislabeled segments.
                 if (this.chunkIndex > 0) {
-                    // Tail audio recorded since the last rotation.
-                    await this.feedSegment(finalBlob, tailStart, tailEnd);
+                    // Tail audio recorded since the last rotation. Skip near-empty tails
+                    // (stop pressed right after a rotation): providers reject sub-0.1s
+                    // audio with HTTP 400, which would falsely flag the transcript as
+                    // incomplete over a fraction of a second of silence.
+                    if (finalBlob.size >= this.MIN_TAIL_BYTES) {
+                        await this.feedSegment(finalBlob, tailStart, tailEnd);
+                    }
                 } else {
                     // Recording was shorter than one segment, so no rotation occurred:
                     // transcribe the whole blob (split as a safety net if it is unexpectedly long).

@@ -21,13 +21,12 @@ export class RecordingUI {
     private stopButton: TouchableButton;
     private waveContainer: HTMLElement;
     private processingTitle: HTMLElement;
-    private processingDescription: HTMLElement;
-    private transcribingStep: HTMLElement;
-    private processingStep: HTMLElement;
-    private transcribingDot: HTMLElement;
     private processingIcon: HTMLElement;
     private completeIcon: HTMLElement;
     private currentState: RecordingState = 'inactive';
+    // Timer for the transient green check shown between the transcribing and
+    // processing stages (see showProcessing).
+    private stageCheckTimer: number | null = null;
 
     constructor(
         private container: HTMLElement,
@@ -170,39 +169,13 @@ export class RecordingUI {
         });
         setIcon(this.completeIcon, 'check');
 
+        // All stage progress lives in the spinner aperture (mini-wave → check →
+        // sparkles → check); a single title line underneath names the stage. The old
+        // two-step chip row took up too much of the phone's screen.
         this.processingTitle = this.processingView.createEl('h2', {
             cls: 'neurovox-processing-title',
             text: 'Transcribing'
         });
-        this.processingDescription = this.processingView.createEl('p', {
-            cls: 'neurovox-processing-description',
-            text: 'Turning your recording into text.'
-        });
-
-        const stages = this.processingView.createDiv({
-            cls: 'neurovox-processing-stages'
-        });
-        stages.setAttribute('aria-label', 'Processing progress');
-
-        this.transcribingStep = stages.createDiv({
-            cls: 'neurovox-processing-step is-transcribing'
-        });
-        this.transcribingDot = this.transcribingStep.createSpan({
-            cls: 'neurovox-processing-step-dot',
-            text: '1'
-        });
-        this.transcribingStep.createSpan({ text: 'Transcribing' });
-
-        stages.createDiv({ cls: 'neurovox-processing-step-line' });
-
-        this.processingStep = stages.createDiv({
-            cls: 'neurovox-processing-step is-processing'
-        });
-        this.processingStep.createSpan({
-            cls: 'neurovox-processing-step-dot',
-            text: '2'
-        });
-        this.processingStep.createSpan({ text: 'Processing' });
     }
 
     public showRecording(): void {
@@ -216,40 +189,41 @@ export class RecordingUI {
     public showProcessing(stage: ProcessingStage): void {
         this.container.removeClass('is-recording-view', 'is-complete-view');
         this.container.addClass('is-processing-view');
-        this.container.setAttribute('data-processing-stage', stage);
         this.pauseButton.buttonEl.disabled = true;
         this.stopButton.buttonEl.disabled = true;
+        this.clearStageCheckTimer();
 
         if (stage === 'transcribing') {
+            this.container.setAttribute('data-processing-stage', 'transcribing');
             this.processingTitle.setText('Transcribing');
-            this.processingDescription.setText('Turning your recording into text.');
-            this.transcribingDot.setText('1');
-            this.transcribingStep.removeClass('is-complete');
-            this.transcribingStep.addClass('is-active');
-            this.processingStep.removeClass('is-active');
         } else {
-            this.processingTitle.setText('Processing your note');
-            this.processingDescription.setText(
-                'Applying your preferences and adding the result to your note.'
-            );
-            this.transcribingDot.setText('✓');
-            this.transcribingStep.removeClass('is-active');
-            this.transcribingStep.addClass('is-complete');
-            this.processingStep.addClass('is-active');
+            // Acknowledge the finished transcription with a brief green check in the
+            // aperture before switching to the processing stage.
+            this.container.setAttribute('data-processing-stage', 'transcribed');
+            this.processingTitle.setText('Transcribed');
+            this.stageCheckTimer = window.setTimeout(() => {
+                this.stageCheckTimer = null;
+                if (this.container.getAttribute('data-processing-stage') === 'transcribed') {
+                    this.container.setAttribute('data-processing-stage', 'processing');
+                    this.processingTitle.setText('Processing your note');
+                }
+            }, 700);
         }
     }
 
     public showComplete(): void {
+        this.clearStageCheckTimer();
         this.container.removeClass('is-recording-view', 'is-processing-view');
         this.container.addClass('is-complete-view');
         this.container.setAttribute('data-processing-stage', 'complete');
         this.processingTitle.setText('Added to your note');
-        this.processingDescription.setText('Your recording is ready.');
-        this.transcribingDot.setText('✓');
-        this.transcribingStep.removeClass('is-active');
-        this.transcribingStep.addClass('is-complete');
-        this.processingStep.removeClass('is-active');
-        this.processingStep.addClass('is-complete');
+    }
+
+    private clearStageCheckTimer(): void {
+        if (this.stageCheckTimer !== null) {
+            window.clearTimeout(this.stageCheckTimer);
+            this.stageCheckTimer = null;
+        }
     }
 
     public updateTimer(seconds: number, maxDuration: number, warningThreshold: number): void {
@@ -289,6 +263,8 @@ export class RecordingUI {
      * 🧹 Ensures all resources are properly released
      */
     public cleanup(): void {
+        this.clearStageCheckTimer();
+
         // Clean up buttons
         this.pauseButton?.cleanup();
         this.stopButton?.cleanup();
