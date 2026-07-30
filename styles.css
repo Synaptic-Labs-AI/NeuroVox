@@ -474,98 +474,24 @@
     display: flex;
 }
 
+/* Transient green check in the aperture right after transcription finishes,
+   before the processing (sparkles) stage takes over. */
+.neurovox-timer-content[data-processing-stage="transcribed"] .neurovox-processing-mini-wave,
+.neurovox-timer-content[data-processing-stage="transcribed"] .neurovox-processing-stage-icon {
+    display: none;
+}
+
+.neurovox-timer-content[data-processing-stage="transcribed"] .neurovox-processing-complete-icon {
+    display: flex;
+    color: var(--color-green);
+}
+
 .neurovox-processing-title {
-    margin: 0 0 8px;
+    margin: 0;
     color: var(--text-normal);
     font-size: 1.5rem;
     font-weight: 650;
     letter-spacing: -0.025em;
-}
-
-.neurovox-processing-description {
-    min-height: 40px;
-    max-width: 285px;
-    margin: 0 0 30px;
-    color: var(--text-muted);
-    font-size: 0.82rem;
-    line-height: 1.55;
-    text-align: center;
-}
-
-.neurovox-processing-stages {
-    display: grid;
-    grid-template-columns: 1fr 44px 1fr;
-    align-items: center;
-    width: 100%;
-    padding: 0 8px;
-    transition: opacity 0.22s ease;
-}
-
-.neurovox-processing-step {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--text-faint);
-    font-size: 0.7rem;
-    font-weight: 650;
-    transition: color 0.24s ease;
-}
-
-.neurovox-processing-step:last-child {
-    justify-content: flex-end;
-}
-
-.neurovox-processing-step-dot {
-    display: grid;
-    flex: 0 0 auto;
-    width: 21px;
-    height: 21px;
-    place-items: center;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 50%;
-    font-size: 0.62rem;
-    transition:
-        color 0.24s ease,
-        background-color 0.24s ease,
-        border-color 0.24s ease,
-        box-shadow 0.24s ease;
-}
-
-.neurovox-processing-step.is-active {
-    color: var(--text-normal);
-}
-
-.neurovox-processing-step.is-active .neurovox-processing-step-dot {
-    color: var(--interactive-accent);
-    border-color: var(--interactive-accent);
-    background: color-mix(in srgb, var(--interactive-accent) 13%, transparent);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 6%, transparent);
-}
-
-.neurovox-processing-step.is-complete {
-    color: var(--color-green);
-}
-
-.neurovox-processing-step.is-complete .neurovox-processing-step-dot {
-    color: var(--background-primary);
-    border-color: var(--color-green);
-    background: var(--color-green);
-}
-
-.neurovox-processing-step-line {
-    position: relative;
-    height: 1px;
-    overflow: hidden;
-    background: var(--background-modifier-border);
-}
-
-.neurovox-processing-step-line::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent);
-    transform: translateX(-100%);
-    animation: neurovox-processing-line-travel 1.45s ease-in-out infinite;
 }
 
 .neurovox-timer-content.is-complete-view .neurovox-processing-spinner,
@@ -596,10 +522,6 @@
     color: var(--color-green);
 }
 
-.neurovox-timer-content.is-complete-view .neurovox-processing-stages {
-    opacity: 0;
-}
-
 @keyframes neurovox-processing-spin {
     to { transform: rotate(360deg); }
 }
@@ -618,10 +540,6 @@
 
 @keyframes neurovox-processing-mark-pulse {
     50% { opacity: 0.55; transform: scale(0.9) rotate(8deg); }
-}
-
-@keyframes neurovox-processing-line-travel {
-    to { transform: translateX(100%); }
 }
 
 /* Mobile: the processing card shares the phone's full-screen sheet, so compact
@@ -662,20 +580,6 @@
 
 .neurovox-timer-modal.is-mobile .neurovox-processing-title {
     font-size: 1.2rem;
-}
-
-.neurovox-timer-modal.is-mobile .neurovox-processing-description {
-    min-height: 0;
-    max-width: 250px;
-    margin-bottom: 22px;
-    font-size: 0.78rem;
-}
-
-.neurovox-timer-modal.is-mobile .neurovox-processing-stages {
-    width: 100%;
-    max-width: 300px;
-    margin: 0 auto;
-    padding: 0 4px;
 }
 
 .neurovox-timer-modal.is-mobile .neurovox-timer-content.is-complete-view .neurovox-processing-aperture {
@@ -1024,8 +928,7 @@
     .neurovox-processing-spinner-inner,
     .neurovox-processing-spinner-glow,
     .neurovox-processing-mini-wave span,
-    .neurovox-processing-stage-icon svg,
-    .neurovox-processing-step-line::after {
+    .neurovox-processing-stage-icon svg {
         animation: none;
     }
 
