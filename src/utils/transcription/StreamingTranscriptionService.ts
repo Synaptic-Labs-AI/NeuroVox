@@ -152,7 +152,7 @@ export class StreamingTranscriptionService {
             Logger.log('[StreamingTranscription] Discarding late result for aborted segment:', metadata.id);
             return;
         }
-        Logger.log('[StreamingTranscription] Segment transcribed:', transcription?.substring(0, 50));
+        Logger.log('[StreamingTranscription] Segment transcribed:', metadata.id, 'chars:', transcription?.length ?? 0, 'text:', transcription?.substring(0, 60));
 
         const transcriptionChunk: TranscriptionChunk = {
             metadata,

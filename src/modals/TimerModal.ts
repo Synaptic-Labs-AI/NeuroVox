@@ -1,4 +1,5 @@
 import { Modal, Notice, Platform } from 'obsidian';
+import { Logger } from '../utils/Logger';
 import { AudioRecordingManager } from '../utils/RecordingManager';
 import { RecordingUI, RecordingState } from '../ui/RecordingUI';
 import NeuroVoxPlugin from '../main';
@@ -311,6 +312,7 @@ export class TimerModal extends Modal {
             const end = this.seconds;
             const blob = await this.recordingManager.rotate();
             this.segmentStartSeconds = end;
+            Logger.log('[TimerModal] Rotated segment', this.chunkIndex, `${start}s-${end}s`, 'blob bytes:', blob?.size ?? 0);
             if (blob) {
                 await this.feedSegment(blob, start, end);
             }
