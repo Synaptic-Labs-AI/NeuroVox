@@ -228,27 +228,13 @@ export abstract class AIAdapter {
             const { headers, body } = await this.prepareTranscriptionRequest(audioArrayBuffer, model);
             const endpoint = `${this.getApiBaseUrl()}${this.getTranscriptionEndpoint()}`;
 
-            try {
-                const response = await this.makeAPIRequest<TranscriptionResponse>(
-                    endpoint,
-                    'POST',
-                    headers,
-                    body
-                );
-                return this.parseTranscriptionResponse(response);
-            } catch (error: unknown) {
-                // Provide more specific error messages based on status codes
-                const httpError = error as { response?: { status?: number; data?: { error?: { message?: string } } } };
-                if (httpError?.response?.status === 400) {
-                    throw new Error(`Invalid request format: ${httpError?.response?.data?.error?.message || 'Check audio format and model name'}`);
-                } else if (httpError?.response?.status === 401) {
-                    throw new Error('Invalid API key or unauthorized access');
-                } else if (httpError?.response?.status === 413) {
-                    throw new Error('Audio file too large. Maximum size is 25MB');
-                }
-
-                throw error;
-            }
+            const response = await this.makeAPIRequest<TranscriptionResponse>(
+                endpoint,
+                'POST',
+                headers,
+                body
+            );
+            return this.parseTranscriptionResponse(response);
         } catch (error) {
             const message = this.getErrorMessage(error);
             throw new Error(`Failed to transcribe audio: ${message}`);
@@ -325,19 +311,46 @@ export abstract class AIAdapter {
             ...headers
         };
 
+        // throw:false so error responses can be read: with throw:true, requestUrl throws a
+        // bare "status 4xx" error and the provider's body — which says exactly what was
+        // wrong with the request — is discarded.
         const response = await requestUrl({
             url: endpoint,
             method,
             headers: requestHeaders,
             body: body || undefined,
-            throw: true
+            throw: false
         });
+
+        if (response.status >= 400) {
+            throw new Error(`HTTP ${response.status}: ${this.extractErrorDetail(response) || 'no error detail in response'}`);
+        }
 
         if (!response.json) {
             throw new Error('Invalid response format');
         }
 
         return response.json as T;
+    }
+
+    /** Pulls a human-readable error message out of a provider error response body. */
+    private extractErrorDetail(response: { json: unknown; text: string }): string {
+        try {
+            const json = response.json as { error?: { message?: string } | string; message?: string } | null;
+            const detail =
+                (typeof json?.error === 'object' ? json.error?.message : json?.error) ||
+                json?.message ||
+                response.text ||
+                '';
+            return String(detail).slice(0, 300);
+        } catch {
+            // response.json is a parsing getter and throws on non-JSON bodies.
+            try {
+                return (response.text || '').slice(0, 300);
+            } catch {
+                return '';
+            }
+        }
     }
 
     protected async prepareTranscriptionRequest(audioArrayBuffer: ArrayBuffer, model: string): Promise<{

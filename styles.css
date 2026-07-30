@@ -811,34 +811,15 @@
     transition: max-height var(--neurovox-transition-normal) ease, opacity var(--neurovox-transition-normal) ease;
 }
 
+/* Open accordions grow to their natural height and the settings pane itself scrolls.
+   Do not clamp with max-height + overflow: a fixed clamp (formerly 1000px desktop /
+   60vh mobile) clipped tall content on desktop and created a nested scroll container
+   on mobile, where inner touch-scrolling fights the outer settings scroll in WKWebView
+   and stops working. The trade-off is no height animation on open (opacity still fades). */
 .neurovox-accordion-open .neurovox-accordion-content {
-    max-height: 1000px;
+    max-height: none;
+    overflow: visible;
     opacity: 1;
-}
-
-/* Mobile optimization for accordion content */
-@media (max-width: 768px) {
-    .neurovox-accordion-open .neurovox-accordion-content {
-        max-height: 60vh;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-        overscroll-behavior: contain;
-        scrollbar-width: thin;
-    }
-
-    /* Improve touch scrolling experience */
-    .neurovox-accordion-content::-webkit-scrollbar {
-        width: 4px;
-    }
-
-    .neurovox-accordion-content::-webkit-scrollbar-track {
-        background: var(--background-secondary);
-    }
-
-    .neurovox-accordion-content::-webkit-scrollbar-thumb {
-        background-color: var(--background-modifier-border);
-        border-radius: 2px;
-    }
 }
 
 /************************************

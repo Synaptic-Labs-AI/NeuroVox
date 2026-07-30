@@ -141,11 +141,12 @@ export class AudioRecordingManager {
         this.recorder.startRecording();
 
         const blob = await this.stopRecorder(previous);
-        try {
-            previous.destroy();
-        } catch {
-            // ignore — buffers are released regardless
-        }
+        // Do NOT call previous.destroy() here: StereoAudioRecorder records on a global
+        // shared AudioContext (RecordRTC.Storage.AudioContextConstructor) and destroy()
+        // closes it — killing the replacement recorder that is already capturing on it.
+        // That made every segment after the first rotation empty (providers then reject
+        // them with HTTP 400). stopRecording() has already disconnected the previous
+        // recorder's audio nodes; dropping the reference lets GC release its buffers.
         return blob;
     }
 
