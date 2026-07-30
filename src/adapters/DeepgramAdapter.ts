@@ -1,4 +1,3 @@
-import { requestUrl } from 'obsidian';
 import { AIAdapter, AIProvider } from './AIAdapter';
 import { NeuroVoxSettings } from '../settings/Settings';
 import {
@@ -66,8 +65,9 @@ export class DeepgramAdapter extends AIAdapter {
     }
 
     // Override the transcribeAudio method since Deepgram has a different API structure
-    public async transcribeAudio(audioArrayBuffer: ArrayBuffer, model: string): Promise<string> {
+    public async transcribeAudio(audioArrayBuffer: ArrayBuffer, model: string, signal?: AbortSignal): Promise<string> {
         try {
+            this.throwIfAborted(signal);
             // Deepgram API expects the audio file directly in the body, not as form data
             const endpoint = `${this.getApiBaseUrl()}${this.getTranscriptionEndpoint()}?model=${model}`;
 
@@ -87,30 +87,8 @@ export class DeepgramAdapter extends AIAdapter {
         }
     }
 
-    // Override the makeAPIRequest method to handle Deepgram's authorization header format
-    protected async makeAPIRequest<T = unknown>(
-        endpoint: string,
-        method: string,
-        headers: Record<string, string>,
-        body: string | ArrayBuffer | null
-    ): Promise<T> {
-        const requestHeaders: Record<string, string> = {
-            'Authorization': `Token ${this.getApiKey()}`, // Deepgram uses "Token" instead of "Bearer"
-            ...headers
-        };
-
-        const response = await requestUrl({
-            url: endpoint,
-            method,
-            headers: requestHeaders,
-            body: body || undefined,
-            throw: true
-        });
-
-        if (!response.json) {
-            throw new Error('Invalid response format');
-        }
-
-        return response.json as T;
+    // Deepgram uses "Token" instead of "Bearer"
+    protected getAuthHeaders(): Record<string, string> {
+        return { 'Authorization': `Token ${this.getApiKey()}` };
     }
 }

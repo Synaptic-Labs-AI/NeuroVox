@@ -25,8 +25,9 @@ export class AudioFileManager {
         let filePath = folderPath ? `${folderPath}/${fileName}` : fileName;
         let count = 1;
 
-        // Ensure unique filename
-        while (await this.plugin.app.vault.adapter.exists(filePath)) {
+        // Ensure unique filename. The vault index is the native source of truth for
+        // vault content (adapter.exists hits the filesystem and can disagree with it).
+        while (this.plugin.app.vault.getAbstractFileByPath(filePath)) {
             fileName = `recording-${timestamp}-${count}.webm`;
             filePath = folderPath ? `${folderPath}/${fileName}` : fileName;
             count++;
@@ -52,17 +53,4 @@ export class AudioFileManager {
         }
     }
 
-    /**
-     * Removes temporary chunk files after processing is complete
-     * @param paths Array of file paths to remove
-     */
-    public async removeTemporaryFiles(paths: string[]): Promise<void> {
-        for (const path of paths) {
-            try {
-                await this.plugin.app.vault.adapter.remove(path);
-            } catch {
-                // Silent fail for cleanup
-            }
-        }
-    }
 }

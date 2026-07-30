@@ -212,8 +212,19 @@ export abstract class AIAdapter {
         }
     }
 
-    public async transcribeAudio(audioArrayBuffer: ArrayBuffer, model: string): Promise<string> {
+    /**
+     * Upper bound on how long one transcription call may legitimately take. The streaming
+     * drain derives its stall timeout from this, so providers with long-running flows
+     * (AssemblyAI's upload+poll) must override it — otherwise their segments get cut off
+     * mid-flight and dropped.
+     */
+    public getTranscriptionTimeoutMs(): number {
+        return 120_000;
+    }
+
+    public async transcribeAudio(audioArrayBuffer: ArrayBuffer, model: string, signal?: AbortSignal): Promise<string> {
         try {
+            this.throwIfAborted(signal);
             const { headers, body } = await this.prepareTranscriptionRequest(audioArrayBuffer, model);
             const endpoint = `${this.getApiBaseUrl()}${this.getTranscriptionEndpoint()}`;
 
@@ -287,6 +298,22 @@ export abstract class AIAdapter {
         return this.keyValidated && this.lastValidatedKey === currentKey;
     }
 
+    /**
+     * Auth headers for this provider. Most APIs take `Bearer <key>`; providers with a
+     * different scheme (Deepgram's `Token <key>`, AssemblyAI's bare key) override this
+     * instead of duplicating makeAPIRequest.
+     */
+    protected getAuthHeaders(): Record<string, string> {
+        return { 'Authorization': `Bearer ${this.getApiKey()}` };
+    }
+
+    /** Throws an AbortError-shaped error if the signal has been aborted. */
+    protected throwIfAborted(signal?: AbortSignal): void {
+        if (signal?.aborted) {
+            throw new Error('Transcription aborted');
+        }
+    }
+
     protected async makeAPIRequest<T = unknown>(
         endpoint: string,
         method: string,
@@ -294,7 +321,7 @@ export abstract class AIAdapter {
         body: string | ArrayBuffer | null
     ): Promise<T> {
         const requestHeaders: Record<string, string> = {
-            'Authorization': `Bearer ${this.getApiKey()}`,
+            ...this.getAuthHeaders(),
             ...headers
         };
 

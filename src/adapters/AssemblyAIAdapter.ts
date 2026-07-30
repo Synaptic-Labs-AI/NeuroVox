@@ -1,4 +1,3 @@
-import { requestUrl } from 'obsidian';
 import { AIAdapter, AIProvider } from './AIAdapter';
 import { NeuroVoxSettings } from '../settings/Settings';
 import {
@@ -16,7 +15,7 @@ import {
  *   3. Poll until the job completes      -> GET  /v2/transcript/{id}
  *
  * It also authenticates with a bare `Authorization: <key>` header (no `Bearer` prefix),
- * so both makeAPIRequest and transcribeAudio are overridden (mirrors DeepgramAdapter).
+ * so getAuthHeaders and transcribeAudio are overridden (mirrors DeepgramAdapter).
  */
 export class AssemblyAIAdapter extends AIAdapter {
     private apiKey: string = '';
@@ -79,8 +78,17 @@ export class AssemblyAIAdapter extends AIAdapter {
         throw new Error('Invalid transcription response format from AssemblyAI');
     }
 
-    public async transcribeAudio(audioArrayBuffer: ArrayBuffer, model: string): Promise<string> {
+    /**
+     * The upload + create + poll flow can legitimately take the full poll budget on long
+     * segments; the streaming drain must not cut it off earlier.
+     */
+    public getTranscriptionTimeoutMs(): number {
+        return this.POLL_INTERVAL_MS * this.MAX_POLL_ATTEMPTS + 30_000; // poll budget + upload margin
+    }
+
+    public async transcribeAudio(audioArrayBuffer: ArrayBuffer, model: string, signal?: AbortSignal): Promise<string> {
         try {
+            this.throwIfAborted(signal);
             // 1. Upload the raw audio bytes.
             const upload = await this.makeAPIRequest<AssemblyAIUploadResponse>(
                 `${this.getApiBaseUrl()}/v2/upload`,
@@ -111,17 +119,20 @@ export class AssemblyAIAdapter extends AIAdapter {
             }
 
             // 3. Poll until completion.
-            return await this.pollForResult(created.id);
+            return await this.pollForResult(created.id, signal);
         } catch (error) {
             const message = this.getErrorMessage(error);
             throw new Error(`Failed to transcribe audio with AssemblyAI: ${message}`);
         }
     }
 
-    private async pollForResult(transcriptId: string): Promise<string> {
+    private async pollForResult(transcriptId: string, signal?: AbortSignal): Promise<string> {
         const url = `${this.getApiBaseUrl()}/v2/transcript/${transcriptId}`;
 
         for (let attempt = 0; attempt < this.MAX_POLL_ATTEMPTS; attempt++) {
+            // Bail between polls when the recording flow has been aborted, instead of
+            // running out the remaining minutes of poll budget.
+            this.throwIfAborted(signal);
             const result = await this.makeAPIRequest<AssemblyAITranscriptionResponse>(
                 url,
                 'GET',
@@ -148,29 +159,7 @@ export class AssemblyAIAdapter extends AIAdapter {
     }
 
     // AssemblyAI uses a bare `Authorization: <key>` header (no `Bearer` prefix).
-    protected async makeAPIRequest<T = unknown>(
-        endpoint: string,
-        method: string,
-        headers: Record<string, string>,
-        body: string | ArrayBuffer | null
-    ): Promise<T> {
-        const requestHeaders: Record<string, string> = {
-            'Authorization': this.getApiKey(),
-            ...headers
-        };
-
-        const response = await requestUrl({
-            url: endpoint,
-            method,
-            headers: requestHeaders,
-            body: body || undefined,
-            throw: true
-        });
-
-        if (!response.json) {
-            throw new Error('Invalid response format');
-        }
-
-        return response.json as T;
+    protected getAuthHeaders(): Record<string, string> {
+        return { 'Authorization': this.getApiKey() };
     }
 }

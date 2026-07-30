@@ -47,22 +47,33 @@ export class TranscriptionService {
      * end — running the language model per chunk would be wasteful and would discard a good
      * chunk transcription whenever post-processing failed.
      */
-    public async transcribeAudioOnly(audioBuffer: ArrayBuffer): Promise<string> {
-        return this.transcribeAudio(audioBuffer);
+    public async transcribeAudioOnly(audioBuffer: ArrayBuffer, signal?: AbortSignal): Promise<string> {
+        return this.transcribeAudio(audioBuffer, signal);
+    }
+
+    /**
+     * Per-segment time budget of the active transcription provider (e.g. AssemblyAI's
+     * upload+poll flow takes minutes; a plain Whisper POST should not). Falls back to the
+     * base default when no adapter is configured.
+     */
+    public getTranscriptionTimeoutMs(): number {
+        const adapter = this.plugin.aiAdapters.get(this.plugin.settings.transcriptionProvider);
+        return adapter?.getTranscriptionTimeoutMs() ?? 120_000;
     }
 
     /**
      * Transcribes audio using the configured AI adapter
      */
-    private async transcribeAudio(audioBuffer: ArrayBuffer): Promise<string> {
+    private async transcribeAudio(audioBuffer: ArrayBuffer, signal?: AbortSignal): Promise<string> {
         const adapter = this.getAdapter(
             this.plugin.settings.transcriptionProvider,
             'transcription'
         );
-        
+
         return adapter.transcribeAudio(
             audioBuffer,
-            this.plugin.settings.transcriptionModel
+            this.plugin.settings.transcriptionModel,
+            signal
         );
     }
 

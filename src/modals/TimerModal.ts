@@ -3,7 +3,6 @@ import { AudioRecordingManager } from '../utils/RecordingManager';
 import { RecordingUI, RecordingState } from '../ui/RecordingUI';
 import NeuroVoxPlugin from '../main';
 import { StreamingTranscriptionService } from '../utils/transcription/StreamingTranscriptionService';
-import { DeviceDetection } from '../utils/DeviceDetection';
 import { splitWavBlob } from '../utils/audio/WavSplitter';
 import { VoiceActivityMonitor } from '../utils/audio/VoiceActivityMonitor';
 import { ChunkMetadata } from '../types';
@@ -12,7 +11,6 @@ interface TimerConfig {
     maxDuration: number;
     warningThreshold: number;
     updateInterval: number;
-    chunkDuration: number;  // Duration in ms for each recording chunk
 }
 
 /**
@@ -28,7 +26,6 @@ export class TimerModal extends Modal {
     private isStopping: boolean = false;
     private currentState: RecordingState = 'inactive';
     private streamingService: StreamingTranscriptionService | null = null;
-    private deviceDetection: DeviceDetection;
     private chunkIndex: number = 0;
     private recordingStartTime: number = 0;
     private segmentIntervalId: number | null = null;
@@ -56,18 +53,13 @@ export class TimerModal extends Modal {
     constructor(private plugin: NeuroVoxPlugin) {
         super(plugin.app);
         this.recordingManager = new AudioRecordingManager(plugin);
-        this.deviceDetection = DeviceDetection.getInstance();
-        
-        // Configure based on device type
-        const streamingOptions = this.deviceDetection.getOptimalStreamingOptions();
 
         this.CONFIG = {
             maxDuration: 12 * 60,
             warningThreshold: 60,
-            updateInterval: 1000,
-            chunkDuration: streamingOptions.chunkDuration * 1000  // Convert to milliseconds
+            updateInterval: 1000
         };
-        
+
         this.setupCloseHandlers();
     }
 
@@ -227,14 +219,9 @@ export class TimerModal extends Modal {
             } else {
                 // Initialize streaming service
                 if (!this.streamingService) {
-                    this.streamingService = new StreamingTranscriptionService(
-                        this.plugin,
-                        {
-                            onMemoryWarning: (usage) => {
-                                new Notice(`Memory usage high: ${Math.round(usage)}%`);
-                            }
-                        }
-                    );
+                    // Segments are spilled to disk as they rotate, so no memory-pressure
+                    // callback is needed; queued audio no longer lives in RAM.
+                    this.streamingService = new StreamingTranscriptionService(this.plugin);
                 }
 
                 this.recordingStartTime = Date.now();
@@ -400,6 +387,11 @@ export class TimerModal extends Modal {
             for (let waited = 0; this.isRotating && waited < 100; waited++) {
                 await new Promise(resolve => window.setTimeout(resolve, 20));
             }
+            if (this.isRotating) {
+                // Proceeding anyway: the tail's start time may overlap the still-rotating
+                // segment, and in the worst case that segment misses the drain entirely.
+                console.warn('[TimerModal] Rotation still in flight after 2s stop wait; proceeding with stop');
+            }
 
             const tailStart = this.segmentStartSeconds;
             const tailEnd = this.seconds;
@@ -410,7 +402,11 @@ export class TimerModal extends Modal {
             }
 
             if (finalBlob && finalBlob.size > 0) {
-                if (this.streamingService.hasReceivedChunks()) {
+                // Branch on whether rotation produced segments (chunkIndex), not on whether
+                // the queue accepted them: if every enqueue fell back to direct
+                // transcription, the final blob is still only tail audio — splitting it as
+                // if it were the whole recording would interleave mislabeled segments.
+                if (this.chunkIndex > 0) {
                     // Tail audio recorded since the last rotation.
                     await this.feedSegment(finalBlob, tailStart, tailEnd);
                 } else {
