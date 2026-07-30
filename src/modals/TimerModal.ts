@@ -162,8 +162,10 @@ export class TimerModal extends Modal {
             this.modalEl.addClass('neurovox-timer-modal-shell');
             contentEl.addClass('neurovox-timer-modal');
 
-            // Add mobile-specific class
+            // Add mobile-specific class to both the shell and the content so CSS can
+            // center the card within the full-screen mobile sheet.
             if (this.isMobileDevice()) {
+                this.modalEl.addClass('is-mobile');
                 contentEl.addClass('is-mobile');
             }
 

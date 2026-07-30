@@ -18,6 +18,8 @@ export class StreamingTranscriptionService {
     private processingPromise: Promise<void> | null = null;
     private lastError: Error | null = null;
     private chunksReceived: number = 0;
+    private drainRequested: boolean = false;
+    private chunksHandled: number = 0;
 
     constructor(
         private plugin: NeuroVoxPlugin,
@@ -64,15 +66,18 @@ export class StreamingTranscriptionService {
 
         this.isProcessing = true;
         this.abortController = new AbortController();
+        const signal = this.abortController.signal;
         Logger.log('[StreamingTranscription] Started processing loop');
 
         try {
-            while (this.isProcessing && !this.abortController.signal.aborted) {
+            while (!signal.aborted) {
                 // Check if we have chunks to process
                 const queueItem = this.chunkQueue.dequeue();
 
                 if (!queueItem) {
-                    // No chunks available, wait a bit
+                    // Queue is empty: exit once a drain has been requested (recording
+                    // stopped and no more chunks are coming), otherwise wait for more.
+                    if (this.drainRequested) break;
                     await this.sleep(100);
                     continue;
                 }
@@ -87,6 +92,8 @@ export class StreamingTranscriptionService {
                     // then continue with the next chunk.
                     this.lastError = error instanceof Error ? error : new Error(String(error));
                     console.error('[StreamingTranscription] Chunk processing failed:', error);
+                } finally {
+                    this.chunksHandled++;
                 }
             }
         } finally {
@@ -160,21 +167,31 @@ export class StreamingTranscriptionService {
     async finishProcessing(): Promise<string> {
         Logger.log('[StreamingTranscription] Finishing processing, queue size:', this.chunkQueue.size(), 'processed:', this.processedChunks.size);
 
-        // Stop accepting new chunks
-        this.isProcessing = false;
+        // Ask the consumer loop to exit once the queue is empty. It must keep running until
+        // then — stopping it immediately (as this method used to) drops every segment still
+        // waiting in the queue, truncating long recordings to whatever had already finished.
+        this.drainRequested = true;
 
-        // Wait for queue to be processed
-        let attempts = 0;
-        const maxAttempts = 300; // 30 seconds timeout
+        // Wait for the loop to drain the queue. The timeout is progress-aware: as long as
+        // chunks keep completing (success or failure) we keep waiting; we bail out only
+        // after a sustained stall, so many queued segments never outlast a fixed cap.
+        const idleTimeoutMs = 90_000;
+        let idleMs = 0;
+        let lastHandled = this.chunksHandled;
 
-        while (this.chunkQueue.size() > 0 && attempts < maxAttempts) {
+        while (this.isProcessing && idleMs < idleTimeoutMs) {
             await this.sleep(100);
-            attempts++;
+            if (this.chunksHandled !== lastHandled) {
+                lastHandled = this.chunksHandled;
+                idleMs = 0;
+            } else {
+                idleMs += 100;
+            }
         }
 
-        Logger.log('[StreamingTranscription] Queue drained, attempts:', attempts);
+        Logger.log('[StreamingTranscription] Queue drained, remaining:', this.chunkQueue.size());
 
-        // Abort if still processing after timeout
+        // Abort only if the loop is still stuck after the stall timeout
         if (this.abortController) {
             this.abortController.abort();
         }
@@ -187,6 +204,7 @@ export class StreamingTranscriptionService {
                 console.error('[StreamingTranscription] Processing promise error:', error);
             }
         }
+        this.isProcessing = false;
 
         // If no chunk was transcribed but at least one failed, surface the real cause instead
         // of an opaque "no transcription result" downstream.
@@ -236,6 +254,8 @@ export class StreamingTranscriptionService {
         this.processingPromise = null;
         this.lastError = null;
         this.chunksReceived = 0;
+        this.drainRequested = false;
+        this.chunksHandled = 0;
     }
 
     private cleanupBlob(_blob: Blob): void {
