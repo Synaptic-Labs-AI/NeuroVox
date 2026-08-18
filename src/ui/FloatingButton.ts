@@ -1,6 +1,6 @@
 // src/ui/FloatingButton.ts
 
-import { MarkdownView, Notice, setIcon } from 'obsidian';
+import { MarkdownView, Notice, Platform, setIcon } from 'obsidian';
 import { ButtonPositionManager } from '../utils/ButtonPositionManager';
 import { PluginData, Position } from '../types';
 import NeuroVoxPlugin from '../main'; // Import the actual class instead of interface
@@ -17,6 +17,9 @@ export class FloatingButton {
     public audioManager: AudioRecordingManager | null = null;
     public isRecording: boolean = false;
     public isProcessing: boolean = false;
+
+    /** Bottom bars that the floating button must stay clear of on mobile. */
+    private static readonly MOBILE_BAR_SELECTORS = '.mobile-navbar, .mobile-tab-bar';
 
     public constructor(
         public plugin: NeuroVoxPlugin,
@@ -50,19 +53,53 @@ export class FloatingButton {
         return !this.containerEl?.isConnected || !this.buttonEl?.isConnected;
     }
 
+    /**
+     * Reads a numeric CSS custom property. Variables are read from the body so
+     * that platform specific overrides (e.g. `body.is-mobile`) are picked up.
+     */
+    private getCssNumber(name: string, fallback: number): number {
+        const value = parseInt(getComputedStyle(document.body).getPropertyValue(name));
+        return Number.isFinite(value) ? value : fallback;
+    }
+
     public getComputedSize(): number {
-        const computedStyle = getComputedStyle(document.documentElement);
-        return parseInt(computedStyle.getPropertyValue('--neurovox-button-size')) || 48;
+        return this.getCssNumber('--neurovox-floating-button-size', 48);
     }
 
     public getComputedMargin(): number {
-        const computedStyle = getComputedStyle(document.documentElement);
-        return parseInt(computedStyle.getPropertyValue('--neurovox-button-margin')) || 20;
+        return this.getCssNumber('--neurovox-button-margin', 20);
     }
 
     public getComputedResizeDelay(): number {
-        const computedStyle = getComputedStyle(document.documentElement);
-        return parseInt(computedStyle.getPropertyValue('--neurovox-resize-delay')) || 100;
+        return this.getCssNumber('--neurovox-resize-delay', 100);
+    }
+
+    /**
+     * Space to keep free at the bottom of the note so the button never lands
+     * under Obsidian's mobile navigation bar. The bar is measured when it can
+     * be found, otherwise the platform fallback in styles.css is used.
+     */
+    public getBottomInset(): number {
+        const fallback = this.getCssNumber('--neurovox-button-bottom-inset', 0);
+
+        if (!this.activeLeafContainer) return fallback;
+
+        const containerRect = this.activeLeafContainer.getBoundingClientRect();
+        if (containerRect.height === 0) return fallback;
+
+        let measured = 0;
+        document.body.querySelectorAll(FloatingButton.MOBILE_BAR_SELECTORS).forEach(bar => {
+            if (!bar.instanceOf(HTMLElement) || bar.offsetParent === null) return;
+            const barRect = bar.getBoundingClientRect();
+            if (barRect.height === 0) return;
+            // Only the part of the bar that overlaps the note counts.
+            measured = Math.max(measured, containerRect.bottom - barRect.top);
+        });
+
+        return Math.min(
+            Math.max(measured, fallback),
+            Math.max(containerRect.height / 2, 0)
+        );
     }
 
     public initializeComponents(): void {
@@ -75,9 +112,7 @@ export class FloatingButton {
         this.resizeObserver = new ResizeObserver(() => {
             if (this.activeLeafContainer && this.pluginData.showFloatingButton) {
                 window.requestAnimationFrame(() => {
-                    if (this.positionManager) {
-                        this.positionManager.constrainPosition();
-                    }
+                    this.refreshBounds();
                 });
             }
         });
@@ -131,6 +166,7 @@ export class FloatingButton {
             this.activeLeafContainer,
             this.getComputedSize(),
             this.getComputedMargin(),
+            this.getBottomInset(),
             this.handlePositionChange.bind(this),
             (position: Position) => { void this.handleDragEnd(position); },
             this.onClickCallback
@@ -157,21 +193,44 @@ export class FloatingButton {
         await this.plugin.saveSettings(); // Save all data
     }
 
+    /**
+     * The area the button may occupy inside the note, with the mobile
+     * navigation bar excluded from the bottom.
+     */
+    private getBounds(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+        if (!this.activeLeafContainer) return null;
+
+        const containerRect = this.activeLeafContainer.getBoundingClientRect();
+        const size = this.getComputedSize();
+        const margin = this.getComputedMargin();
+
+        return {
+            minX: margin,
+            minY: margin,
+            maxX: Math.max(margin, containerRect.width - size - margin),
+            maxY: Math.max(margin, containerRect.height - size - margin - this.getBottomInset())
+        };
+    }
+
+    /**
+     * Re-measures the mobile navigation bar and keeps the button inside the
+     * usable area (the bar can appear, resize, or hide at any time).
+     */
+    public refreshBounds(): void {
+        if (!this.positionManager) return;
+        this.positionManager.setBottomInset(this.getBottomInset());
+        this.positionManager.constrainPosition();
+    }
+
     public async setInitialPosition(): Promise<void> {
         const savedPosition = this.pluginData.buttonPosition;
+        const bounds = this.getBounds();
 
-        if (savedPosition && this.activeLeafContainer && this.positionManager) {
-            const containerRect = this.activeLeafContainer.getBoundingClientRect();
-            
-            // Validate saved position is within bounds
-            const x = Math.min(
-                Math.max(savedPosition.x, this.getComputedMargin()),
-                containerRect.width - this.getComputedSize() - this.getComputedMargin()
-            );
-            const y = Math.min(
-                Math.max(savedPosition.y, this.getComputedMargin()),
-                containerRect.height - this.getComputedSize() - this.getComputedMargin()
-            );
+        if (savedPosition && bounds && this.positionManager) {
+            // Keep the saved spot, but pull it back inside the usable area so
+            // buttons saved before the mobile bar existed are lifted above it.
+            const x = Math.min(Math.max(savedPosition.x, bounds.minX), bounds.maxX);
+            const y = Math.min(Math.max(savedPosition.y, bounds.minY), bounds.maxY);
 
             window.requestAnimationFrame(() => {
                 if (this.positionManager) {
@@ -183,14 +242,24 @@ export class FloatingButton {
         }
     }
 
+    /**
+     * Default spot. On mobile the button is horizontally centered and raised
+     * above Obsidian's navigation bar; on desktop, where no bar is in the way,
+     * it stays in the bottom right corner.
+     */
     public async setDefaultPosition(): Promise<void> {
-        if (!this.activeLeafContainer || !this.positionManager) {
+        const bounds = this.getBounds();
+        if (!bounds || !this.activeLeafContainer || !this.positionManager) {
             return;
         }
 
         const containerRect = this.activeLeafContainer.getBoundingClientRect();
-        const x = containerRect.width - this.getComputedSize() - this.getComputedMargin();
-        const y = containerRect.height - this.getComputedSize() - this.getComputedMargin();
+        const preferredX = Platform.isMobile
+            ? (containerRect.width - this.getComputedSize()) / 2
+            : bounds.maxX;
+
+        const x = Math.min(Math.max(preferredX, bounds.minX), bounds.maxX);
+        const y = bounds.maxY;
 
         window.requestAnimationFrame(() => {
             if (this.positionManager) {
@@ -221,6 +290,7 @@ export class FloatingButton {
             this.plugin.app.workspace.on('layout-change', () => {
                 window.requestAnimationFrame(() => {
                     if (this.positionManager && this.activeLeafContainer) {
+                        this.positionManager.setBottomInset(this.getBottomInset());
                         this.positionManager.updateContainer(this.activeLeafContainer);
                     }
                 });
@@ -238,6 +308,7 @@ export class FloatingButton {
                     if (this.activeLeafContainer && this.positionManager) {
                         window.requestAnimationFrame(() => {
                             if (this.positionManager && this.activeLeafContainer) {
+                                this.positionManager.setBottomInset(this.getBottomInset());
                                 this.positionManager.updateContainer(this.activeLeafContainer);
                             }
                         });
@@ -341,9 +412,7 @@ export class FloatingButton {
         window.requestAnimationFrame(() => {
             if (this.containerEl) {
                 this.containerEl.addClass('is-visible');
-                if (this.positionManager) {
-                    this.positionManager.constrainPosition();
-                }
+                this.refreshBounds();
             }
         });
     }

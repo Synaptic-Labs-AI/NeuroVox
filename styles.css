@@ -24,6 +24,10 @@
     --neurovox-floating-icon-size: 24px;
     --neurovox-button-margin: 20px;
     --neurovox-border-width: 2px;
+    /* Space kept free at the bottom of a note so the floating button never
+       lands under Obsidian's mobile navigation bar. Used as a fallback when
+       the bar cannot be measured; see FloatingButton.getBottomInset(). */
+    --neurovox-button-bottom-inset: 0px;
 
     /* Animation Timing */
     --neurovox-transition-quick: 0.2s;
@@ -39,6 +43,12 @@
     --neurovox-border-radius-lg: var(--radius-m);
     --neurovox-hover-transform: -2px;
     --neurovox-drag-scale: 1.1;
+}
+
+/* Obsidian's mobile navigation bar sits at the bottom of the note, so the
+   floating button keeps clear of it. */
+body.is-mobile {
+    --neurovox-button-bottom-inset: 88px;
 }
 
 /************************************

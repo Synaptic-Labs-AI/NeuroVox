@@ -25,6 +25,8 @@ export type NeuroVoxSettings = {
     recordingFolderPath: string;
     transcriptFolderPath: string;
     showFloatingButton: boolean;
+    /** Last position of the floating mic button inside the note. */
+    buttonPosition?: { x: number; y: number };
     useRecordingModal: boolean;
     showToolbarButton: boolean;
     micButtonColor: string;

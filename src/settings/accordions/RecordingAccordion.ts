@@ -2,7 +2,7 @@
 
 import { BaseAccordion } from "./BaseAccordion";
 import { NeuroVoxSettings, AudioQuality } from "../Settings";
-import { Setting, DropdownComponent } from "obsidian";
+import { Setting, DropdownComponent, Notice } from "obsidian";
 import { AIAdapter, AIProvider, AIModels } from "../../adapters/AIAdapter";
 // TEMPORARILY HIDDEN: local model feature is still in development. Re-enable
 // together with the Moonshine optgroup block in setupModelDropdown() below.
@@ -34,6 +34,9 @@ export class RecordingAccordion extends BaseAccordion {
         
         // Floating Button Toggle
         this.createFloatingButtonSetting();
+
+        // Floating Button Position Reset
+        this.createResetButtonPositionSetting();
         
         // Toolbar Button Toggle
         this.createToolbarButtonSetting();
@@ -109,6 +112,23 @@ export class RecordingAccordion extends BaseAccordion {
                         
                         // Refresh the settings display to show/hide modal toggle
                         void this.refresh();
+                    });
+            });
+    }
+
+    public createResetButtonPositionSetting(): void {
+        new Setting(this.contentEl)
+            .setName("Reset floating button position")
+            .setDesc("Move the floating microphone back to its default spot, centered and above the mobile navigation bar")
+            .addButton(button => {
+                button
+                    .setButtonText("Reset position")
+                    .onClick(async () => {
+                        delete this.plugin.settings.buttonPosition;
+                        // saveSettings() re-creates the floating buttons, which
+                        // fall back to the default position when none is saved.
+                        await this.plugin.saveSettings();
+                        new Notice("Floating button position reset");
                     });
             });
     }

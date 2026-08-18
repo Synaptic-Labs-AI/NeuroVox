@@ -29,6 +29,7 @@ export class ButtonPositionManager {
         public activeContainer: HTMLElement | null,
         public buttonSize: number,
         public margin: number,
+        public bottomInset: number,
         public onPositionChange: (x: number, y: number) => void,
         public onDragEnd: (position: Position) => void,
         public onClick: () => void
@@ -59,6 +60,14 @@ export class ButtonPositionManager {
         this.onPositionChange(x, y);
     }
 
+    /**
+     * Updates the space reserved at the bottom of the container (Obsidian's
+     * mobile navigation bar) and keeps the button clear of it.
+     */
+    public setBottomInset(bottomInset: number): void {
+        this.bottomInset = bottomInset;
+    }
+
     public constrainPosition(): void {
         if (!this.activeContainer) return;
 
@@ -73,7 +82,10 @@ export class ButtonPositionManager {
         }
 
         const maxX = containerRect.width - this.buttonSize - this.margin;
-        const maxY = containerRect.height - this.buttonSize - this.margin;
+        const maxY = Math.max(
+            this.margin,
+            containerRect.height - this.buttonSize - this.margin - this.bottomInset
+        );
 
         // Calculate new position based on relative coordinates
         const targetX = this.relativeX * containerRect.width;
