@@ -3,6 +3,7 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import NeuroVoxPlugin from '../main';
 import { RecordingProcessor } from './RecordingProcessor';
+import { ensureReadyToRecord } from './ProviderReadiness';
 
 export class VideoProcessor {
     private static instance: VideoProcessor | null = null;
@@ -37,6 +38,13 @@ export class VideoProcessor {
 
         try {
             this.isProcessing = true;
+
+            // Check credentials before the expensive part: FFmpeg audio extraction can take
+            // minutes, and all of it is wasted if the transcription key is bad.
+            if (!await ensureReadyToRecord(this.plugin)) {
+                return;
+            }
+
             new Notice('🎥 Starting video processing...');
 
             // Create output markdown file

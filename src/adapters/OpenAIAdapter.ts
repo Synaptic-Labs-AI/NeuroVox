@@ -29,29 +29,21 @@ export class OpenAIAdapter extends AIAdapter {
         return '/audio/transcriptions';
     }
 
-    protected async validateApiKeyImpl(): Promise<boolean> {
-        if (!this.apiKey) {
-            return false;
-        }
+    /**
+     * OpenAI publishes its whole catalog at GET /v1/models, so model lists come from the API
+     * rather than from a table in this repo that goes stale with every release.
+     */
+    protected getModelListEndpoint(): string | null {
+        return '/models';
+    }
 
-        try {
-            // Try a minimal completion request to validate the API key
-            await this.makeAPIRequest(
-                `${this.getApiBaseUrl()}/chat/completions`,
-                'POST',
-                {
-                    'Content-Type': 'application/json'
-                },
-                JSON.stringify({
-                    model: 'gpt-4o-mini',
-                    messages: [{ role: 'user', content: 'test' }],
-                    max_tokens: 1
-                })
-            );
-            return true;
-        } catch {
-            return false;
-        }
+    /**
+     * Probes with GET /models rather than a token-spending completion. It also avoids
+     * pinning validation to one hardcoded model id: when that model is eventually retired,
+     * a completion probe starts failing for everyone holding a perfectly good key.
+     */
+    protected async probeApiKey(): Promise<void> {
+        await this.makeAPIRequest(`${this.getApiBaseUrl()}/models`, 'GET', {}, null);
     }
 
     protected parseTextGenerationResponse(response: ChatCompletionResponse): string {

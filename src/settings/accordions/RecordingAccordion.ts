@@ -3,7 +3,7 @@
 import { BaseAccordion } from "./BaseAccordion";
 import { NeuroVoxSettings, AudioQuality } from "../Settings";
 import { Setting, DropdownComponent } from "obsidian";
-import { AIAdapter, AIProvider, AIModels } from "../../adapters/AIAdapter";
+import { AIAdapter, AIProvider, AIModels, getDynamicModels } from "../../adapters/AIAdapter";
 // TEMPORARILY HIDDEN: local model feature is still in development. Re-enable
 // together with the Moonshine optgroup block in setupModelDropdown() below.
 // import { MoonshineAdapter, MoonshineModelStatus } from "../../adapters/MoonshineAdapter";
@@ -210,7 +210,8 @@ export class RecordingAccordion extends BaseAccordion {
             if (apiKey) {
                 const adapter = this.getAdapter(provider);
                 if (adapter) {
-                    const models = adapter.getAvailableModels('transcription');
+                    // Live catalog where the provider publishes one, static list otherwise.
+                    const models = await adapter.fetchTranscriptionModels();
                     if (models.length > 0) {
                         hasValidProvider = true;
                         const group = createEl("optgroup");
@@ -284,6 +285,13 @@ export class RecordingAccordion extends BaseAccordion {
     }
 
     public getProviderFromModel(modelId: string): AIProvider | null {
+        // Check the live catalogs first: a model fetched from the provider won't be in the
+        // static table, and failing to resolve it would silently reject the user's choice.
+        for (const provider of Object.keys(AIModels) as AIProvider[]) {
+            if (getDynamicModels(provider)?.some(model => model.id === modelId)) {
+                return provider;
+            }
+        }
         for (const [provider, models] of Object.entries(AIModels)) {
             if (models.some(model => model.id === modelId)) {
                 return provider as AIProvider;

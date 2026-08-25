@@ -93,17 +93,14 @@ export class MoonshineAdapter extends AIAdapter {
         return '';
     }
 
-    protected async validateApiKeyImpl(): Promise<boolean> {
-        // For Moonshine, "validation" means checking if a model is ready
-        // We consider it valid if any model is downloaded
-        for (const status of this.modelStatus.values()) {
-            if (status === MoonshineModelStatus.Ready) {
-                return true;
-            }
-        }
-        // Also return true if no model is downloaded yet - user can still select Moonshine
-        // The actual check happens at transcription time
-        return true;
+    /** Nothing to authenticate: the model runs locally. */
+    public requiresApiKey(): boolean {
+        return false;
+    }
+
+    protected async probeApiKey(): Promise<void> {
+        // No credential to check. A model that hasn't been downloaded yet is still fine —
+        // it is fetched on first use, and that failure is reported at transcription time.
     }
 
     protected parseTextGenerationResponse(_response: never): string {

@@ -4,6 +4,7 @@ import { MarkdownView, Notice } from 'obsidian';
 import NeuroVoxPlugin from '../main';
 import { TimerModal } from '../modals/TimerModal';
 import { PluginData } from '../types';
+import { ensureReadyToRecord } from '../utils/ProviderReadiness';
 /**
  * ToolbarButton handles the creation and functionality of the toolbar microphone button.
  */
@@ -26,7 +27,7 @@ export class ToolbarButton {
             'mic-vocal', 
             'Start recording',
             (evt: MouseEvent) => {
-                this.openRecordingModal();
+                void this.openRecordingModal();
             }
         );
         this.ribbonIconEl.addClass('neurovox-toolbar-button'); 
@@ -35,7 +36,7 @@ export class ToolbarButton {
     /**
      * Opens the recording modal.
      */
-    public openRecordingModal(): void {
+    public async openRecordingModal(): Promise<void> {
         const activeLeaf = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
         if (activeLeaf) {
             const activeFile = activeLeaf.file;
@@ -45,6 +46,12 @@ export class ToolbarButton {
             }
             const editor = activeLeaf.editor;
             const cursorPosition = editor.getCursor();
+
+            // Same pre-flight guard as the command and floating button: never open the
+            // recorder when transcription is already known to be impossible.
+            if (!await ensureReadyToRecord(this.plugin)) {
+                return;
+            }
 
             const modal = new TimerModal(this.plugin);
             modal.onStop = async (result: Blob | string) => {

@@ -38,23 +38,29 @@ export class OpenRouterAdapter extends AIAdapter {
         return '/models';
     }
 
-    protected async validateApiKeyImpl(): Promise<boolean> {
-        if (!this.apiKey) {
-            return false;
+    protected async probeApiKey(): Promise<void> {
+        // /models is authenticated and free (no token spend).
+        const response = await this.makeAPIRequest<ModelListResponse>(
+            `${this.getApiBaseUrl()}/models`,
+            'GET',
+            {},
+            null
+        );
+        if (!Array.isArray(response?.data)) {
+            throw new Error('Unexpected response from the OpenRouter model list');
         }
+    }
 
-        try {
-            // /models is authenticated and free (no token spend).
-            const response = await this.makeAPIRequest<ModelListResponse>(
-                `${this.getApiBaseUrl()}/models`,
-                'GET',
-                {},
-                null
-            );
-            return Array.isArray(response?.data);
-        } catch {
-            return false;
-        }
+    /**
+     * OpenRouter reads these for app attribution on its rankings page and, for some routes,
+     * to identify the calling app at all. They are cheap to send and removing the guesswork
+     * about whether a route needs them is worth more than the two header bytes.
+     */
+    protected getExtraHeaders(): Record<string, string> {
+        return {
+            'HTTP-Referer': 'https://github.com/Synaptic-Labs-AI/NeuroVox',
+            'X-Title': 'NeuroVox'
+        };
     }
 
     protected parseTextGenerationResponse(response: ChatCompletionResponse): string {

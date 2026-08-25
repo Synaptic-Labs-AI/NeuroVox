@@ -7,6 +7,8 @@ import NeuroVoxPlugin from '../../main';
 export interface InsertContent {
     transcription: string;
     postProcessing?: string;
+    /** Rendered as a warning callout beneath the transcript when post-processing failed. */
+    postProcessingError?: string;
     audioFilePath?: string;
 }
 
@@ -93,9 +95,25 @@ export class DocumentInserter {
             
             postContent = this.formatLines(postContent, usePostCallout);
             formattedContent += '\n---\n' + postContent + '\n\n';
+        } else if (content.postProcessingError) {
+            // Say in the note itself that the summary is missing and why, so a silently
+            // absent callout is never mistaken for "post-processing had nothing to add".
+            formattedContent += '\n---\n' + this.formatFailureCallout(content.postProcessingError) + '\n\n';
         }
         
         return formattedContent + '\n';
+    }
+
+    /**
+     * Renders a post-processing failure as an Obsidian warning callout. The transcript above
+     * it is intact; this only explains the missing summary.
+     */
+    private formatFailureCallout(error: string): string {
+        const body = error
+            .split('\n')
+            .map(line => `>${line.trim()}`)
+            .join('\n');
+        return `>[!warning]- Post-processing failed\n${body}\n>\n>The transcription above was saved. Check your post-processing model and API key in NeuroVox settings, then rerun post-processing if you want a summary.`;
     }
 
     /**

@@ -29,29 +29,17 @@ export class GroqAdapter extends AIAdapter {
         return '/audio/transcriptions';
     }
 
-    protected async validateApiKeyImpl(): Promise<boolean> {
-        if (!this.apiKey) {
-            return false;
-        }
+    /** Groq is OpenAI-compatible and serves its live catalog at GET /openai/v1/models. */
+    protected getModelListEndpoint(): string | null {
+        return '/models';
+    }
 
-        try {
-            // Try a minimal completion request to validate the API key
-            await this.makeAPIRequest(
-                `${this.getApiBaseUrl()}/chat/completions`,
-                'POST',
-                {
-                    'Content-Type': 'application/json'
-                },
-                JSON.stringify({
-                    model: 'llama-3.1-8b-instant',
-                    messages: [{ role: 'user', content: 'test' }],
-                    max_tokens: 1
-                })
-            );
-            return true;
-        } catch {
-            return false;
-        }
+    /**
+     * Probes with GET /models rather than a token-spending completion against a hardcoded
+     * model id, which would start failing for valid keys once that model is retired.
+     */
+    protected async probeApiKey(): Promise<void> {
+        await this.makeAPIRequest(`${this.getApiBaseUrl()}/models`, 'GET', {}, null);
     }
 
     protected parseTextGenerationResponse(response: ChatCompletionResponse): string {
