@@ -23,6 +23,7 @@ import { AssemblyAIAdapter } from './adapters/AssemblyAIAdapter';
 import { AIProvider, AIAdapter } from './adapters/AIAdapter';
 import { RecordingProcessor } from './utils/RecordingProcessor';
 import { SegmentStore } from './utils/audio/SegmentStore';
+import { ensureReadyToRecord } from './utils/ProviderReadiness';
 
 export default class NeuroVoxPlugin extends Plugin {
     settings: NeuroVoxSettings;
@@ -202,7 +203,7 @@ export default class NeuroVoxPlugin extends Plugin {
                 const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (!activeView?.file) return false;
                 if (checking) return true;
-                this.handleRecordingStart();
+                void this.handleRecordingStart();
                 return true;
             }
         });
@@ -270,14 +271,10 @@ export default class NeuroVoxPlugin extends Plugin {
 
     public async processExistingAudioFile(file: TFile): Promise<void> {
         try {
-            const adapter = this.aiAdapters.get(this.settings.transcriptionProvider);
-            if (!adapter) {
-                throw new Error(`Transcription provider ${this.settings.transcriptionProvider} not found`);
-            }
-
-            // Moonshine doesn't require an API key (local model)
-            if (this.settings.transcriptionProvider !== AIProvider.Moonshine && !adapter.getApiKey()) {
-                throw new Error(`API key not set for ${this.settings.transcriptionProvider}`);
+            // Verify credentials before creating the transcript note and uploading audio:
+            // a key that is present but expired would otherwise fail after all that work.
+            if (!await ensureReadyToRecord(this)) {
+                return;
             }
 
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
@@ -338,6 +335,11 @@ export default class NeuroVoxPlugin extends Plugin {
 
     public async processVideoFile(file: TFile): Promise<void> {
         try {
+            // Ahead of loading FFmpeg, which fetches its WASM core before any work starts.
+            if (!await ensureReadyToRecord(this)) {
+                return;
+            }
+
             const videoProcessor = await VideoProcessor.getInstance(this);
             await videoProcessor.processVideo(file);
         } catch (error) {
@@ -421,7 +423,7 @@ export default class NeuroVoxPlugin extends Plugin {
         const button = new FloatingButton(
             this,
             this.settings,
-            () => this.handleRecordingStart()
+            () => { void this.handleRecordingStart(); }
         );
         
         this.buttonMap.set(file.path, button);
@@ -439,7 +441,7 @@ export default class NeuroVoxPlugin extends Plugin {
 
     private modalInstance: TimerModal | null = null;
 
-    public handleRecordingStart(): void {
+    public async handleRecordingStart(): Promise<void> {
         const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (!activeView) {
             new Notice('❌ No active note found to insert transcription.');
@@ -450,7 +452,15 @@ export default class NeuroVoxPlugin extends Plugin {
         if (!activeFile) {
             new Notice('❌ No active file found.');
             return;
-        }        if (this.settings.useRecordingModal) {
+        }
+
+        // Check the transcription credentials BEFORE opening the recorder. Discovering an
+        // expired key after the user has spoken means the audio is already gone.
+        if (!await ensureReadyToRecord(this)) {
+            return;
+        }
+
+        if (this.settings.useRecordingModal) {
             if (this.modalInstance) return;
             
             this.modalInstance = new TimerModal(this);
@@ -463,17 +473,8 @@ export default class NeuroVoxPlugin extends Plugin {
                         activeView.editor.getCursor()
                     );
                 } else {
-                    // Legacy mode - need to transcribe
-                    const adapter = this.aiAdapters.get(this.settings.transcriptionProvider);
-                    if (!adapter) {
-                        throw new Error(`Transcription provider ${this.settings.transcriptionProvider} not found`);
-                    }
-
-                    // Moonshine doesn't require an API key (local model)
-                    if (this.settings.transcriptionProvider !== AIProvider.Moonshine && !adapter.getApiKey()) {
-                        throw new Error(`API key not set for ${this.settings.transcriptionProvider}`);
-                    }
-
+                    // Legacy mode - need to transcribe. Credentials were verified in the
+                    // pre-flight check above, before the recorder opened.
                     await this.recordingProcessor.processRecording(
                         result,
                         activeFile,

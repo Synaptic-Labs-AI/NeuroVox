@@ -2,9 +2,10 @@ import { Notice, TFile, EditorPosition } from 'obsidian';
 import NeuroVoxPlugin from '../main';
 import { AudioProcessor } from './audio/AudioProcessor';
 import { TranscriptionService } from './transcription/TranscriptionService';
-import { DocumentInserter } from './document/DocumentInserter';
+import { DocumentInserter, InsertContent } from './document/DocumentInserter';
 import { ProcessingState } from './state/ProcessingState';
 import { AIAdapter, AIProvider } from '../adapters/AIAdapter';
+import { isRetryable } from '../adapters/ApiError';
 
 /**
  * Configuration for the processing pipeline
@@ -82,12 +83,17 @@ export class RecordingProcessor {
             );
             this.processingState.completeStep();
 
+            if (result.postProcessingError) {
+                new Notice(`⚠️ Post-processing failed, saving the transcription anyway: ${result.postProcessingError}`, 12000);
+            }
+
             // Insert the content
             this.processingState.startStep('Content Insertion');
-            await this.documentInserter.insertContent(
+            await this.insertOrRescue(
                 {
                     transcription: result.transcription,
                     postProcessing: result.postProcessing,
+                    postProcessingError: result.postProcessingError,
                     audioFilePath: audioResult.finalPath
                 },
                 activeFile,
@@ -123,22 +129,31 @@ export class RecordingProcessor {
             // Skip audio processing since we already have the transcription
             this.processingState.startStep('Content Processing');
 
-            // Generate post-processing if enabled
+            // Generate post-processing if enabled. A failure here is recorded and carried
+            // forward — the transcript is the thing the user actually spoke, and it gets
+            // written to the note whether or not the summary succeeds.
             let postProcessing: string | undefined;
+            let postProcessingError: string | undefined;
             if (this.plugin.settings.generatePostProcessing) {
                 this.processingState.startStep('Post-processing');
-                postProcessing = await this.executeWithRetry(() =>
-                    this.generatePostProcessing(transcriptionResult)
-                );
+                try {
+                    postProcessing = await this.executeWithRetry(() =>
+                        this.generatePostProcessing(transcriptionResult)
+                    );
+                } catch (error: unknown) {
+                    postProcessingError = error instanceof Error ? error.message : 'Unknown error';
+                    new Notice(`⚠️ Post-processing failed, saving the transcription anyway: ${postProcessingError}`, 12000);
+                }
                 this.processingState.completeStep();
             }
 
             // Insert the content
             this.processingState.startStep('Content Insertion');
-            await this.documentInserter.insertContent(
+            await this.insertOrRescue(
                 {
                     transcription: transcriptionResult,
-                    postProcessing
+                    postProcessing,
+                    postProcessingError
                     // No audioFilePath for streaming mode
                 },
                 activeFile,
@@ -152,6 +167,34 @@ export class RecordingProcessor {
             throw error;
         } finally {
             this.processingState.setIsProcessing(false);
+        }
+    }
+
+    /**
+     * Writes the content into the note, falling back to the clipboard if that write fails.
+     *
+     * Insertion is the last step, so by the time it runs the recording is gone and the
+     * transcript exists only in memory. If the vault write fails there is nowhere else for
+     * the text to go, and losing it is the single worst outcome of the whole pipeline.
+     */
+    private async insertOrRescue(
+        content: InsertContent,
+        activeFile: TFile,
+        cursorPosition: EditorPosition
+    ): Promise<void> {
+        try {
+            await this.documentInserter.insertContent(content, activeFile, cursorPosition);
+        } catch (error) {
+            try {
+                await navigator.clipboard.writeText(content.transcription);
+                new Notice('📋 Could not write to the note. The transcription was copied to your clipboard instead.', 15000);
+            } catch {
+                // Clipboard unavailable too: leave the text in the console as a last resort
+                // so it is at least recoverable from the developer tools.
+                console.error('[NeuroVox] Unable to save transcription anywhere. Transcript follows:\n', content.transcription);
+                new Notice('❌ Could not save the transcription to the note or the clipboard. See the developer console to recover it.', 15000);
+            }
+            throw error;
         }
     }
 
@@ -185,16 +228,15 @@ export class RecordingProcessor {
             throw new Error(`${provider} adapter not found`);
         }
 
-        if (!adapter.isReady(category)) {
-            const apiKey = adapter.getApiKey();
-            if (!apiKey) {
-                throw new Error(`${provider} API key is not configured`);
-            }
-            throw new Error(
-                `${provider} adapter is not ready for ${category}. Please check your settings and model availability.`
-            );
+        if (adapter.requiresApiKey() && !adapter.getApiKey()) {
+            throw new Error(`${provider} API key is not configured (needed for ${category})`);
         }
 
+        // Deliberately not gated on the cached isReady() flag. That flag goes false on any
+        // failed validation — including a network blip at plugin load — and never recovers
+        // on its own, which would silently disable this category for the rest of the
+        // session. Credentials are verified up front by the pre-flight check; if the key has
+        // gone bad since, the provider's own error is more useful than a stale local flag.
         return adapter;
     }
 
@@ -208,6 +250,12 @@ export class RecordingProcessor {
         try {
             return await operation();
         } catch (error) {
+            // A rejected key or a bad request parameter fails identically every time.
+            // Retrying it three more times only makes the user wait longer for the same
+            // error — which is exactly what made the original failure so frustrating.
+            if (!isRetryable(error)) {
+                throw error;
+            }
             if (retryCount < this.config.maxRetries) {
                 await new Promise(resolve => window.setTimeout(resolve, this.config.retryDelay));
                 return this.executeWithRetry(operation, retryCount + 1);

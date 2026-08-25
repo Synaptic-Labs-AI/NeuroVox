@@ -7,6 +7,12 @@ import NeuroVoxPlugin from '../../main';
 export interface TranscriptionResult {
     transcription: string;
     postProcessing?: string;
+    /**
+     * Why post-processing failed, when it did. Post-processing is a bonus on top of the
+     * transcript, so its failure is reported alongside the transcription rather than
+     * replacing it — losing a recording because the summarizer choked is never acceptable.
+     */
+    postProcessingError?: string;
 }
 
 /**
@@ -22,22 +28,30 @@ export class TranscriptionService {
      * @returns The transcription result
      */
     public async transcribeContent(audioBuffer: ArrayBuffer): Promise<TranscriptionResult> {
+        let transcription: string;
         try {
-            // Get transcription
-            const transcription = await this.transcribeAudio(audioBuffer);
-
-            // Generate post-processing if enabled
-            const postProcessing = this.plugin.settings.generatePostProcessing
-                ? await this.generatePostProcessing(transcription)
-                : undefined;
-
-            return {
-                transcription,
-                postProcessing
-            };
+            transcription = await this.transcribeAudio(audioBuffer);
         } catch (error) {
+            // Only a transcription failure is fatal: there is nothing to save without it.
             const message = error instanceof Error ? error.message : 'Unknown error';
             throw new Error(`Transcription failed: ${message}`);
+        }
+
+        if (!this.plugin.settings.generatePostProcessing) {
+            return { transcription };
+        }
+
+        try {
+            return {
+                transcription,
+                postProcessing: await this.generatePostProcessing(transcription)
+            };
+        } catch (error) {
+            // Report the failure with the transcript, never instead of it.
+            return {
+                transcription,
+                postProcessingError: error instanceof Error ? error.message : 'Unknown error'
+            };
         }
     }
 
@@ -107,16 +121,15 @@ export class TranscriptionService {
             throw new Error(`${provider} adapter not found`);
         }
 
-        if (!adapter.isReady(category)) {
-            const apiKey = adapter.getApiKey();
-            if (!apiKey) {
-                throw new Error(`${provider} API key is not configured`);
-            }
-            throw new Error(
-                `${provider} adapter is not ready for ${category}. Please check your settings and model availability.`
-            );
+        if (adapter.requiresApiKey() && !adapter.getApiKey()) {
+            throw new Error(`${provider} API key is not configured (needed for ${category})`);
         }
 
+        // Deliberately not gated on the cached isReady() flag. That flag goes false on any
+        // failed validation — including a network blip at plugin load — and never recovers
+        // on its own, which would silently disable this category for the rest of the
+        // session. Credentials are verified up front by the pre-flight check; if the key has
+        // gone bad since, the provider's own error is more useful than a stale local flag.
         return adapter;
     }
 }

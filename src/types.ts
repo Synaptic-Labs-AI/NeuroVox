@@ -241,5 +241,5 @@ export interface NeuroVoxPlugin extends Plugin {
     refreshFloatingButtons(): void;
     updateAllButtonColors(): void;
     cleanupUI(): void;
-    handleRecordingStart(): void;
+    handleRecordingStart(): Promise<void>;
 }

@@ -75,7 +75,7 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     useRecordingModal: true,
     showToolbarButton: true,
     micButtonColor: '#4B4B4B',
-    transcriptionModel: 'whisper-1',
+    transcriptionModel: 'gpt-transcribe',
     transcriptionProvider: AIProvider.OpenAI,
     transcriptionCalloutFormat: '>[!info]- Transcription\n>![[{audioPath}]]\n>{transcription}',
     showTimer: true,
@@ -85,8 +85,10 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     // Post-Processing
     generatePostProcessing: true,
     postProcessingPrompt: 'Process the following transcript to extract key insights and information.',
-    postProcessingMaxTokens: 500,
-    postProcessingModel: 'gpt-4o-mini',
+    // Reasoning models spend part of this budget thinking before they emit any text, so a
+    // few hundred tokens can produce an empty response. 2000 leaves room for both.
+    postProcessingMaxTokens: 2000,
+    postProcessingModel: 'gpt-5.6-luna',
     postProcessingProvider: AIProvider.OpenAI,
     postProcessingTemperature: 0.7,
     postProcessingCalloutFormat: '>[!note]- Post-Processing\n>{postProcessing}',

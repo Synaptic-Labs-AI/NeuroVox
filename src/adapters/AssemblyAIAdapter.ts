@@ -49,22 +49,13 @@ export class AssemblyAIAdapter extends AIAdapter {
         return '/v2/transcript';
     }
 
-    protected async validateApiKeyImpl(): Promise<boolean> {
-        if (!this.apiKey) {
-            return false;
-        }
-
-        try {
-            await this.makeAPIRequest(
-                `${this.getApiBaseUrl()}/v2/transcript?limit=1`,
-                'GET',
-                {},
-                null
-            );
-            return true;
-        } catch {
-            return false;
-        }
+    protected async probeApiKey(): Promise<void> {
+        await this.makeAPIRequest(
+            `${this.getApiBaseUrl()}/v2/transcript?limit=1`,
+            'GET',
+            {},
+            null
+        );
     }
 
     protected parseTextGenerationResponse(_response: ChatCompletionResponse): string {

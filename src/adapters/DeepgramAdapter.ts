@@ -33,22 +33,16 @@ export class DeepgramAdapter extends AIAdapter {
         return '/v1/listen';
     }
 
-    protected async validateApiKeyImpl(): Promise<boolean> {
-        if (!this.apiKey) {
-            return false;
-        }
-
-        try {
-            // Use Deepgram's projects endpoint to validate the API key
-            const response = await this.makeAPIRequest<DeepgramProjectsResponse>(
-                `${this.getApiBaseUrl()}/v1/projects`,
-                'GET',
-                {},
-                null
-            );
-            return response && Array.isArray(response.projects);
-        } catch {
-            return false;
+    protected async probeApiKey(): Promise<void> {
+        // Deepgram's projects endpoint is authenticated and free.
+        const response = await this.makeAPIRequest<DeepgramProjectsResponse>(
+            `${this.getApiBaseUrl()}/v1/projects`,
+            'GET',
+            {},
+            null
+        );
+        if (!response || !Array.isArray(response.projects)) {
+            throw new Error('Unexpected response from Deepgram projects endpoint');
         }
     }
 

@@ -1,5 +1,6 @@
 import { requestUrl } from 'obsidian';
 import { NeuroVoxSettings } from '../settings/Settings';
+import { ApiRequestError, getStatus, isAuthError } from './ApiError';
 import {
     ChatCompletionResponse,
     TranscriptionResponse,
@@ -18,6 +19,21 @@ export enum AIProvider {
     AssemblyAI = 'assemblyai',
 }
 
+/**
+ * Outcome of checking a provider credential.
+ *
+ * `rejected` and `unreachable` are deliberately distinct: only the first says anything about
+ * the key itself. Collapsing them (as a bare boolean does) means a dropped Wi-Fi connection
+ * gets reported as an invalid key and blocks a recording the user could have made.
+ */
+export type ApiKeyStatus = 'valid' | 'missing' | 'rejected' | 'unreachable';
+
+export interface ApiKeyCheck {
+    status: ApiKeyStatus;
+    /** Provider's own explanation, when there was one. */
+    message?: string;
+}
+
 export interface AIModel {
     id: string;
     name: string;
@@ -27,14 +43,18 @@ export interface AIModel {
 
 export const AIModels: Record<AIProvider, AIModel[]> = {
     [AIProvider.OpenAI]: [
-        { id: 'whisper-1', name: 'Whisper', category: 'transcription' },
-        { id: 'gpt-4o-mini-transcribe', name: 'GPT-4o Mini Transcribe', category: 'transcription' },
+        { id: 'gpt-transcribe', name: 'GPT Transcribe (recommended)', category: 'transcription' },
         { id: 'gpt-4o-transcribe', name: 'GPT-4o Transcribe', category: 'transcription' },
+        { id: 'gpt-4o-mini-transcribe', name: 'GPT-4o Mini Transcribe', category: 'transcription' },
+        { id: 'whisper-1', name: 'Whisper (legacy)', category: 'transcription' },
         { id: 'gpt-4o', name: 'GPT 4o', category: 'language', maxTokens: 16000 },
         { id: 'gpt-4o-mini', name: 'GPT 4o Mini', category: 'language', maxTokens: 16000 },
         { id: 'gpt-5', name: 'GPT 5', category: 'language', maxTokens: 400000 },
         { id: 'gpt-5-mini', name: 'GPT 5 Mini', category: 'language', maxTokens: 400000 },
         { id: 'gpt-5-nano', name: 'GPT 5 Nano', category: 'language', maxTokens: 400000 },
+        { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', category: 'language', maxTokens: 400000 },
+        { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', category: 'language', maxTokens: 400000 },
+        { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', category: 'language', maxTokens: 400000 },
     ],
     [AIProvider.Groq]: [
         { id: 'whisper-large-v3-turbo', name: 'Whisper Large v3 Turbo', category: 'transcription' },
@@ -101,6 +121,47 @@ export function getModelInfo(modelId: string): AIModel | undefined {
     return staticModel;
 }
 
+/**
+ * Model ids that are neither chat nor speech-to-text. A provider's /models endpoint lists its
+ * whole product line — embeddings, image, TTS, moderation — and none of that belongs in a
+ * transcription or post-processing picker.
+ */
+const NON_TEXT_MODEL_PATTERN = /(embedding|moderation|dall-e|sora|tts|image|realtime|audio-preview|search-preview|computer-use|guard|rerank)/i;
+
+/** Ids that identify a speech-to-text model across OpenAI-compatible providers. */
+const TRANSCRIPTION_MODEL_PATTERN = /(whisper|transcribe|speech-to-text)/i;
+
+/**
+ * Classifies a model id from a live catalog, or returns null for models this plugin has no
+ * use for. Matching on the id rather than on a list of known model families is what keeps the
+ * picker working for models released after this code was written.
+ *
+ * Exclusions are checked FIRST. Some speech models are Realtime-session models whose ids also
+ * say "whisper" (gpt-realtime-whisper); they need a WebSocket session, not the multipart POST
+ * to /v1/audio/transcriptions this plugin makes, so offering them would just hand the user a
+ * model that always fails.
+ */
+export function classifyModelId(id: string): 'language' | 'transcription' | null {
+    if (NON_TEXT_MODEL_PATTERN.test(id)) return null;
+    if (TRANSCRIPTION_MODEL_PATTERN.test(id)) return 'transcription';
+    return 'language';
+}
+
+/**
+ * Merges a live catalog over the static one. Live entries win on id (their metadata is
+ * current); static entries the endpoint didn't list are kept, so a provider that only
+ * publishes part of its line-up never removes a model the user already relies on.
+ */
+export function mergeModelCatalogs(live: AIModel[], fallback: AIModel[]): AIModel[] {
+    const byId = new Map<string, AIModel>();
+    for (const model of fallback) byId.set(model.id, model);
+    for (const model of live) {
+        const existing = byId.get(model.id);
+        byId.set(model.id, { ...model, maxTokens: model.maxTokens ?? existing?.maxTokens });
+    }
+    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export abstract class AIAdapter {
     public models: AIModel[];
     private keyValidated: boolean = false;
@@ -119,7 +180,12 @@ export abstract class AIAdapter {
     protected abstract getApiBaseUrl(): string;
     protected abstract getTextGenerationEndpoint(): string;
     protected abstract getTranscriptionEndpoint(): string;
-    protected abstract validateApiKeyImpl(): Promise<boolean>;
+    /**
+     * Performs one cheap authenticated call against the provider. Must THROW on failure
+     * rather than return a boolean, so verifyApiKey() can read the HTTP status off the
+     * error and tell a refused key apart from an unreachable provider.
+     */
+    protected abstract probeApiKey(): Promise<void>;
     protected abstract parseTextGenerationResponse(response: ChatCompletionResponse): string;
     protected abstract parseTranscriptionResponse(
         response: TranscriptionResponse | DeepgramTranscriptionResponse | MoonshineTranscriptionResponse | AssemblyAITranscriptionResponse | string
@@ -134,13 +200,14 @@ export abstract class AIAdapter {
     }
 
     /**
-     * Fetches the provider's language/chat models from its /models endpoint and caches them
-     * for the session. Falls back to the static AIModels language entries on any failure.
-     * Providers without a model-list endpoint just return their static language models.
+     * Fetches the provider's live model catalog and caches it for the session.
+     *
+     * The hardcoded AIModels table goes stale the moment a provider ships something new, so
+     * it is only a fallback: whenever the provider exposes a catalog endpoint, that endpoint
+     * is the source of truth. Any failure (no endpoint, no key, network, unexpected shape)
+     * falls back to the static list rather than leaving the user with an empty picker.
      */
-    public async fetchLanguageModels(): Promise<AIModel[]> {
-        const staticLanguage = this.models.filter(m => m.category === 'language');
-
+    public async fetchModels(): Promise<AIModel[]> {
         // Serve the session cache once populated to avoid refetching on every settings render.
         const cached = dynamicModels[this.provider];
         if (cached) {
@@ -148,8 +215,8 @@ export abstract class AIAdapter {
         }
 
         const endpoint = this.getModelListEndpoint();
-        if (!endpoint || !this.getApiKey()) {
-            return staticLanguage;
+        if (!endpoint || (this.requiresApiKey() && !this.getApiKey())) {
+            return this.models;
         }
 
         try {
@@ -161,24 +228,44 @@ export abstract class AIAdapter {
             );
             const parsed = this.parseModelList(response);
             if (parsed.length > 0) {
-                dynamicModels[this.provider] = parsed;
-                return parsed;
+                const merged = mergeModelCatalogs(parsed, this.models);
+                dynamicModels[this.provider] = merged;
+                return merged;
             }
         } catch {
             // Fall through to static list on network / parse errors.
         }
-        return staticLanguage;
+        return this.models;
+    }
+
+    /** Live language/chat models, or the static ones when the catalog is unavailable. */
+    public async fetchLanguageModels(): Promise<AIModel[]> {
+        return (await this.fetchModels()).filter(m => m.category === 'language');
+    }
+
+    /** Live transcription models, or the static ones when the catalog is unavailable. */
+    public async fetchTranscriptionModels(): Promise<AIModel[]> {
+        return (await this.fetchModels()).filter(m => m.category === 'transcription');
     }
 
     /**
-     * Maps an OpenAI-compatible model list into language AIModels. Providers with richer
-     * metadata (e.g. OpenRouter) may override this to filter by modality / context length.
+     * Maps an OpenAI-compatible model list into AIModels, classifying each id by name.
+     * Providers with richer metadata (e.g. OpenRouter) override this.
      */
     protected parseModelList(response: ModelListResponse): AIModel[] {
         if (!response?.data) return [];
-        return response.data
-            .map(m => ({ id: m.id, name: m.id, category: 'language' as const }))
-            .sort((a, b) => a.name.localeCompare(b.name));
+        const models: AIModel[] = [];
+        for (const entry of response.data) {
+            const category = classifyModelId(entry.id);
+            if (!category) continue;
+            models.push({
+                id: entry.id,
+                name: entry.name || entry.id,
+                category,
+                maxTokens: entry.context_length
+            });
+        }
+        return models.sort((a, b) => a.name.localeCompare(b.name));
     }
 
     public setApiKey(key: string): void {
@@ -191,24 +278,61 @@ export abstract class AIAdapter {
     }
 
     public async generateResponse(prompt: string, model: string, options?: { maxTokens?: number, temperature?: number }): Promise<string> {
-        try {
-            const endpoint = `${this.getApiBaseUrl()}${this.getTextGenerationEndpoint()}`;
-            const body = {
-                model,
-                messages: [{ role: "user", content: prompt }],
-                max_tokens: options?.maxTokens || 1000,
-                temperature: options?.temperature || 0.7,
-            };
-            const response = await this.makeAPIRequest<ChatCompletionResponse>(
-                endpoint,
-                'POST',
-                { 'Content-Type': 'application/json' },
-                JSON.stringify(body)
+        const endpoint = `${this.getApiBaseUrl()}${this.getTextGenerationEndpoint()}`;
+        const maxTokens = options?.maxTokens ?? 1000;
+        // ?? not ||: a deliberate temperature of 0 must not be silently rewritten to 0.7.
+        const temperature = options?.temperature ?? 0.7;
+
+        let body: Record<string, unknown> = {
+            model,
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: maxTokens,
+            temperature,
+        };
+
+        // Newer reasoning models reject `max_tokens` in favour of `max_completion_tokens`,
+        // and reject any `temperature` other than their default. Which models those are
+        // cannot be hardcoded here — the model catalog is fetched live from the provider and
+        // new models ship constantly — so send the conventional body and let the provider's
+        // own 400 say what to drop, then retry with a corrected one. Each adjustment removes
+        // a parameter, so the loop always terminates.
+        const maxAttempts = 3;
+        for (let attempt = 1; ; attempt++) {
+            try {
+                const response = await this.makeAPIRequest<ChatCompletionResponse>(
+                    endpoint,
+                    'POST',
+                    { 'Content-Type': 'application/json' },
+                    JSON.stringify(body)
+                );
+                this.assertGeneratedText(response, model, maxTokens);
+                return this.parseTextGenerationResponse(response);
+            } catch (error) {
+                const corrected = attempt < maxAttempts ? adjustChatBodyForParameterError(body, error) : null;
+                if (corrected) {
+                    body = corrected;
+                    continue;
+                }
+                throw new ApiRequestError(
+                    `Failed to generate response: ${this.getErrorMessage(error)}`,
+                    { status: getStatus(error) }
+                );
+            }
+        }
+    }
+
+    /**
+     * Catches the reasoning-model failure that otherwise surfaces as an opaque "invalid
+     * response format": the model spent the whole token budget thinking and returned an
+     * empty message. The fix is a settings change, so the error has to say so.
+     */
+    private assertGeneratedText(response: ChatCompletionResponse, model: string, maxTokens: number): void {
+        const choice = response?.choices?.[0];
+        if (choice && !choice.message?.content?.trim() && choice.finish_reason === 'length') {
+            throw new ApiRequestError(
+                `${model} used its entire ${maxTokens}-token budget before producing any text. ` +
+                `Raise "Maximum post-processing length" in settings, or pick a different model.`
             );
-            return this.parseTextGenerationResponse(response);
-        } catch (error) {
-            const message = this.getErrorMessage(error);
-            throw new Error(`Failed to generate response: ${message}`);
         }
     }
 
@@ -236,42 +360,56 @@ export abstract class AIAdapter {
             );
             return this.parseTranscriptionResponse(response);
         } catch (error) {
-            const message = this.getErrorMessage(error);
-            throw new Error(`Failed to transcribe audio: ${message}`);
+            // Rethrow as ApiRequestError so the status survives: it decides whether the
+            // caller retries and whether a pre-flight check calls the key rejected.
+            throw new ApiRequestError(
+                `Failed to transcribe audio: ${this.getErrorMessage(error)}`,
+                { status: getStatus(error) }
+            );
         }
     }
 
     public async validateApiKey(): Promise<boolean> {
-        try {
-            const currentKey = this.getApiKey();
-            
-            if (!currentKey) {
-                this.keyValidated = false;
-                this.lastValidatedKey = '';
-                return false;
-            }
+        return (await this.verifyApiKey()).status === 'valid';
+    }
 
-            // Return cached validation if key hasn't changed
-            if (this.keyValidated && this.lastValidatedKey === currentKey) {
-                return true;
-            }
+    /**
+     * Checks the configured credential against the provider, distinguishing "refused" from
+     * "couldn't ask". A successful check is cached for the session; a failed one is not, so
+     * fixing a key in settings takes effect without reloading the plugin.
+     */
+    public async verifyApiKey(): Promise<ApiKeyCheck> {
+        const currentKey = this.getApiKey();
 
-            // Otherwise validate the key
-            const isValid = await this.validateApiKeyImpl();
-            if (isValid) {
-                this.keyValidated = true;
-                this.lastValidatedKey = currentKey;
-            } else {
-                this.keyValidated = false;
-                this.lastValidatedKey = '';
-            }
-
-            return isValid;
-        } catch {
+        if (!currentKey && this.requiresApiKey()) {
             this.keyValidated = false;
             this.lastValidatedKey = '';
-            return false;
+            return { status: 'missing' };
         }
+
+        if (this.keyValidated && this.lastValidatedKey === currentKey) {
+            return { status: 'valid' };
+        }
+
+        try {
+            await this.probeApiKey();
+            this.keyValidated = true;
+            this.lastValidatedKey = currentKey;
+            return { status: 'valid' };
+        } catch (error) {
+            this.keyValidated = false;
+            this.lastValidatedKey = '';
+            const message = this.getErrorMessage(error);
+            // Only 401/403 condemns the key. Everything else — offline, provider outage, a
+            // retired model behind the probe endpoint — says nothing about the credential,
+            // and must not be reported to the user as an invalid key.
+            return { status: isAuthError(error) ? 'rejected' : 'unreachable', message };
+        }
+    }
+
+    /** False for local providers (Moonshine), which have nothing to authenticate. */
+    public requiresApiKey(): boolean {
+        return true;
     }
 
     public getAvailableModels(category: 'transcription' | 'language'): AIModel[] {
@@ -293,6 +431,14 @@ export abstract class AIAdapter {
         return { 'Authorization': `Bearer ${this.getApiKey()}` };
     }
 
+    /**
+     * Non-auth headers this provider expects on every request (e.g. OpenRouter's
+     * app-attribution pair). Merged under the per-call headers, which win.
+     */
+    protected getExtraHeaders(): Record<string, string> {
+        return {};
+    }
+
     /** Throws an AbortError-shaped error if the signal has been aborted. */
     protected throwIfAborted(signal?: AbortSignal): void {
         if (signal?.aborted) {
@@ -308,6 +454,7 @@ export abstract class AIAdapter {
     ): Promise<T> {
         const requestHeaders: Record<string, string> = {
             ...this.getAuthHeaders(),
+            ...this.getExtraHeaders(),
             ...headers
         };
 
@@ -323,7 +470,11 @@ export abstract class AIAdapter {
         });
 
         if (response.status >= 400) {
-            throw new Error(`HTTP ${response.status}: ${this.extractErrorDetail(response) || 'no error detail in response'}`);
+            const detail = this.extractErrorDetail(response);
+            throw new ApiRequestError(
+                `HTTP ${response.status}: ${detail || 'no error detail in response'}`,
+                { status: response.status, detail }
+            );
         }
 
         if (!response.json) {
@@ -401,4 +552,41 @@ export abstract class AIAdapter {
         if (typeof error === 'string') return error;
         return 'Unknown error occurred';
     }
+}
+
+/**
+ * Given a provider's rejection of a chat request, returns a corrected body when the
+ * complaint was about a parameter we can adapt, or null when it was about anything else.
+ *
+ * Only 400/422 responses are considered: those are the provider saying the request itself
+ * was malformed. The parameter names are matched against the provider's message rather than
+ * against a list of model families, so models released after this code still work.
+ */
+export function adjustChatBodyForParameterError(
+    body: Record<string, unknown>,
+    error: unknown
+): Record<string, unknown> | null {
+    const status = getStatus(error);
+    if (status !== 400 && status !== 422) return null;
+
+    const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+    const next = { ...body };
+    let changed = false;
+
+    // "Unsupported parameter: 'max_tokens' is not supported with this model.
+    //  Use 'max_completion_tokens' instead."
+    if ('max_tokens' in next && message.includes('max_tokens')) {
+        next.max_completion_tokens = next.max_tokens;
+        delete next.max_tokens;
+        changed = true;
+    }
+
+    // "Unsupported value: 'temperature' does not support 0.7 with this model.
+    //  Only the default (1) value is supported."
+    if ('temperature' in next && message.includes('temperature')) {
+        delete next.temperature;
+        changed = true;
+    }
+
+    return changed ? next : null;
 }
