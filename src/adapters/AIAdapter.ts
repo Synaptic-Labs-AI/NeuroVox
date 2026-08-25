@@ -43,9 +43,10 @@ export interface AIModel {
 
 export const AIModels: Record<AIProvider, AIModel[]> = {
     [AIProvider.OpenAI]: [
-        { id: 'whisper-1', name: 'Whisper', category: 'transcription' },
-        { id: 'gpt-4o-mini-transcribe', name: 'GPT-4o Mini Transcribe', category: 'transcription' },
+        { id: 'gpt-transcribe', name: 'GPT Transcribe (recommended)', category: 'transcription' },
         { id: 'gpt-4o-transcribe', name: 'GPT-4o Transcribe', category: 'transcription' },
+        { id: 'gpt-4o-mini-transcribe', name: 'GPT-4o Mini Transcribe', category: 'transcription' },
+        { id: 'whisper-1', name: 'Whisper (legacy)', category: 'transcription' },
         { id: 'gpt-4o', name: 'GPT 4o', category: 'language', maxTokens: 16000 },
         { id: 'gpt-4o-mini', name: 'GPT 4o Mini', category: 'language', maxTokens: 16000 },
         { id: 'gpt-5', name: 'GPT 5', category: 'language', maxTokens: 400000 },
@@ -134,10 +135,15 @@ const TRANSCRIPTION_MODEL_PATTERN = /(whisper|transcribe|speech-to-text)/i;
  * Classifies a model id from a live catalog, or returns null for models this plugin has no
  * use for. Matching on the id rather than on a list of known model families is what keeps the
  * picker working for models released after this code was written.
+ *
+ * Exclusions are checked FIRST. Some speech models are Realtime-session models whose ids also
+ * say "whisper" (gpt-realtime-whisper); they need a WebSocket session, not the multipart POST
+ * to /v1/audio/transcriptions this plugin makes, so offering them would just hand the user a
+ * model that always fails.
  */
 export function classifyModelId(id: string): 'language' | 'transcription' | null {
-    if (TRANSCRIPTION_MODEL_PATTERN.test(id)) return 'transcription';
     if (NON_TEXT_MODEL_PATTERN.test(id)) return null;
+    if (TRANSCRIPTION_MODEL_PATTERN.test(id)) return 'transcription';
     return 'language';
 }
 

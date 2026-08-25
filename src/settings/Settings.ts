@@ -75,7 +75,7 @@ export const DEFAULT_SETTINGS: NeuroVoxSettings = {
     useRecordingModal: true,
     showToolbarButton: true,
     micButtonColor: '#4B4B4B',
-    transcriptionModel: 'whisper-1',
+    transcriptionModel: 'gpt-transcribe',
     transcriptionProvider: AIProvider.OpenAI,
     transcriptionCalloutFormat: '>[!info]- Transcription\n>![[{audioPath}]]\n>{transcription}',
     showTimer: true,

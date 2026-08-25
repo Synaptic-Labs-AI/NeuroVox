@@ -252,10 +252,21 @@ describe('classifyModelId', () => {
         assert.equal(classifyModelId('llama-3.3-70b-versatile'), 'language');
     });
 
+    it('recognises current speech models, not just the Whisper generation', () => {
+        assert.equal(classifyModelId('gpt-transcribe'), 'transcription');
+    });
+
     it('drops models that belong in neither picker', () => {
         for (const id of ['text-embedding-3-large', 'dall-e-3', 'tts-1', 'omni-moderation-latest', 'llama-guard-4-12b']) {
             assert.equal(classifyModelId(id), null, id);
         }
+    });
+
+    it('drops Realtime speech models, which need a WebSocket session', () => {
+        // These say "whisper"/"transcribe" but cannot be used through the multipart POST to
+        // /v1/audio/transcriptions, so they must not reach the transcription picker.
+        assert.equal(classifyModelId('gpt-realtime-whisper'), null);
+        assert.equal(classifyModelId('gpt-realtime-translate'), null);
     });
 });
 
