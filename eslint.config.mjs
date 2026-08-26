@@ -47,12 +47,4 @@ export default defineConfig([
 			}],
 		},
 	},
-	{
-		// Logger is the single sanctioned wrapper around console for gated
-		// debug output, so the no-console guideline rule is off here only.
-		files: ["src/utils/Logger.ts"],
-		rules: {
-			"obsidianmd/rule-custom-message": "off",
-		},
-	},
 ]);
