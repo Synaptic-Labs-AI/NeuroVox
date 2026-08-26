@@ -801,93 +801,17 @@
     outline: none;
 }
 
-/* Enhanced confirmation modal styles */
-.neurovox-confirmation-modal {
-    padding: var(--neurovox-spacing-md);
-}
-
-.neurovox-confirmation-modal.is-mobile {
-    padding: var(--neurovox-spacing-sm);
-}
-
-.neurovox-confirmation-modal.is-mobile .mobile-title {
-    font-size: 1.5em;
-    margin-bottom: var(--neurovox-spacing-md);
-}
-
-.neurovox-confirmation-modal.is-mobile .mobile-message {
-    font-size: 1.1em;
-    line-height: 1.4;
-    margin-bottom: var(--neurovox-spacing-lg);
-}
-
-.neurovox-confirmation-buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--neurovox-spacing-sm);
-    margin-top: var(--neurovox-spacing-lg);
-}
-
-/* Mobile-optimized button container */
-.neurovox-confirmation-buttons.is-mobile {
-    flex-direction: column-reverse;
-    gap: var(--neurovox-spacing-md);
-    margin-top: var(--neurovox-spacing-xl);
-}
-
-/* Mobile-optimized buttons */
-.neurovox-confirmation-buttons .mobile-button {
-    height: 48px !important;
-    min-width: 100% !important;
-    font-size: 1.1em !important;
-    padding: var(--neurovox-spacing-sm) var(--neurovox-spacing-md) !important;
-    margin: 0 !important;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
-    user-select: none;
-}
-
-/* Active states for mobile buttons */
-.neurovox-confirmation-buttons .mobile-button:active {
-    transform: scale(0.98);
-    opacity: 0.9;
-}
-
-.neurovox-button-danger {
-    background-color: var(--text-error) !important;
-    color: var(--text-on-accent) !important;
-}
-
-.neurovox-button-primary {
-    background-color: var(--interactive-accent) !important;
-    color: var(--text-on-accent) !important;
-}
-
-.neurovox-button-danger:hover,
-.neurovox-button-primary:hover {
-    opacity: 0.9;
-}
-
-.neurovox-modal-toggle-setting {
-    margin-top: 0 !important;
-    margin-bottom: var(--neurovox-spacing-md);
-    opacity: 0.9;
-}
-
-.neurovox-modal-toggle-setting .setting-item-control {
-    padding-right: 2em;
-}
-
 /* Transition effect for settings */
 .neurovox-accordion-content .setting-item {
     transition: opacity var(--neurovox-transition-normal) ease;
 }
 
-/* Recording Button Animation */
+/* Recording Button Animation.
+ * Declared after `.neurovox-button.floating` so the equal-specificity
+ * background-color here wins on source order without !important. */
 .neurovox-button.recording {
     animation: breathing 2s ease-in-out infinite;
-    background-color: var(--color-red) !important;
+    background-color: var(--color-red);
 }
 
 @keyframes breathing {
@@ -999,7 +923,7 @@
 /* Utility classes (replace inline style assignments per Obsidian guidelines).
  * Also used as the show/hide helper for the local-model settings section. */
 .neurovox-hidden {
-    display: none !important;
+    display: none;
 }
 
 .neurovox-full-width {

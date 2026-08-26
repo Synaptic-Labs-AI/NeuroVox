@@ -17,11 +17,6 @@ export default defineConfig([
 		},
 		rules: {
 			"obsidianmd/sample-names": "off",
-			// The declarative settings API (getSettingDefinitions) is an Obsidian
-			// 1.13.0+ feature; this plugin's minAppVersion is 1.4.0, so adopting it
-			// as the settings mechanism isn't viable yet. Revisit if minAppVersion
-			// is raised to >= 1.13.0.
-			"obsidianmd/settings-tab/prefer-setting-definitions": "off",
 			// Teach the sentence-case rule our product/provider names and acronyms
 			// so it stops flagging correctly-cased brand names as violations.
 			"obsidianmd/ui/sentence-case": ["warn", {
@@ -48,11 +43,15 @@ export default defineConfig([
 		},
 	},
 	{
-		// Logger is the single sanctioned wrapper around console for gated
-		// debug output, so the no-console guideline rule is off here only.
-		files: ["src/utils/Logger.ts"],
+		// This file renders the 1.13 setting *definitions* on older Obsidian
+		// versions, so it necessarily reads properties off the 1.13-only
+		// SettingControl types. Those types describe plain object literals this
+		// plugin builds itself — no Obsidian 1.13 runtime API is touched — so
+		// the version check is a false positive here. Drop this override once
+		// minAppVersion reaches 1.13.0 and the file is deleted.
+		files: ["src/settings/LegacySettingsRenderer.ts"],
 		rules: {
-			"obsidianmd/rule-custom-message": "off",
+			"obsidianmd/no-unsupported-api": "off",
 		},
 	},
 ]);

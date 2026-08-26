@@ -3,12 +3,12 @@
  *
  * Obsidian's plugin guidelines discourage console output in production
  * (https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console),
- * so these helpers no-op unless debug logging is explicitly enabled. Genuine
- * error/warning reporting should continue to use console.error / console.warn
- * directly, which the guidelines permit.
+ * so these helpers no-op unless debug logging is explicitly enabled, and the
+ * output they do emit goes to `console.debug` — the level the guidelines
+ * reserve for developer diagnostics, which browsers hide by default.
  *
- * This is the single sanctioned place that touches console.log; the no-console
- * guideline rule is turned off for this file in eslint.config.mjs.
+ * Genuine error/warning reporting should continue to use console.error /
+ * console.warn directly, which the guidelines also permit.
  */
 
 let debugEnabled = false;
@@ -18,14 +18,18 @@ export function setDebugLogging(enabled: boolean): void {
 	debugEnabled = enabled;
 }
 
+function emit(args: unknown[]): void {
+	if (debugEnabled) console.debug(...args);
+}
+
 export const Logger = {
 	log(...args: unknown[]): void {
-		if (debugEnabled) console.log(...args);
+		emit(args);
 	},
 	info(...args: unknown[]): void {
-		if (debugEnabled) console.info(...args);
+		emit(args);
 	},
 	debug(...args: unknown[]): void {
-		if (debugEnabled) console.debug(...args);
+		emit(args);
 	},
 };
