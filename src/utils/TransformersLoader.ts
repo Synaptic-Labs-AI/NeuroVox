@@ -15,7 +15,7 @@
  * local models are unavailable. The original iframe-based implementation is
  * preserved in git history — restore it together with a review-compliant
  * on-device runtime (no external <script>/CDN loading) and re-expose the UI in
- * ModelHookupAccordion / RecordingAccordion when the feature is ready.
+ * ApiKeysSection / RecordingSection when the feature is ready.
  */
 
 import type { TransformersProgressData } from '../types';
