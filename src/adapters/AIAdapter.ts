@@ -286,16 +286,16 @@ export abstract class AIAdapter {
         let body: Record<string, unknown> = {
             model,
             messages: [{ role: "user", content: prompt }],
-            max_tokens: maxTokens,
+            [this.chatMaxTokensParam()]: maxTokens,
             temperature,
         };
 
-        // Newer reasoning models reject `max_tokens` in favour of `max_completion_tokens`,
-        // and reject any `temperature` other than their default. Which models those are
+        // Some models reject the output-cap parameter under the name we chose, and reasoning
+        // models reject any `temperature` other than their default. Which models those are
         // cannot be hardcoded here — the model catalog is fetched live from the provider and
         // new models ship constantly — so send the conventional body and let the provider's
-        // own 400 say what to drop, then retry with a corrected one. Each adjustment removes
-        // a parameter, so the loop always terminates.
+        // own 400 say what to fix, then retry with a corrected one. Each adjustment removes
+        // or renames a parameter, so the loop always terminates.
         const maxAttempts = 3;
         for (let attempt = 1; ; attempt++) {
             try {
@@ -319,6 +319,17 @@ export abstract class AIAdapter {
                 );
             }
         }
+    }
+
+    /**
+     * Name of the chat request's output-cap parameter. `max_tokens` is the lingua franca of
+     * OpenAI-compatible providers, so it is the default; adapters whose provider has moved
+     * to a newer name (OpenAI's `max_completion_tokens`) override this. Either way,
+     * adjustChatBodyForParameterError converts on a 400, so a wrong choice costs one retry,
+     * not a failure.
+     */
+    protected chatMaxTokensParam(): 'max_tokens' | 'max_completion_tokens' {
+        return 'max_tokens';
     }
 
     /**
@@ -572,6 +583,16 @@ export function adjustChatBodyForParameterError(
     const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
     const next = { ...body };
     let changed = false;
+
+    // The mirror case first: a provider that only knows `max_tokens` rejecting the newer
+    // name. Checked before the forward case because its message can never contain the
+    // literal substring "max_tokens" ("max_completion_tokens" interposes "completion_"),
+    // while a body holds only one of the two names — so exactly one branch can fire.
+    if ('max_completion_tokens' in next && message.includes('max_completion_tokens')) {
+        next.max_tokens = next.max_completion_tokens;
+        delete next.max_completion_tokens;
+        changed = true;
+    }
 
     // "Unsupported parameter: 'max_tokens' is not supported with this model.
     //  Use 'max_completion_tokens' instead."

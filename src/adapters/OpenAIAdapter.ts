@@ -46,6 +46,16 @@ export class OpenAIAdapter extends AIAdapter {
         await this.makeAPIRequest(`${this.getApiBaseUrl()}/models`, 'GET', {}, null);
     }
 
+    /**
+     * OpenAI deprecated `max_tokens` in favour of `max_completion_tokens`, and the reasoning
+     * models (o-series, gpt-5 family) hard-reject the old name. Since users typically pick
+     * current models, send the new name up front instead of paying a 400-and-retry round
+     * trip on every post-processing call.
+     */
+    protected chatMaxTokensParam(): 'max_tokens' | 'max_completion_tokens' {
+        return 'max_completion_tokens';
+    }
+
     protected parseTextGenerationResponse(response: ChatCompletionResponse): string {
         if (response?.choices?.[0]?.message?.content) {
             return response.choices[0].message.content;

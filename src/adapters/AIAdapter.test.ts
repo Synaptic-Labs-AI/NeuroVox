@@ -218,6 +218,40 @@ describe('generateResponse parameter recovery', () => {
         await adapter.generateResponse('hi', 'm', { temperature: 0 });
         assert.equal(adapter.sentBodies[0].temperature, 0);
     });
+
+    it('sends max_completion_tokens up front when the adapter opts in (OpenAI)', async () => {
+        class NewParamAdapter extends TestAdapter {
+            protected chatMaxTokensParam(): 'max_tokens' | 'max_completion_tokens' {
+                return 'max_completion_tokens';
+            }
+        }
+        const adapter = new NewParamAdapter();
+        adapter.scriptResponses(() => completion('ok'));
+
+        await adapter.generateResponse('hi', 'gpt-5.6-luna', { maxTokens: 2000 });
+        assert.equal(adapter.sentBodies[0].max_completion_tokens, 2000);
+        assert.equal('max_tokens' in adapter.sentBodies[0], false);
+    });
+
+    it('falls back to max_tokens when a provider rejects max_completion_tokens', async () => {
+        class NewParamAdapter extends TestAdapter {
+            protected chatMaxTokensParam(): 'max_tokens' | 'max_completion_tokens' {
+                return 'max_completion_tokens';
+            }
+        }
+        const adapter = new NewParamAdapter();
+        adapter.scriptResponses(
+            () => new ApiRequestError(
+                "HTTP 400: Unknown parameter: 'max_completion_tokens'.",
+                { status: 400 }
+            ),
+            () => completion('summary')
+        );
+
+        assert.equal(await adapter.generateResponse('hi', 'older-model', { maxTokens: 500 }), 'summary');
+        assert.equal(adapter.sentBodies[1].max_tokens, 500);
+        assert.equal('max_completion_tokens' in adapter.sentBodies[1], false);
+    });
 });
 
 describe('adjustChatBodyForParameterError', () => {
