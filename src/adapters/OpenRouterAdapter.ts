@@ -39,15 +39,17 @@ export class OpenRouterAdapter extends AIAdapter {
     }
 
     protected async probeApiKey(): Promise<void> {
-        // /models is authenticated and free (no token spend).
-        const response = await this.makeAPIRequest<ModelListResponse>(
-            `${this.getApiBaseUrl()}/models`,
+        // /key returns the calling key's metadata: authenticated, free (no token spend),
+        // and 401s on a bad key. (/models is public and accepts any key, so it can't
+        // tell a valid credential from a revoked one.)
+        const response = await this.makeAPIRequest<{ data?: unknown }>(
+            `${this.getApiBaseUrl()}/key`,
             'GET',
             {},
             null
         );
-        if (!Array.isArray(response?.data)) {
-            throw new Error('Unexpected response from the OpenRouter model list');
+        if (!response?.data) {
+            throw new Error('Unexpected response from the OpenRouter key endpoint');
         }
     }
 
