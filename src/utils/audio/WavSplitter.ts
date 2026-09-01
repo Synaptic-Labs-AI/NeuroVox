@@ -10,12 +10,24 @@ export interface WavSegment {
     durationMs: number; // duration of this segment
 }
 
-interface WavFormat {
+export interface WavFormat {
     numChannels: number;
     sampleRate: number;
     byteRate: number;
     blockAlign: number;
     bitsPerSample: number;
+}
+
+/**
+ * Location of the PCM payload inside a parsed WAV buffer, plus its format.
+ */
+export interface ParsedWav {
+    fmt: WavFormat;
+    /** Byte offset of the first PCM sample within the buffer. */
+    dataOffset: number;
+    /** Number of PCM bytes actually present (clamped to the buffer). */
+    dataSize: number;
+    bytesPerSecond: number;
 }
 
 function readFourCC(view: DataView, offset: number): string {
@@ -36,7 +48,7 @@ function writeFourCC(view: DataView, offset: number, text: string): void {
 /**
  * Builds a standalone 16-bit PCM WAV file (44-byte header + data) around a slice of PCM.
  */
-function buildWav(pcm: Uint8Array, fmt: WavFormat): Uint8Array {
+export function buildWav(pcm: Uint8Array, fmt: WavFormat): Uint8Array {
     const out = new Uint8Array(44 + pcm.length);
     const view = new DataView(out.buffer);
 
@@ -61,17 +73,10 @@ function buildWav(pcm: Uint8Array, fmt: WavFormat): Uint8Array {
 }
 
 /**
- * Splits a PCM WAV blob into ~segmentSeconds-long segments, each a valid standalone WAV.
- *
- * This bounds per-request memory when transcribing long recordings: instead of holding the
- * entire recording as one arrayBuffer/upload, each segment is transcribed and freed in turn.
- *
- * Returns null when the blob isn't a parseable PCM WAV (the caller should then fall back to
- * transcribing the whole blob), and a single-element array when the recording is already
- * shorter than one segment.
+ * Parses the RIFF/WAVE headers of a 16-bit PCM WAV buffer and locates its PCM payload.
+ * Returns null when the buffer is not a parseable uncompressed-PCM WAV.
  */
-export async function splitWavBlob(blob: Blob, segmentSeconds: number): Promise<WavSegment[] | null> {
-    const buffer = await blob.arrayBuffer();
+export function parseWav(buffer: ArrayBuffer): ParsedWav | null {
     if (buffer.byteLength < 44) return null;
 
     const view = new DataView(buffer);
@@ -117,6 +122,25 @@ export async function splitWavBlob(blob: Blob, segmentSeconds: number): Promise<
 
     const bytesPerSecond = fmt.byteRate || fmt.sampleRate * fmt.blockAlign;
     if (bytesPerSecond <= 0) return null;
+
+    return { fmt, dataOffset, dataSize, bytesPerSecond };
+}
+
+/**
+ * Splits a PCM WAV blob into ~segmentSeconds-long segments, each a valid standalone WAV.
+ *
+ * This bounds per-request memory when transcribing long recordings: instead of holding the
+ * entire recording as one arrayBuffer/upload, each segment is transcribed and freed in turn.
+ *
+ * Returns null when the blob isn't a parseable PCM WAV (the caller should then fall back to
+ * transcribing the whole blob), and a single-element array when the recording is already
+ * shorter than one segment.
+ */
+export async function splitWavBlob(blob: Blob, segmentSeconds: number): Promise<WavSegment[] | null> {
+    const buffer = await blob.arrayBuffer();
+    const parsed = parseWav(buffer);
+    if (!parsed) return null;
+    const { fmt, dataOffset, dataSize, bytesPerSecond } = parsed;
 
     // Segment length in bytes, aligned to a whole audio frame.
     let segBytes = Math.floor(bytesPerSecond * segmentSeconds);

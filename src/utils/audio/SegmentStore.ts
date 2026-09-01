@@ -12,6 +12,7 @@ export interface SegmentStoreAdapter {
     writeBinary(normalizedPath: string, data: ArrayBuffer): Promise<void>;
     readBinary(normalizedPath: string): Promise<ArrayBuffer>;
     remove(normalizedPath: string): Promise<void>;
+    rmdir(normalizedPath: string, recursive: boolean): Promise<void>;
     list(normalizedPath: string): Promise<{ files: string[]; folders: string[] }>;
 }
 
@@ -25,8 +26,11 @@ export interface SegmentStoreAdapter {
  * for transcription and deleted immediately after. Peak audio memory is therefore bounded
  * by a single segment regardless of recording length or transcription backlog.
  *
- * Files also survive a crash or app kill mid-recording; sweep() clears leftovers on the
- * next plugin load.
+ * The segment files are also the recording's durable copy until it has been assembled into
+ * a single audio file in the vault (see RecordingArchive), which is why the transcription
+ * loop never deletes them: they must outlive a failed or interrupted transcription. Each
+ * recording gets its own store directory, and files that survive a crash or app kill are
+ * recovered into the vault on the next plugin load.
  */
 export class SegmentStore {
     private initialized = false;
@@ -71,6 +75,32 @@ export class SegmentStore {
         return this.adapter.readBinary(path);
     }
 
+    /**
+     * Lists the segment files currently in the store, in ascending numeric id order
+     * (segment_0, segment_1, ... segment_10), which is recording order.
+     */
+    async listFiles(): Promise<string[]> {
+        if (!(await this.adapter.exists(this.dir))) return [];
+        const listing = await this.adapter.list(this.dir);
+        return sortSegmentPaths(listing.files);
+    }
+
+    /**
+     * Removes the store directory and everything in it. Used once the recording has been
+     * safely written to the vault, so the segments are no longer the only copy.
+     */
+    async removeDir(): Promise<void> {
+        try {
+            if (await this.adapter.exists(this.dir)) {
+                await this.adapter.rmdir(this.dir, true);
+            }
+        } catch (error) {
+            // Leave stragglers for the load-time recovery pass rather than failing the stop.
+            console.error('[SegmentStore] Failed to remove segment directory:', error);
+        }
+        this.initialized = false;
+    }
+
     /** Removes a segment file. Missing files are treated as already removed. */
     async remove(path: string): Promise<void> {
         try {
@@ -98,4 +128,16 @@ export class SegmentStore {
         }
         return removed;
     }
+}
+
+/**
+ * Orders segment paths by the numeric suffix of their file name so that "segment_10" sorts
+ * after "segment_9". Paths without a number keep their relative order at the end.
+ */
+export function sortSegmentPaths(paths: string[]): string[] {
+    const indexOf = (path: string): number => {
+        const match = /(\d+)\.[^./]+$/.exec(path);
+        return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+    };
+    return [...paths].sort((a, b) => indexOf(a) - indexOf(b));
 }

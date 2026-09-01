@@ -2,6 +2,7 @@ import NeuroVoxPlugin from '../../main';
 import { AudioFileManager } from './AudioFileManager';
 import { AudioQuality } from '../../settings/Settings';
 import { AIProvider } from '../../adapters/AIAdapter';
+import { splitWavBlob, WavSegment } from './WavSplitter';
 
 /**
  * Processes audio files including chunking, concatenation, and storage
@@ -12,6 +13,9 @@ export class AudioProcessor {
 
     // Maximum audio size before skipping chunking (25MB)
     private readonly MAX_AUDIO_SIZE_BYTES = 25 * 1024 * 1024;
+
+    // Segment length used when a PCM WAV is too large for one provider request.
+    private readonly SEGMENT_SECONDS = 60;
 
     // Audio quality settings (sample rates in Hz)
     private readonly SAMPLE_RATES = {
@@ -43,6 +47,8 @@ export class AudioProcessor {
     ): Promise<{
         finalPath: string;
         audioBlob: Blob;
+        /** Set when the file exceeds the provider's request limit and was cut into segments. */
+        segments?: WavSegment[];
         processedChunks?: number;
         totalChunks?: number;
     }> {
@@ -54,9 +60,19 @@ export class AudioProcessor {
             if (this.canProviderHandleFile(provider, audioBlob.size)) {
                 const finalPath = audioFilePath || await this.audioFileManager.saveAudioFile(audioBlob);
                 return { finalPath, audioBlob };
-            } else {
-                throw new Error(this.getLargeFileErrorMessage(provider, fileSizeMB));
             }
+
+            // Too large for one request. Recordings NeuroVox saves are uncompressed PCM WAV
+            // (a 12-minute desktop recording is ~45MB), which can be cut into independently
+            // decodable segments and transcribed in turn, so a saved recording can always be
+            // re-processed rather than refused.
+            const segments = await splitWavBlob(audioBlob, this.SEGMENT_SECONDS);
+            if (segments && segments.length > 1) {
+                const finalPath = audioFilePath || await this.audioFileManager.saveAudioFile(audioBlob);
+                return { finalPath, audioBlob, segments };
+            }
+
+            throw new Error(this.getLargeFileErrorMessage(provider, fileSizeMB));
 
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';

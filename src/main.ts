@@ -22,7 +22,8 @@ import { OpenRouterAdapter } from './adapters/OpenRouterAdapter';
 import { AssemblyAIAdapter } from './adapters/AssemblyAIAdapter';
 import { AIProvider, AIAdapter } from './adapters/AIAdapter';
 import { RecordingProcessor } from './utils/RecordingProcessor';
-import { SegmentStore } from './utils/audio/SegmentStore';
+import { recoverOrphanedRecordings } from './utils/audio/RecordingArchive';
+import { AudioFileManager } from './utils/audio/AudioFileManager';
 import { ensureReadyToRecord } from './utils/ProviderReadiness';
 
 export default class NeuroVoxPlugin extends Plugin {
@@ -60,13 +61,35 @@ export default class NeuroVoxPlugin extends Plugin {
             // Trigger initial state
             this.events.trigger('floating-button-setting-changed', this.settings.showFloatingButton);
 
-            // Clear segment temp files orphaned by a crash or force-quit mid-recording.
-            void new SegmentStore(this.app.vault.adapter, `${this.manifest.dir}/segments-tmp`).sweep();
+            // Segment files orphaned by a crash or force-quit mid-recording are the only copy
+            // of that audio: join them into the recordings folder instead of discarding them.
+            // Deferred until the vault index is ready so the new files register normally.
+            this.app.workspace.onLayoutReady(() => { void this.recoverUnsavedRecordings(); });
         } catch {
             new Notice("Failed to initialize NeuroVox plugin");
         }
     }
     
+    /**
+     * Recovers recordings whose segments survived on disk from an interrupted session and
+     * tells the user where they went.
+     */
+    private async recoverUnsavedRecordings(): Promise<void> {
+        try {
+            const recovered = await recoverOrphanedRecordings(
+                this.app.vault.adapter,
+                `${this.manifest.dir}/segments-tmp`,
+                new AudioFileManager(this)
+            );
+            if (recovered.length > 0) {
+                const folder = this.settings.recordingFolderPath || 'the vault root';
+                new Notice(`NeuroVox recovered ${recovered.length} unsaved recording${recovered.length === 1 ? '' : 's'} to ${folder}. Open one and run "Transcribe audio file" to transcribe it.`, 15000);
+            }
+        } catch (error) {
+            console.error('[NeuroVox] Recording recovery failed:', error);
+        }
+    }
+
     /**
      * Register event listeners for floating button setting changes
      */
@@ -464,23 +487,23 @@ export default class NeuroVoxPlugin extends Plugin {
             if (this.modalInstance) return;
             
             this.modalInstance = new TimerModal(this);
-            this.modalInstance.onStop = async (result: Blob | string) => {
-                if (typeof result === 'string') {
-                    // Streaming mode - transcription already done
-                    await this.recordingProcessor.processStreamingResult(
-                        result,
-                        activeFile,
-                        activeView.editor.getCursor()
-                    );
-                } else {
-                    // Legacy mode - need to transcribe. Credentials were verified in the
-                    // pre-flight check above, before the recorder opened.
-                    await this.recordingProcessor.processRecording(
-                        result,
-                        activeFile,
-                        activeView.editor.getCursor()
-                    );
-                }
+            this.modalInstance.onStop = async (result: string, audioFilePath: string | null) => {
+                // Transcription already done by the streaming pipeline; the recording was
+                // saved to the vault before it ran, so the note can link to the audio.
+                await this.recordingProcessor.processStreamingResult(
+                    result,
+                    activeFile,
+                    activeView.editor.getCursor(),
+                    audioFilePath ?? undefined
+                );
+            };
+            this.modalInstance.onTranscriptionFailed = async (audioFilePath: string, error: Error) => {
+                await this.recordingProcessor.insertRecordingFallback(
+                    audioFilePath,
+                    error.message,
+                    activeFile,
+                    activeView.editor.getCursor()
+                );
             };
             
             const originalOnClose = this.modalInstance.onClose?.bind(this.modalInstance);

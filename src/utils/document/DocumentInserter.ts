@@ -41,6 +41,31 @@ export class DocumentInserter {
     }
 
     /**
+     * Inserts a warning callout embedding a recording whose transcription failed. The audio
+     * was saved before transcription ran; this tells the user where it is and how to retry.
+     */
+    public async insertRecordingFallback(
+        audioFilePath: string,
+        errorMessage: string,
+        file: TFile,
+        position: EditorPosition
+    ): Promise<void> {
+        const reason = errorMessage
+            .split('\n')
+            .map(line => `>${line.trim()}`)
+            .join('\n');
+        const callout = [
+            '>[!warning]- Transcription failed',
+            `>![[${audioFilePath}]]`,
+            reason,
+            '>',
+            '>The recording was saved. Open the audio file and run the "Transcribe audio file" command to try again.',
+            ''
+        ].join('\n');
+        await this.insertAtPosition(callout + '\n', file, position);
+    }
+
+    /**
      * Checks if a format string uses Obsidian callout syntax
      */
     private isCalloutFormat(format: string): boolean {

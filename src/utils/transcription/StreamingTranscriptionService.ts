@@ -57,6 +57,16 @@ export class StreamingTranscriptionService {
             return false;
         }
 
+        this.enqueue(path, metadata);
+        return true;
+    }
+
+    /**
+     * Queues a segment that is already on disk (spilled by RecordingArchive, which keeps the
+     * file as the recording's durable copy). The service reads the file when the segment's
+     * turn comes but never deletes it: the archive owns the files' lifetime.
+     */
+    enqueue(path: string, metadata: ChunkMetadata): void {
         this.pending.push({ path, metadata });
 
         // Start processing if not already running
@@ -64,8 +74,6 @@ export class StreamingTranscriptionService {
             Logger.log('[StreamingTranscription] Starting processing...');
             this.processingPromise = this.startProcessing();
         }
-
-        return true;
     }
 
     private async startProcessing(): Promise<void> {
@@ -120,11 +128,10 @@ export class StreamingTranscriptionService {
                 } finally {
                     signal.removeEventListener('abort', propagateAbort);
                     this.chunksHandled++;
-                    // The file is deleted whether transcription succeeded or failed (a
-                    // failed segment is reported via the incomplete-transcript marker).
-                    // Bounded: a hung delete leaves the file for the load-time sweep
-                    // rather than stalling the drain.
-                    await Promise.race([this.store.remove(item.path), this.sleep(5_000)]);
+                    // The segment file is deliberately left in place: it is part of the
+                    // recording's durable copy until RecordingArchive has written the
+                    // whole recording to the vault (a failed segment is reported via the
+                    // incomplete-transcript marker, and its audio is still recoverable).
                 }
             }
         } finally {
@@ -267,11 +274,8 @@ export class StreamingTranscriptionService {
         this.processingPromise = null;
 
         // Segments still queued at this point were dropped (stall abort, or a wedged loop
-        // abandoned above). Count them honestly and release their files.
-        const dropped = this.pending.length;
-        for (const item of this.pending.splice(0)) {
-            await Promise.race([this.store.remove(item.path), this.sleep(2_000)]);
-        }
+        // abandoned above). Count them honestly; their files stay with the archive.
+        const dropped = this.pending.splice(0).length;
 
         const processedCount = this.processedChunks.size;
         const failed = this.failedChunks;
@@ -337,11 +341,8 @@ export class StreamingTranscriptionService {
     }
 
     private cleanup(): void {
-        // Release queued segment files before dropping their paths.
-        const leftovers = this.pending.splice(0);
-        for (const item of leftovers) {
-            void this.store.remove(item.path);
-        }
+        // Drop the queued paths only; the files belong to the recording archive.
+        this.pending = [];
         this.resultCompiler.clear();
         this.processedChunks.clear();
         this.isProcessing = false;

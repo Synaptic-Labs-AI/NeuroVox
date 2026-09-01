@@ -6,6 +6,9 @@ import NeuroVoxPlugin from '../main';
 import { StreamingTranscriptionService } from '../utils/transcription/StreamingTranscriptionService';
 import { splitWavBlob } from '../utils/audio/WavSplitter';
 import { VoiceActivityMonitor } from '../utils/audio/VoiceActivityMonitor';
+import { SegmentStore } from '../utils/audio/SegmentStore';
+import { RecordingArchive } from '../utils/audio/RecordingArchive';
+import { AudioFileManager } from '../utils/audio/AudioFileManager';
 import { ChunkMetadata } from '../types';
 
 interface TimerConfig {
@@ -27,6 +30,7 @@ export class TimerModal extends Modal {
     private isStopping: boolean = false;
     private currentState: RecordingState = 'inactive';
     private streamingService: StreamingTranscriptionService | null = null;
+    private archive: RecordingArchive | null = null;
     private chunkIndex: number = 0;
     private recordingStartTime: number = 0;
     private segmentIntervalId: number | null = null;
@@ -52,7 +56,17 @@ export class TimerModal extends Modal {
 
     private readonly CONFIG: TimerConfig;
 
-    public onStop: (result: Blob | string) => void | Promise<void>;
+    /**
+     * Called with the finished transcript and the vault path of the saved recording (null
+     * only if the audio could not be written to the vault).
+     */
+    public onStop: (result: string, audioFilePath: string | null) => void | Promise<void>;
+
+    /**
+     * Called when transcription failed but the recording itself was saved, so the caller
+     * can leave a pointer to the audio where the transcript would have gone.
+     */
+    public onTranscriptionFailed?: (audioFilePath: string, error: Error) => void | Promise<void>;
 
     constructor(private plugin: NeuroVoxPlugin) {
         super(plugin.app);
@@ -221,16 +235,25 @@ export class TimerModal extends Modal {
                 this.recordingManager.resume();
                 this.resumeTimer();
             } else {
-                // Initialize streaming service
-                if (!this.streamingService) {
-                    // Segments are spilled to disk as they rotate, so no memory-pressure
-                    // callback is needed; queued audio no longer lives in RAM.
-                    this.streamingService = new StreamingTranscriptionService(this.plugin);
-                }
-
                 this.recordingStartTime = Date.now();
                 this.chunkIndex = 0;
                 this.segmentStartSeconds = 0;
+
+                // Each recording gets its own segment directory. The segment files are the
+                // recording's durable copy until the archive has joined them into one audio
+                // file in the vault, and a per-recording directory is what lets a crashed
+                // recording be recovered on the next load without colliding with the next one.
+                if (!this.streamingService) {
+                    const startedAt = new Date(this.recordingStartTime);
+                    const store = new SegmentStore(
+                        this.plugin.app.vault.adapter,
+                        `${this.plugin.manifest.dir}/segments-tmp/rec-${startedAt.toISOString().replace(/[:.]/g, '-')}`
+                    );
+                    this.archive = new RecordingArchive(store, new AudioFileManager(this.plugin), startedAt);
+                    // Segments are spilled to disk as they rotate, so no memory-pressure
+                    // callback is needed; queued audio no longer lives in RAM.
+                    this.streamingService = new StreamingTranscriptionService(this.plugin, undefined, store);
+                }
 
                 // StereoAudioRecorder does not emit timeSlice chunks, so instead of relying on
                 // onDataAvailable we rotate the recorder ourselves (see maybeRotate/rotateSegment).
@@ -325,12 +348,13 @@ export class TimerModal extends Modal {
     }
 
     /**
-     * Feeds a recording segment into the streaming service for transcription. Uses the queue
-     * (which serializes and frees blobs); on backpressure it transcribes directly to avoid
-     * dropping audio.
+     * Archives a recording segment and feeds it to the streaming service for transcription.
+     * The archive spills the blob to disk first (that file is the segment's durable copy,
+     * and the queue reads from it); if the spill fails, the segment is kept in memory by the
+     * archive and transcribed directly so no audio is dropped either way.
      */
     private async feedSegment(blob: Blob, startSeconds: number, endSeconds: number): Promise<void> {
-        if (!this.streamingService || !blob || blob.size === 0) return;
+        if (!this.streamingService || !this.archive || !blob || blob.size === 0) return;
 
         const metadata: ChunkMetadata = {
             id: `segment_${this.chunkIndex}`,
@@ -341,8 +365,10 @@ export class TimerModal extends Modal {
         };
         this.chunkIndex++;
 
-        const added = await this.streamingService.addChunk(blob, metadata);
-        if (!added) {
+        const path = await this.archive.addSegment(blob);
+        if (path) {
+            this.streamingService.enqueue(path, metadata);
+        } else {
             await this.streamingService.transcribeFinalBlob(blob, metadata);
         }
     }
@@ -385,6 +411,11 @@ export class TimerModal extends Modal {
         this.currentState = 'stopped';
         this.ui.showProcessing('transcribing');
 
+        let savedPath: string | null = null;
+        // Set once the transcript reaches onStop: a failure after that point is a note
+        // write problem (already rescued to the clipboard downstream), not a lost transcript.
+        let transcriptHandedOff = false;
+
         try {
             this.stopRotationMonitor();
 
@@ -402,7 +433,7 @@ export class TimerModal extends Modal {
             const tailEnd = this.seconds;
             const finalBlob = await this.recordingManager.stop();
 
-            if (!this.streamingService) {
+            if (!this.streamingService || !this.archive) {
                 throw new Error('Streaming service not initialized');
             }
 
@@ -415,16 +446,26 @@ export class TimerModal extends Modal {
                     // Tail audio recorded since the last rotation. Skip near-empty tails
                     // (stop pressed right after a rotation): providers reject sub-0.1s
                     // audio with HTTP 400, which would falsely flag the transcript as
-                    // incomplete over a fraction of a second of silence.
+                    // incomplete over a fraction of a second of silence. The tail is
+                    // archived regardless so the saved file holds the whole recording.
                     if (finalBlob.size >= this.MIN_TAIL_BYTES) {
                         await this.feedSegment(finalBlob, tailStart, tailEnd);
+                    } else {
+                        await this.archive.addSegment(finalBlob);
                     }
                 } else {
                     // Recording was shorter than one segment, so no rotation occurred:
-                    // transcribe the whole blob (split as a safety net if it is unexpectedly long).
+                    // archive the whole blob, then transcribe it (split as a safety net if
+                    // it is unexpectedly long).
+                    await this.archive.addSegment(finalBlob);
                     await this.transcribeFinalRecording(finalBlob);
                 }
             }
+
+            // Write the recording to the vault BEFORE waiting on transcription. From here
+            // on, nothing that goes wrong (provider errors, timeouts, a failed note write)
+            // can lose the audio: it exists as a file the user can re-process.
+            savedPath = await this.persistRecording();
 
             // Get transcription result from streaming service
             const result = await this.streamingService.finishProcessing();
@@ -435,8 +476,9 @@ export class TimerModal extends Modal {
 
             // Keep the modal visible while post-processing and note insertion complete.
             this.ui.showProcessing('processing');
+            transcriptHandedOff = true;
             if (this.onStop) {
-                await this.onStop(result);
+                await this.onStop(result, savedPath);
             }
 
             this.ui.showComplete();
@@ -445,7 +487,42 @@ export class TimerModal extends Modal {
             this.cleanup();
             super.close();
         } catch (error) {
+            // If the failure hit before the recording was written (e.g. the recorder's own
+            // stop threw), make one more attempt now: the archived segments are still here.
+            if (!savedPath && this.archive?.hasAudio()) {
+                savedPath = await this.persistRecording();
+            }
+            if (savedPath && !transcriptHandedOff) {
+                // Transcription failed, but the audio is safe. Say where it is and leave a
+                // pointer in the note so the user can retry without hunting for the file.
+                const err = error instanceof Error ? error : new Error(String(error));
+                new Notice(`Recording saved to ${savedPath}. Open it and run "Transcribe audio file" to retry.`, 15000);
+                try {
+                    await this.onTranscriptionFailed?.(savedPath, err);
+                } catch (insertError) {
+                    console.error('[TimerModal] Could not add the saved-recording note:', insertError);
+                }
+            }
             this.handleError('Failed to finish recording', error);
+        }
+    }
+
+    /**
+     * Joins the archived segments into one audio file in the recordings folder. A failure
+     * here is reported but does not abort the stop flow: transcription still runs, and the
+     * segment files stay on disk so the recording is recovered on the next plugin load.
+     */
+    private async persistRecording(): Promise<string | null> {
+        if (!this.archive) return null;
+        try {
+            const path = await this.archive.finalize();
+            Logger.log('[TimerModal] Recording saved to', path);
+            return path;
+        } catch (error) {
+            console.error('[TimerModal] Failed to save recording to the vault:', error);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            new Notice(`Could not save the recording audio (${message}). Its segments were kept and will be recovered the next time NeuroVox loads.`, 15000);
+            return null;
         }
     }
 
@@ -548,6 +625,13 @@ export class TimerModal extends Modal {
             if (this.streamingService) {
                 this.streamingService.abort();
                 this.streamingService = null;
+            }
+
+            // Release the segment files only if the recording reached the vault; otherwise
+            // they stay for load-time recovery.
+            if (this.archive) {
+                void this.archive.dispose();
+                this.archive = null;
             }
         } catch {
             // Cleanup failures here are non-fatal; proceed to reset state below.
