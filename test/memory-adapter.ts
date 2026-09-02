@@ -28,10 +28,24 @@ export class MemoryAdapter implements SegmentStoreAdapter {
     async remove(path: string): Promise<void> {
         if (!this.files.delete(path)) throw new Error(`no such file: ${path}`);
     }
+    async rmdir(path: string, recursive: boolean): Promise<void> {
+        if (!this.dirs.has(path)) throw new Error(`no such dir: ${path}`);
+        const children = [...this.files.keys()].filter(f => f.startsWith(`${path}/`));
+        const subdirs = [...this.dirs].filter(d => d.startsWith(`${path}/`));
+        if (!recursive && (children.length > 0 || subdirs.length > 0)) {
+            throw new Error(`dir not empty: ${path}`);
+        }
+        children.forEach(f => this.files.delete(f));
+        subdirs.forEach(d => this.dirs.delete(d));
+        this.dirs.delete(path);
+    }
+    /** Lists direct children only, like Obsidian's DataAdapter.list. */
     async list(path: string): Promise<{ files: string[]; folders: string[] }> {
+        const isDirectChild = (p: string) =>
+            p.startsWith(`${path}/`) && !p.slice(path.length + 1).includes('/');
         return {
-            files: [...this.files.keys()].filter(f => f.startsWith(`${path}/`)),
-            folders: []
+            files: [...this.files.keys()].filter(isDirectChild),
+            folders: [...this.dirs].filter(isDirectChild)
         };
     }
 }

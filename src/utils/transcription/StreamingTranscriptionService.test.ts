@@ -3,8 +3,9 @@
 // Tests for the streaming transcription pipeline with the disk-spill queue:
 //  - stop-time drain: every queued segment is transcribed, none dropped (the
 //    1.1.4 truncation regression);
-//  - spill lifecycle: queued audio lives on disk, not in memory, and every
-//    temp file is deleted once handled;
+//  - spill lifecycle: queued audio lives on disk, not in memory, and the
+//    segment files are left in place for the recording archive (never deleted
+//    by the transcription loop, which would lose audio on a failed segment);
 //  - per-segment timeout: one hung provider request cannot stall the drain or
 //    silently discard the segments behind it;
 //  - honest partial results: failed/dropped segments are called out in the
@@ -142,7 +143,7 @@ describe('StreamingTranscriptionService drain-on-stop', () => {
 });
 
 describe('StreamingTranscriptionService disk spill', () => {
-    it('spills queued segments to disk and deletes every file once drained', async () => {
+    it('spills queued segments to disk and leaves every file in place after the drain', async () => {
         const { service, adapter } = await makeService(async i => {
             await delay(40);
             return `text-${i}`;
@@ -157,19 +158,33 @@ describe('StreamingTranscriptionService disk spill', () => {
 
         await service.finishProcessing();
 
-        assert.equal(adapter.files.size, 0, 'all segment temp files must be deleted after the drain');
+        // The files are the recording's durable copy; RecordingArchive removes them
+        // only after the whole recording has been written to the vault.
+        assert.equal(adapter.files.size, 4, 'segment files must survive the drain for the archive');
     });
 
-    it('deletes the temp file even when a segment fails to transcribe', async () => {
+    it('keeps the segment file when a segment fails to transcribe, so the audio is not lost', async () => {
         const { service, adapter } = await makeService(async () => {
             await delay(10);
             throw new Error('boom');
         });
 
         await service.addChunk(new Blob(['aaaa']), makeMetadata(0));
-        await service.finishProcessing().catch(() => { /* all-fail throws; files must still be cleaned */ });
+        await service.finishProcessing().catch(() => { /* all-fail throws; file must survive */ });
 
-        assert.equal(adapter.files.size, 0);
+        assert.equal(adapter.files.size, 1);
+    });
+
+    it('transcribes a segment enqueued by path without touching its file', async () => {
+        const { service, adapter } = await makeService(async (_i, buf) => `text-${new TextDecoder().decode(buf)}`);
+        const store = new SegmentStore(adapter, 'plugins/neurovox/segments-tmp/rec-1');
+        const path = await store.save('segment_0', new Blob(['cccc']));
+
+        service.enqueue(path, makeMetadata(0));
+        const result = await service.finishProcessing();
+
+        assert.match(result, /text-cccc/);
+        assert.ok(adapter.files.has(path), 'the archive-owned file must still exist');
     });
 
     it('reports a rejected segment when the disk write fails, so the caller can transcribe it directly', async () => {
@@ -185,7 +200,7 @@ describe('StreamingTranscriptionService disk spill', () => {
         assert.match(result, /direct-0/);
     });
 
-    it('abort removes queued segment files', async () => {
+    it('abort drops the queue but leaves the segment files for the archive', async () => {
         const { service, adapter } = await makeService(async () => {
             await delay(5_000); // effectively never within this test
             return 'unreachable';
@@ -194,13 +209,13 @@ describe('StreamingTranscriptionService disk spill', () => {
         for (let i = 0; i < 3; i++) {
             await service.addChunk(new Blob(['aaaa']), makeMetadata(i));
         }
-        assert.ok(adapter.files.size >= 2);
+        assert.equal(adapter.files.size, 3);
 
         service.abort();
         await delay(50);
 
-        // The in-flight segment's file is released by the loop; the queued ones by abort().
-        assert.ok(adapter.files.size <= 1, `expected queued files removed, found ${adapter.files.size}`);
+        assert.equal(service.getStats().queueSize, 0, 'abort must empty the queue');
+        assert.equal(adapter.files.size, 3, 'abort must not delete audio that may not be in the vault yet');
     });
 });
 
@@ -318,7 +333,7 @@ describe('StreamingTranscriptionService reuse', () => {
         assert.match(result, /text-1/, 'segments from the second run must be transcribed');
         assert.doesNotMatch(result, /text-0/, "the first recording's transcript must not leak into the second");
         assert.match(result, /Segments: 1/);
-        assert.equal(adapter.files.size, 0);
+        assert.equal(adapter.files.size, 2, 'both runs’ segment files remain for their archives');
     });
 
     it('does not carry failures or errors from one recording into the next', async () => {

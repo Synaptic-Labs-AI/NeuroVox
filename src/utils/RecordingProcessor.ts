@@ -1,7 +1,8 @@
 import { Notice, TFile, EditorPosition } from 'obsidian';
 import NeuroVoxPlugin from '../main';
 import { AudioProcessor } from './audio/AudioProcessor';
-import { TranscriptionService } from './transcription/TranscriptionService';
+import { TranscriptionService, TranscriptionResult } from './transcription/TranscriptionService';
+import { WavSegment } from './audio/WavSplitter';
 import { DocumentInserter, InsertContent } from './document/DocumentInserter';
 import { ProcessingState } from './state/ProcessingState';
 import { AIAdapter, AIProvider } from '../adapters/AIAdapter';
@@ -77,10 +78,15 @@ export class RecordingProcessor {
 
             // Transcribe the audio
             this.processingState.startStep('Transcription');
-            const audioBuffer = await audioResult.audioBlob.arrayBuffer();
-            const result = await this.executeWithRetry(() => 
-                this.transcriptionService.transcribeContent(audioBuffer)
-            );
+            let result: TranscriptionResult;
+            if (audioResult.segments) {
+                result = await this.transcribeSegments(audioResult.segments);
+            } else {
+                const audioBuffer = await audioResult.audioBlob.arrayBuffer();
+                result = await this.executeWithRetry(() =>
+                    this.transcriptionService.transcribeContent(audioBuffer)
+                );
+            }
             this.processingState.completeStep();
 
             if (result.postProcessingError) {
@@ -116,7 +122,8 @@ export class RecordingProcessor {
     public async processStreamingResult(
         transcriptionResult: string,
         activeFile: TFile,
-        cursorPosition: EditorPosition
+        cursorPosition: EditorPosition,
+        audioFilePath?: string
     ): Promise<void> {
         if (this.processingState.getIsProcessing()) {
             throw new Error('Recording is already in progress.');
@@ -153,8 +160,8 @@ export class RecordingProcessor {
                 {
                     transcription: transcriptionResult,
                     postProcessing,
-                    postProcessingError
-                    // No audioFilePath for streaming mode
+                    postProcessingError,
+                    audioFilePath
                 },
                 activeFile,
                 cursorPosition
@@ -168,6 +175,56 @@ export class RecordingProcessor {
         } finally {
             this.processingState.setIsProcessing(false);
         }
+    }
+
+    /**
+     * Transcribes a recording that was too large for a single provider request, one segment
+     * at a time, then post-processes the assembled transcript once. Any segment failing
+     * (after retries) fails the run: the audio file is untouched, so the user can retry.
+     */
+    private async transcribeSegments(segments: WavSegment[]): Promise<TranscriptionResult> {
+        const texts: string[] = [];
+        for (let i = 0; i < segments.length; i++) {
+            this.processingState.updateProgress(i, segments.length);
+            const buffer = await segments[i].blob.arrayBuffer();
+            const text = await this.executeWithRetry(() =>
+                this.transcriptionService.transcribeAudioOnly(buffer)
+            );
+            if (text.trim()) texts.push(text.trim());
+        }
+        this.processingState.updateProgress(segments.length, segments.length);
+
+        const transcription = texts.join('\n\n');
+        if (!transcription) {
+            throw new Error('No transcription result received');
+        }
+        if (!this.plugin.settings.generatePostProcessing) {
+            return { transcription };
+        }
+        try {
+            const postProcessing = await this.executeWithRetry(() => this.generatePostProcessing(transcription));
+            return { transcription, postProcessing };
+        } catch (error: unknown) {
+            // Same contract as TranscriptionService.transcribeContent: report the failure
+            // alongside the transcript, never instead of it.
+            return {
+                transcription,
+                postProcessingError: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+    }
+
+    /**
+     * Leaves a pointer to a saved recording in the note when its transcription failed, so
+     * the audio is one click away from a retry rather than buried in the recordings folder.
+     */
+    public async insertRecordingFallback(
+        audioFilePath: string,
+        errorMessage: string,
+        activeFile: TFile,
+        cursorPosition: EditorPosition
+    ): Promise<void> {
+        await this.documentInserter.insertRecordingFallback(audioFilePath, errorMessage, activeFile, cursorPosition);
     }
 
     /**
