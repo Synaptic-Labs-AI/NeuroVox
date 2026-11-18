@@ -43,6 +43,8 @@ export interface AIModel {
 
 export const AIModels: Record<AIProvider, AIModel[]> = {
     [AIProvider.OpenAI]: [
+        { id: 'gpt-6.2-sol', name: 'GPT-6.2 Sol', category: 'language', maxTokens: 1050000 },
+        { id: 'gpt-6.2-astra', name: 'GPT-6.2 Astra', category: 'language', maxTokens: 1050000 },
         { id: 'gpt-transcribe', name: 'GPT Transcribe (recommended)', category: 'transcription' },
         { id: 'gpt-4o-transcribe', name: 'GPT-4o Transcribe', category: 'transcription' },
         { id: 'gpt-4o-mini-transcribe', name: 'GPT-4o Mini Transcribe', category: 'transcription' },
@@ -79,6 +81,9 @@ export const AIModels: Record<AIProvider, AIModel[]> = {
     ],
     [AIProvider.OpenRouter]: [
         // Fallback list only — replaced at runtime by fetchLanguageModels() (the live /models catalog).
+        { id: 'openai/gpt-6.2-sol', name: 'GPT-6.2 Sol', category: 'language', maxTokens: 1050000 },
+        { id: 'openai/gpt-6.2-astra', name: 'GPT-6.2 Astra', category: 'language', maxTokens: 1050000 },
+        { id: 'google/gemini-4-hydrogen', name: 'Gemini 4 Hydrogen', category: 'language', maxTokens: 1048576 },
         { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', category: 'language', maxTokens: 200000 },
         { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini', category: 'language', maxTokens: 400000 },
         { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash', category: 'language', maxTokens: 1000000 },
