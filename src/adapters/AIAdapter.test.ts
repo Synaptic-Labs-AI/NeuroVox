@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 
 import {
     AIAdapter,
+    AIModels,
     AIProvider,
     adjustChatBodyForParameterError,
     classifyModelId,
@@ -321,4 +322,20 @@ describe('mergeModelCatalogs', () => {
     it('keeps static models the live catalog did not list', () => {
         assert.ok(mergeModelCatalogs(live, fallback).some(m => m.id === 'gpt-4o'));
     });
+});
+
+// Discovery failure must still leave newly released post-processing models selectable.
+describe('current language model fallbacks', () => {
+    for (const [provider, id, window] of [
+        [AIProvider.OpenAI, 'gpt-6.2-sol', 1050000],
+        [AIProvider.OpenAI, 'gpt-6.2-astra', 1050000],
+        [AIProvider.OpenRouter, 'openai/gpt-6.2-sol', 1050000],
+        [AIProvider.OpenRouter, 'openai/gpt-6.2-astra', 1050000],
+        [AIProvider.OpenRouter, 'google/gemini-4-hydrogen', 1048576],
+    ] as const) {
+        it(`keeps ${provider}/${id} available when discovery is unavailable`, () => {
+            assert.ok(AIModels[provider].some(model => model.id === id && model.category === 'language' && model.maxTokens === window));
+            assert.equal(classifyModelId(id), 'language');
+        });
+    }
 });
