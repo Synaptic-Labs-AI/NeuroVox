@@ -84,7 +84,9 @@ export const AIModels: Record<AIProvider, AIModel[]> = {
         { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash', category: 'language', maxTokens: 1000000 },
     ],
     [AIProvider.AssemblyAI]: [
-        { id: 'universal-3-pro', name: 'Universal-3 Pro (best accuracy)', category: 'transcription' },
+        { id: 'assemblyai-stt-3-7', name: 'AssemblyAI STT 3.7 (recommended)', category: 'transcription' },
+        { id: 'universal-3-5-pro', name: 'Universal-3.5 Pro (legacy)', category: 'transcription' },
+        { id: 'universal-3-pro', name: 'Universal-3 Pro (legacy)', category: 'transcription' },
         { id: 'universal-2', name: 'Universal-2', category: 'transcription' },
     ],
 };

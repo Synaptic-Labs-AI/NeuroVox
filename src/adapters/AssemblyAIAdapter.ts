@@ -11,7 +11,7 @@ import {
  *
  * AssemblyAI uses an asynchronous flow rather than a single multipart request:
  *   1. Upload raw audio bytes            -> POST /v2/upload   -> { upload_url }
- *   2. Create a transcript job           -> POST /v2/transcript { audio_url, speech_model }
+ *   2. Create a transcript job           -> POST /v2/transcript { audio_url, speech_models }
  *   3. Poll until the job completes      -> GET  /v2/transcript/{id}
  *
  * It also authenticates with a bare `Authorization: <key>` header (no `Bearer` prefix),
@@ -99,9 +99,9 @@ export class AssemblyAIAdapter extends AIAdapter {
                 { 'Content-Type': 'application/json' },
                 JSON.stringify({
                     audio_url: upload.upload_url,
-                    // `speech_model` (singular) is deprecated; AssemblyAI now takes a
-                    // `speech_models` fallback array of universal-3-pro / universal-2.
-                    speech_models: [model || 'universal-3-pro']
+                    speech_models: [model || 'assemblyai-stt-3-7'],
+                    // STT 3.7 keeps fillers by default; preserve clean note transcripts.
+                    disfluencies: !model || model === 'assemblyai-stt-3-7' ? false : undefined
                 })
             );
 
