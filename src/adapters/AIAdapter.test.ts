@@ -331,6 +331,7 @@ describe('current language model fallbacks', () => {
         [AIProvider.OpenAI, 'gpt-6.2-astra', 1050000],
         [AIProvider.OpenRouter, 'openai/gpt-6.2-sol', 1050000],
         [AIProvider.OpenRouter, 'openai/gpt-6.2-astra', 1050000],
+        [AIProvider.OpenRouter, 'google/gemini-4-neon', 1048576],
         [AIProvider.OpenRouter, 'google/gemini-4-hydrogen', 1048576],
     ] as const) {
         it(`keeps ${provider}/${id} available when discovery is unavailable`, () => {
